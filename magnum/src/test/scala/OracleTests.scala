@@ -2,7 +2,7 @@ import com.augustnagro.magnum.*
 import com.augustnagro.magnum.UUIDCodec.VarCharUUIDCodec
 import com.dimafeng.testcontainers.OracleContainer
 import com.dimafeng.testcontainers.munit.fixtures.TestContainersFixtures
-import munit.{AnyFixture, FunSuite}
+import munit.{AnyFixture, FunSuite, Tag}
 import oracle.jdbc.datasource.impl.OracleDataSource
 import org.testcontainers.utility.DockerImageName
 import shared.*
@@ -13,6 +13,12 @@ import scala.util.Using
 
 @munit.IgnoreSuite
 class OracleTests extends FunSuite, TestContainersFixtures:
+
+  override def munitTestTransforms: List[TestTransform] =
+    super.munitTestTransforms :+ new TestTransform(
+      "Slow",
+      test => test.withTags(test.tags + new Tag("Slow"))
+    )
 
   given DbCodec[Boolean] =
     DbCodec[String].biMap(_ == "Y", b => if b then "Y" else "N")

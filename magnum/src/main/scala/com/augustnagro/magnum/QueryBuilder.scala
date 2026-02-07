@@ -6,29 +6,58 @@ sealed trait HasRoot extends QBState
 class QueryBuilder[S <: QBState, E] private (
     private val meta: TableMeta[E],
     private val codec: DbCodec[E],
-    private val predicates: Vector[Predicate],
+    private val rootPredicate: Option[Predicate],
     private val orderEntries: Vector[(Col[?], SortOrder)],
     private val limitOpt: Option[Int],
     private val offsetOpt: Option[Long]
 ):
 
+  private def addAnd(pred: Predicate): Option[Predicate] =
+    Some(rootPredicate match
+      case None                          => pred
+      case Some(Predicate.And(children)) => Predicate.And(children :+ pred)
+      case Some(other)                   => Predicate.And(Vector(other, pred))
+    )
+
+  private def addOr(pred: Predicate): Option[Predicate] =
+    Some(rootPredicate match
+      case None                         => pred
+      case Some(Predicate.Or(children)) => Predicate.Or(children :+ pred)
+      case Some(other)                  => Predicate.Or(Vector(other, pred))
+    )
+
   def where(frag: Frag): QueryBuilder[HasRoot, E] =
-    new QueryBuilder(meta, codec, predicates :+ Predicate.Leaf(frag), orderEntries, limitOpt, offsetOpt)
+    new QueryBuilder(meta, codec, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
+
+  def orWhere(frag: Frag): QueryBuilder[HasRoot, E] =
+    new QueryBuilder(meta, codec, addOr(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
+
+  def whereGroup(
+      f: PredicateGroupBuilder => PredicateGroupBuilder
+  ): QueryBuilder[HasRoot, E] =
+    new QueryBuilder(meta, codec, addAnd(f(PredicateGroupBuilder.empty).build), orderEntries, limitOpt, offsetOpt)
+
+  def orWhereGroup(
+      f: PredicateGroupBuilder => PredicateGroupBuilder
+  ): QueryBuilder[HasRoot, E] =
+    new QueryBuilder(meta, codec, addOr(f(PredicateGroupBuilder.empty).build), orderEntries, limitOpt, offsetOpt)
 
   def orderBy(col: Col[?], order: SortOrder = SortOrder.Asc): QueryBuilder[S, E] =
-    new QueryBuilder(meta, codec, predicates, orderEntries :+ (col, order), limitOpt, offsetOpt)
+    new QueryBuilder(meta, codec, rootPredicate, orderEntries :+ (col, order), limitOpt, offsetOpt)
 
   def limit(n: Int): QueryBuilder[S, E] =
-    new QueryBuilder(meta, codec, predicates, orderEntries, Some(n), offsetOpt)
+    new QueryBuilder(meta, codec, rootPredicate, orderEntries, Some(n), offsetOpt)
 
   def offset(n: Long): QueryBuilder[S, E] =
-    new QueryBuilder(meta, codec, predicates, orderEntries, limitOpt, Some(n))
+    new QueryBuilder(meta, codec, rootPredicate, orderEntries, limitOpt, Some(n))
 
   private def buildWhere: (String, Seq[Any], FragWriter) =
-    if predicates.isEmpty then ("", Seq.empty, FragWriter.empty)
-    else
-      val whereFrag = Predicate.And(predicates).toFrag
-      (" WHERE " + whereFrag.sqlString, whereFrag.params, whereFrag.writer)
+    rootPredicate match
+      case None => ("", Seq.empty, FragWriter.empty)
+      case Some(pred) =>
+        val frag = pred.toFrag
+        if frag.sqlString.isEmpty then ("", Seq.empty, FragWriter.empty)
+        else (" WHERE " + frag.sqlString, frag.params, frag.writer)
 
   def build: Frag =
     val selectCols = meta.columns.map(_.sqlName).mkString(", ")
@@ -84,4 +113,4 @@ object QueryBuilder:
       meta: TableMeta[E],
       codec: DbCodec[E]
   ): QueryBuilder[HasRoot, E] =
-    new QueryBuilder(meta, codec, Vector.empty, Vector.empty, None, None)
+    new QueryBuilder(meta, codec, None, Vector.empty, None, None)

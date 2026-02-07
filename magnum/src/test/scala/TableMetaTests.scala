@@ -1,7 +1,13 @@
 import com.augustnagro.magnum.*
-import munit.FunSuite
+import munit.{FunSuite, Tag}
 
 class TableMetaTests extends FunSuite:
+
+  override def munitTestTransforms: List[TestTransform] =
+    super.munitTestTransforms :+ new TestTransform(
+      "QB",
+      test => test.withTags(test.tags + new Tag("QB"))
+    )
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
   case class User(@Id id: Long, firstName: String, age: Int)

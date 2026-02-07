@@ -2,7 +2,7 @@ import com.augustnagro.magnum.*
 import com.clickhouse.jdbc.ClickHouseDataSource
 import com.dimafeng.testcontainers.ClickHouseContainer
 import com.dimafeng.testcontainers.munit.fixtures.TestContainersFixtures
-import munit.{AnyFixture, FunSuite, Location}
+import munit.{AnyFixture, FunSuite, Location, Tag}
 import org.testcontainers.utility.DockerImageName
 import shared.*
 
@@ -11,6 +11,12 @@ import java.util.UUID
 import scala.util.Using
 
 class ClickHouseTests extends FunSuite, TestContainersFixtures:
+
+  override def munitTestTransforms: List[TestTransform] =
+    super.munitTestTransforms :+ new TestTransform(
+      "Slow",
+      test => test.withTags(test.tags + new Tag("Slow"))
+    )
 
   sharedTests(this, ClickhouseDbType, xa)
 

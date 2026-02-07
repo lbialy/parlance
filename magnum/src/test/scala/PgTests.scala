@@ -1,7 +1,7 @@
 import com.augustnagro.magnum.*
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.fixtures.TestContainersFixtures
-import munit.{AnyFixture, FunSuite, Location}
+import munit.{AnyFixture, FunSuite, Location, Tag}
 import org.postgresql.ds.PGSimpleDataSource
 import org.testcontainers.utility.DockerImageName
 import shared.*
@@ -11,6 +11,12 @@ import scala.util.Using
 import scala.util.Using.Manager
 
 class PgTests extends FunSuite, TestContainersFixtures:
+
+  override def munitTestTransforms: List[TestTransform] =
+    super.munitTestTransforms :+ new TestTransform(
+      "Slow",
+      test => test.withTags(test.tags + new Tag("Slow"))
+    )
 
   sharedTests(this, PostgresDbType, xa)
 

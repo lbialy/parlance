@@ -1,7 +1,13 @@
 import com.augustnagro.magnum.*
-import munit.FunSuite
+import munit.{FunSuite, Tag}
 
 class ColTests extends FunSuite:
+
+  override def munitTestTransforms: List[TestTransform] =
+    super.munitTestTransforms :+ new TestTransform(
+      "QB",
+      test => test.withTags(test.tags + new Tag("QB"))
+    )
 
   test("Col has correct scalaName and sqlName"):
     val col = Col[String]("firstName", "first_name")

@@ -1,5 +1,5 @@
 import com.augustnagro.magnum.*
-import munit.FunSuite
+import munit.{FunSuite, Tag}
 import org.h2.jdbcx.JdbcDataSource
 
 import java.nio.file.{Files, Path}
@@ -10,6 +10,12 @@ case class QbUser(@Id id: Long, firstName: Option[String], age: Int)
     derives DbCodec, TableMeta
 
 class QueryBuilderBasicTests extends FunSuite:
+
+  override def munitTestTransforms: List[TestTransform] =
+    super.munitTestTransforms :+ new TestTransform(
+      "QB",
+      test => test.withTags(test.tags + new Tag("QB"))
+    )
 
   lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
 
