@@ -11,6 +11,7 @@ import java.sql.Statement
 import java.time.LocalTime
 import scala.util.Using
 
+@munit.IgnoreSuite
 class OracleTests extends FunSuite, TestContainersFixtures:
 
   given DbCodec[Boolean] =

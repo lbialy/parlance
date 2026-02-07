@@ -4,31 +4,37 @@
 
 Yet another database client for Scala. No dependencies, high productivity.
 
-* [Installing](#installing)
-* [ScalaDoc](#scaladoc)
-* [Documentation](#documentation)
-  * [`connect` creates a database connection](#connect-creates-a-database-connection)
-  * [`transact` creates a database transaction](#transact-creates-a-database-transaction)
-  * [Type-safe Transaction & Connection Management](#type-safe-transaction--connection-management)
-  * [Customizing Transactions](#customizing-transactions)
-  * [Sql Interpolator, Frag, Query, Update, Returning](#sql-interpolator-frag-query-and-update)
-  * [Batch Updates](#batch-updates)
-  * [Immutable Repositories](#immutable-repositories)
-  * [Repositories](#repositories)
-  * [Database generated columns](#database-generated-columns)
-  * [Specifications](#specifications)
-  * [Scala 3 Enum & NewType Support](#scala-3-enum--newtype-support)
-  * [`DbCodec`: Typeclass for JDBC reading & writing](#dbcodec-typeclass-for-jdbc-reading--writing)
-  * [Future-Proof Queries](#future-proof-queries)
-  * [Splicing Literal Values into Frags](#splicing-literal-values-into-frags)
-  * [Postgres Module](#postgres-module)
-  * [Logging](#logging-sql-queries)
-* [Integrations](#integrations)
-  * [ZIO](#zio) 
-* [Motivation](#motivation)
-* [Feature List And Database Support](#feature-list)
-* [Talks and Blogs](#talks-and-blogs)
-* [Frequently Asked Questions](#frequently-asked-questions)
+- [Magnum](#magnum)
+- [Installing](#installing)
+- [ScalaDoc](#scaladoc)
+- [Documentation](#documentation)
+  - [`connect` creates a database connection.](#connect-creates-a-database-connection)
+  - [`transact` creates a database transaction.](#transact-creates-a-database-transaction)
+  - [Type-safe Transaction \& Connection Management](#type-safe-transaction--connection-management)
+  - [Customizing transactions](#customizing-transactions)
+  - [Sql Interpolator, Frag, Query, and Update](#sql-interpolator-frag-query-and-update)
+  - [Batch Updates](#batch-updates)
+  - [Immutable Repositories](#immutable-repositories)
+  - [Repositories](#repositories)
+  - [Database generated columns](#database-generated-columns)
+  - [Specifications](#specifications)
+  - [Scala 3 Enum \& NewType Support](#scala-3-enum--newtype-support)
+  - [`DbCodec`: Typeclass for JDBC reading \& writing](#dbcodec-typeclass-for-jdbc-reading--writing)
+  - [Defining your own DbCodecs](#defining-your-own-dbcodecs)
+  - [Future-Proof Queries](#future-proof-queries)
+  - [Splicing Literal Values into Frags](#splicing-literal-values-into-frags)
+  - [Postgres Module](#postgres-module)
+    - [Arrays of Enums](#arrays-of-enums)
+  - [Logging SQL queries](#logging-sql-queries)
+    - [Logging Slow Queries](#logging-slow-queries)
+- [Motivation](#motivation)
+- [Feature List](#feature-list)
+- [Developing](#developing)
+- [Talks and Blogs](#talks-and-blogs)
+- [Frequently Asked Questions](#frequently-asked-questions)
+    - [Does Magnum support nested entities like:](#does-magnum-support-nested-entities-like)
+    - [UUID DbCodec doesn't work for my database](#uuid-dbcodec-doesnt-work-for-my-database)
+- [Todo](#todo)
 
 ## Installing
 
@@ -542,22 +548,6 @@ Setting to TRACE will log SQL queries and their parameters.
 
 You can log slow queries by using the `Transactor` class in conjunction with `SqlLogger.logSlowQueries(FiniteDuration)`. See [Customizing Transactions](#customizing-transactions) for an example. You can also implement your own SqlLogger subclass as desired.
 
-## Integrations
-
-### ZIO
-
-Magnum provides a fine layer of integration with ZIO.    
-The `magnum-zio` module provides an implementation of the `connect` and `transact` utils that return a ZIO effect.
-
-To use the ZIO integration, add the following dependency:
-```scala
-"com.augustnagro" %% "magnumzio" % "x.x.x"
-```
-
-and import these utils in your code with:
-```scala
-import com.augustnagro.magnum.magzio.*
-```
 
 ## Motivation
 

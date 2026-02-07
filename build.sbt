@@ -45,7 +45,7 @@ val postgresDriverVersion = "42.7.4"
 
 lazy val root = project
   .in(file("."))
-  .aggregate(magnum, magnumPg, magnumZio)
+  .aggregate(magnum, magnumPg)
 
 lazy val magnum = project
   .in(file("magnum"))
@@ -82,20 +82,5 @@ lazy val magnumPg = project
       "io.circe" %% "circe-core" % circeVersion % Test,
       "io.circe" %% "circe-parser" % circeVersion % Test,
       "org.scala-lang.modules" %% "scala-xml" % "2.3.0" % Test
-    )
-  )
-
-lazy val magnumZio = project
-  .in(file("magnum-zio"))
-  .dependsOn(magnum)
-  .settings(
-    Test / fork := true,
-    publish / skip := false,
-    libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % "2.1.12" % Provided,
-      "org.scalameta" %% "munit" % munitVersion % Test,
-      "com.dimafeng" %% "testcontainers-scala-munit" % testcontainersVersion % Test,
-      "com.dimafeng" %% "testcontainers-scala-postgresql" % testcontainersVersion % Test,
-      "org.postgresql" % "postgresql" % postgresDriverVersion % Test
     )
   )
