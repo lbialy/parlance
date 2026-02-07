@@ -126,4 +126,71 @@ class JoinedQueryTests extends FunSuite:
       assertEquals(book.title, "Foundation")
       assertEquals(author.name, "Asimov")
 
+  // --- Phase 10: alias-qualified WHERE on joined tables ---
+
+  val b = Columns.of[JnBook]
+  val a = Columns.of[JnAuthor]
+
+  test("whereJoined with typed operator"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val results = qb.where(qb.joinedCol(a.name) === "Tolkien").run()
+      assertEquals(results.size, 2)
+      assert(results.forall(_._2.name == "Tolkien"))
+
+  test("whereRoot with typed operator"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val results = qb.where(qb.rootCol(b.title) === "Dune").run()
+      assertEquals(results.size, 1)
+      assertEquals(results.head._1.title, "Dune")
+      assertEquals(results.head._2.name, "Herbert")
+
+  test("combined root + joined where"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val results = qb
+        .where(qb.joinedCol(a.name) === "Tolkien")
+        .where(qb.rootCol(b.title) === "The Hobbit")
+        .run()
+      assertEquals(results.size, 1)
+      assertEquals(results.head._1.title, "The Hobbit")
+
+  test("ambiguous column with qualification"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val results = qb.where(qb.rootCol(b.id) === 5L).run()
+      assertEquals(results.size, 1)
+      assertEquals(results.head._1.title, "Dune")
+      // also test joinedCol on id
+      val results2 = qb.where(qb.joinedCol(a.id) === 1L).run()
+      assertEquals(results2.size, 2)
+      assert(results2.forall(_._2.name == "Tolkien"))
+
+  test("orderBy with BoundCol"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val results = qb.orderBy(qb.joinedCol(a.name)).run()
+      // Asimov < Herbert < Tolkien
+      assertEquals(results(0)._2.name, "Asimov")
+      assertEquals(results(1)._2.name, "Asimov")
+      assertEquals(results(2)._2.name, "Herbert")
+      assertEquals(results(3)._2.name, "Tolkien")
+      assertEquals(results(4)._2.name, "Tolkien")
+
+  test("build SQL shows qualified WHERE columns"):
+    val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+    val frag = qb
+      .where(qb.rootCol(b.title) === "Dune")
+      .where(qb.joinedCol(a.name) === "Tolkien")
+      .build
+    val sql = frag.sqlString
+    assert(sql.contains("t0.title = ?"), s"Expected t0.title = ? in: $sql")
+    assert(sql.contains("t1.name = ?"), s"Expected t1.name = ? in: $sql")
+
 end JoinedQueryTests

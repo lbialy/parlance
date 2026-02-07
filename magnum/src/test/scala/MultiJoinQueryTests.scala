@@ -1,0 +1,140 @@
+import com.augustnagro.magnum.*
+import munit.{FunSuite, Tag}
+import org.h2.jdbcx.JdbcDataSource
+
+import java.nio.file.{Files, Path}
+import scala.util.Using
+
+@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+case class MjCountry(@Id id: Long, name: String) derives DbCodec, TableMeta
+
+@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+case class MjPublisher(@Id id: Long, name: String) derives DbCodec, TableMeta
+
+@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+case class MjAuthor(@Id id: Long, name: String, countryId: Long)
+    derives DbCodec, TableMeta
+
+@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+case class MjBook(@Id id: Long, authorId: Long, publisherId: Long, title: String)
+    derives DbCodec, TableMeta
+
+class MultiJoinQueryTests extends FunSuite:
+
+  override def munitTestTransforms: List[TestTransform] =
+    super.munitTestTransforms :+ new TestTransform(
+      "QB",
+      test => test.withTags(test.tags + new Tag("QB"))
+    )
+
+  lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
+
+  def xa(): Transactor =
+    val ds = JdbcDataSource()
+    ds.setURL("jdbc:h2:" + h2DbPath)
+    ds.setUser("sa")
+    ds.setPassword("")
+    val ddl = Files.readString(
+      Path.of(getClass.getResource("/h2/qb-multi-join.sql").toURI)
+    )
+    Using.Manager: use =>
+      val con = use(ds.getConnection)
+      val stmt = use(con.createStatement)
+      stmt.execute(ddl)
+
+    Transactor(ds)
+
+  val bookAuthor = Relationship.belongsTo[MjBook, MjAuthor](_.authorId, _.id)
+  val authorCountry = Relationship.belongsTo[MjAuthor, MjCountry](_.countryId, _.id)
+  val bookPublisher = Relationship.belongsTo[MjBook, MjPublisher](_.publisherId, _.id)
+
+  val country = Columns.of[MjCountry]
+  val author = Columns.of[MjAuthor]
+  val book = Columns.of[MjBook]
+  val publisher = Columns.of[MjPublisher]
+
+  test("3-table linear join returns all tuples"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry).run()
+      assertEquals(results.size, 5)
+      // each result is (MjBook, MjAuthor, MjCountry)
+      val dune = results.find(_._1.title == "Dune")
+      assert(dune.isDefined)
+      assertEquals(dune.get._2.name, "Herbert")
+      assertEquals(dune.get._3.name, "USA")
+
+  test("WHERE on 3rd table"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry)
+      val results = qb.where(qb.col(2, country.name) === "UK").run()
+      assertEquals(results.size, 2)
+      assert(results.forall(_._2.name == "Tolkien"))
+      assert(results.forall(_._3.name == "UK"))
+
+  test("ORDER BY on 3rd table"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry)
+      val results = qb.orderBy(qb.col(2, country.name)).run()
+      // UK < USA — Tolkien's books first, then Asimov/Herbert
+      assertEquals(results(0)._3.name, "UK")
+      assertEquals(results(1)._3.name, "UK")
+      assertEquals(results(2)._3.name, "USA")
+
+  test("build SQL for 3-table join"):
+    val frag = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry).build
+    val sql = frag.sqlString
+    assert(sql.contains("t0."), s"Expected t0. alias in: $sql")
+    assert(sql.contains("t1."), s"Expected t1. alias in: $sql")
+    assert(sql.contains("t2."), s"Expected t2. alias in: $sql")
+    assert(sql.contains("INNER JOIN"), s"Expected INNER JOIN in: $sql")
+    assert(
+      sql.contains("ON t0.author_id = t1.id"),
+      s"Expected first ON clause in: $sql"
+    )
+    assert(
+      sql.contains("ON t1.country_id = t2.id"),
+      s"Expected second ON clause in: $sql"
+    )
+
+  test("star join: book -> author and book -> publisher"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder.from[MjBook].join(bookAuthor).join(bookPublisher).run()
+      assertEquals(results.size, 5)
+      // each result is (MjBook, MjAuthor, MjPublisher)
+      val dune = results.find(_._1.title == "Dune")
+      assert(dune.isDefined)
+      assertEquals(dune.get._2.name, "Herbert")
+      assertEquals(dune.get._3.name, "Chilton Books")
+
+  test("star join WHERE on both branches"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[MjBook].join(bookAuthor).join(bookPublisher)
+      val results = qb
+        .where(qb.col(1, author.name) === "Asimov")
+        .where(qb.col(2, publisher.name) === "Gnome Press")
+        .run()
+      assertEquals(results.size, 2)
+      assert(results.forall(_._1.authorId == 2L))
+
+  test("count with 3-table join"):
+    val t = xa()
+    t.connect:
+      val result = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry).count()
+      assertEquals(result, 5L)
+
+  test("first with 3-table join"):
+    val t = xa()
+    t.connect:
+      val qb = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry)
+      val result = qb.where(qb.col(0, book.title) === "Dune").first()
+      assert(result.isDefined)
+      assertEquals(result.get._1.title, "Dune")
+      assertEquals(result.get._2.name, "Herbert")
+      assertEquals(result.get._3.name, "USA")
+
+end MultiJoinQueryTests

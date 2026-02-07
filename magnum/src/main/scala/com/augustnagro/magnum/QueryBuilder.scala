@@ -104,13 +104,19 @@ class QueryBuilder[S <: QBState, E] private (
   def join[T](rel: Relationship[E, T])(using
       joinedMeta: TableMeta[T],
       joinedCodec: DbCodec[T]
-  ): JoinedQuery[E, T] =
-    new JoinedQuery[E, T](
-      meta, codec,
-      joinedMeta, joinedCodec,
+  ): JoinedQuery[(E, T)] =
+    val entry = JoinEntry(
+      TableRef(joinedMeta.tableName, "t1", joinedMeta.tableName),
       JoinType.Inner,
-      rel.fk, rel.pk,
-      rootPredicate, orderEntries, limitOpt, offsetOpt
+      Frag(s"t0.${rel.fk.sqlName} = t1.${rel.pk.sqlName}", Seq.empty, FragWriter.empty)
+    )
+    new JoinedQuery[(E, T)](
+      Vector(meta, joinedMeta),
+      Vector(codec, joinedCodec),
+      Vector(entry),
+      rootPredicate,
+      orderEntries.map((c, o) => (c: ColRef[?], o)),
+      limitOpt, offsetOpt
     )
 
   def debugPrintSql(): this.type =

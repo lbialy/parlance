@@ -9,7 +9,7 @@ package com.augustnagro.magnum
   * @param alias
   *   the table alias (e.g. "u")
   */
-class BoundCol[A](val col: Col[A], val alias: String) extends SqlLiteral:
+class BoundCol[A](val col: Col[A], val alias: String) extends ColRef[A]:
   def queryRepr: String = s"$alias.${col.sqlName}"
 
   def scalaName: String = col.scalaName

@@ -2,49 +2,49 @@ package com.augustnagro.magnum
 
 import java.sql.PreparedStatement
 
-extension [A](col: Col[A])
+extension [A](col: ColRef[A])
 
   def ===(value: A)(using codec: DbCodec[A]): Frag =
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(value, ps, pos)
       pos + codec.cols.length
-    Frag(s"${col.sqlName} = ?", Seq(value), writer)
+    Frag(s"${col.queryRepr} = ?", Seq(value), writer)
 
   def !==(value: A)(using codec: DbCodec[A]): Frag =
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(value, ps, pos)
       pos + codec.cols.length
-    Frag(s"${col.sqlName} <> ?", Seq(value), writer)
+    Frag(s"${col.queryRepr} <> ?", Seq(value), writer)
 
   def >(value: A)(using codec: DbCodec[A]): Frag =
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(value, ps, pos)
       pos + codec.cols.length
-    Frag(s"${col.sqlName} > ?", Seq(value), writer)
+    Frag(s"${col.queryRepr} > ?", Seq(value), writer)
 
   def <(value: A)(using codec: DbCodec[A]): Frag =
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(value, ps, pos)
       pos + codec.cols.length
-    Frag(s"${col.sqlName} < ?", Seq(value), writer)
+    Frag(s"${col.queryRepr} < ?", Seq(value), writer)
 
   def >=(value: A)(using codec: DbCodec[A]): Frag =
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(value, ps, pos)
       pos + codec.cols.length
-    Frag(s"${col.sqlName} >= ?", Seq(value), writer)
+    Frag(s"${col.queryRepr} >= ?", Seq(value), writer)
 
   def <=(value: A)(using codec: DbCodec[A]): Frag =
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(value, ps, pos)
       pos + codec.cols.length
-    Frag(s"${col.sqlName} <= ?", Seq(value), writer)
+    Frag(s"${col.queryRepr} <= ?", Seq(value), writer)
 
   def isNull: Frag =
-    Frag(s"${col.sqlName} IS NULL", Seq.empty, FragWriter.empty)
+    Frag(s"${col.queryRepr} IS NULL", Seq.empty, FragWriter.empty)
 
   def isNotNull: Frag =
-    Frag(s"${col.sqlName} IS NOT NULL", Seq.empty, FragWriter.empty)
+    Frag(s"${col.queryRepr} IS NOT NULL", Seq.empty, FragWriter.empty)
 
   def in(values: Iterable[A])(using codec: DbCodec[A]): Frag =
     val vals = values.toVector
@@ -57,11 +57,11 @@ extension [A](col: Col[A])
           codec.writeSingle(v, ps, currentPos)
           currentPos += codec.cols.length
         currentPos
-      Frag(s"${col.sqlName} IN ($placeholders)", vals, writer)
+      Frag(s"${col.queryRepr} IN ($placeholders)", vals, writer)
 
-extension (col: Col[String])
+extension (col: ColRef[String])
   def like(pattern: String)(using codec: DbCodec[String]): Frag =
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(pattern, ps, pos)
       pos + codec.cols.length
-    Frag(s"${col.sqlName} LIKE ?", Seq(pattern), writer)
+    Frag(s"${col.queryRepr} LIKE ?", Seq(pattern), writer)
