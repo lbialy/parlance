@@ -101,6 +101,18 @@ class QueryBuilder[S <: QBState, E] private (
     Frag(s"SELECT EXISTS($innerSql$whereSql)", params, writer)
       .query[Boolean].run().head
 
+  def join[T](rel: Relationship[E, T])(using
+      joinedMeta: TableMeta[T],
+      joinedCodec: DbCodec[T]
+  ): JoinedQuery[E, T] =
+    new JoinedQuery[E, T](
+      meta, codec,
+      joinedMeta, joinedCodec,
+      JoinType.Inner,
+      rel.fk, rel.pk,
+      rootPredicate, orderEntries, limitOpt, offsetOpt
+    )
+
   def debugPrintSql(): this.type =
     println(s"SQL: ${build.sqlString}")
     println(s"Params: ${build.params.mkString(", ")}")
