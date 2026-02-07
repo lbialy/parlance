@@ -1,8 +1,8 @@
 package com.augustnagro.magnum
 
-trait SortOrder
-
-object SortOrder:
-  case object Default extends SortOrder
-  case object Asc extends SortOrder
-  case object Desc extends SortOrder
+enum SortOrder extends SqlLiteral:
+  case Default, Asc, Desc
+  def queryRepr: String = this match
+    case Default => ""
+    case Asc     => "ASC"
+    case Desc    => "DESC"
