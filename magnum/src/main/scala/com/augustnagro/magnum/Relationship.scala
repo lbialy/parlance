@@ -19,6 +19,22 @@ case class BelongsToMany[S, T, +CT <: Selectable](
     targetPk: Col[?]
 )
 
+case class HasManyThrough[S, T, +CT <: Selectable](
+    intermediateTable: String,
+    sourceFk: String,
+    intermediatePk: Col[?],
+    targetFk: Col[?],
+    sourcePk: Col[?]
+)
+
+case class HasOneThrough[S, T, +CT <: Selectable](
+    intermediateTable: String,
+    sourceFk: String,
+    intermediatePk: Col[?],
+    targetFk: Col[?],
+    sourcePk: Col[?]
+)
+
 object Relationship:
   inline def belongsTo[S, T](
       inline fk: S => Any,
@@ -50,6 +66,18 @@ object Relationship:
       TableMeta[T]
   ): Any =
     ${ belongsToManyConventionImpl[S, T] }
+
+  transparent inline def hasManyThrough[S, I, T](
+      inline intermediateFk: I => Any,
+      inline targetFk: T => Any
+  )(using TableMeta[S], TableMeta[I], TableMeta[T]): Any =
+    ${ hasManyThroughImpl[S, I, T]('intermediateFk, 'targetFk) }
+
+  transparent inline def hasOneThrough[S, I, T](
+      inline intermediateFk: I => Any,
+      inline targetFk: T => Any
+  )(using TableMeta[S], TableMeta[I], TableMeta[T]): Any =
+    ${ hasOneThroughImpl[S, I, T]('intermediateFk, 'targetFk) }
 
   // --- Macro implementations ---
 
@@ -131,6 +159,80 @@ object Relationship:
             tSnake + "_id",
             $metaS.primaryKey,
             $metaT.primaryKey
+          )
+        }
+
+  private def hasManyThroughImpl[S: Type, I: Type, T: Type](
+      intermediateFk: Expr[I => Any],
+      targetFk: Expr[T => Any]
+  )(using Quotes): Expr[Any] =
+    import quotes.reflect.*
+    val metaS = Expr.summon[TableMeta[S]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+    )
+    val metaI = Expr.summon[TableMeta[I]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[I].show}")
+    )
+    val metaT = Expr.summon[TableMeta[T]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+    )
+    val iFkName = extractFieldName(intermediateFk.asTerm)
+    val tFkName = extractFieldName(targetFk.asTerm)
+    val iFkNameExpr = Expr(iFkName)
+    val tFkNameExpr = Expr(tFkName)
+    val ct = computeColumnsRefinement[T]()
+    ct.asType match
+      case '[ctType] =>
+        '{
+          val iFkCol = $metaI.columnByName($iFkNameExpr).getOrElse(
+            throw RuntimeException("Column " + $iFkNameExpr + " not found on intermediate")
+          )
+          val tFkCol = $metaT.columnByName($tFkNameExpr).getOrElse(
+            throw RuntimeException("Column " + $tFkNameExpr + " not found on target")
+          )
+          HasManyThrough[S, T, ctType & Selectable](
+            $metaI.tableName,
+            iFkCol.sqlName,
+            $metaI.primaryKey,
+            tFkCol,
+            $metaS.primaryKey
+          )
+        }
+
+  private def hasOneThroughImpl[S: Type, I: Type, T: Type](
+      intermediateFk: Expr[I => Any],
+      targetFk: Expr[T => Any]
+  )(using Quotes): Expr[Any] =
+    import quotes.reflect.*
+    val metaS = Expr.summon[TableMeta[S]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+    )
+    val metaI = Expr.summon[TableMeta[I]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[I].show}")
+    )
+    val metaT = Expr.summon[TableMeta[T]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+    )
+    val iFkName = extractFieldName(intermediateFk.asTerm)
+    val tFkName = extractFieldName(targetFk.asTerm)
+    val iFkNameExpr = Expr(iFkName)
+    val tFkNameExpr = Expr(tFkName)
+    val ct = computeColumnsRefinement[T]()
+    ct.asType match
+      case '[ctType] =>
+        '{
+          val iFkCol = $metaI.columnByName($iFkNameExpr).getOrElse(
+            throw RuntimeException("Column " + $iFkNameExpr + " not found on intermediate")
+          )
+          val tFkCol = $metaT.columnByName($tFkNameExpr).getOrElse(
+            throw RuntimeException("Column " + $tFkNameExpr + " not found on target")
+          )
+          HasOneThrough[S, T, ctType & Selectable](
+            $metaI.tableName,
+            iFkCol.sqlName,
+            $metaI.primaryKey,
+            tFkCol,
+            $metaS.primaryKey
           )
         }
 

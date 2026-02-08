@@ -128,6 +128,50 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   ): PivotEagerQuery[E, T] =
     PivotEagerQuery(build, codec, meta, rel, targetMeta, targetCodec)
 
+  def withRelated[T](rel: HasManyThrough[E, T, ?])(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): ThroughQuery[E, T] =
+    ThroughQuery(build, codec, meta, rel.intermediateTable, rel.sourceFk,
+      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
+      rel.sourcePk.scalaName, targetMeta, targetCodec)
+
+  def withRelated[T](rel: HasOneThrough[E, T, ?])(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): ThroughQuery[E, T] =
+    ThroughQuery(build, codec, meta, rel.intermediateTable, rel.sourceFk,
+      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
+      rel.sourcePk.scalaName, targetMeta, targetCodec)
+
+  // --- withCount for HasMany ---
+
+  def withCount[T](rel: HasMany[E, T, ?])(using
+      relMeta: TableMeta[T]
+  ): CountQuery[E] =
+    val subSql = buildRelCountSql(rel, relMeta)
+    new CountQuery(meta, codec, subSql, None, rootPredicate, orderEntries, limitOpt, offsetOpt)
+
+  def withCount[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => Frag)(using
+      relMeta: TableMeta[T]
+  ): CountQuery[E] =
+    val subSql = buildRelCountSql(rel, relMeta)
+    val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
+    new CountQuery(meta, codec, subSql, Some(f(cols)), rootPredicate, orderEntries, limitOpt, offsetOpt)
+
+  // --- withCount for BelongsToMany ---
+
+  def withCount[T](rel: BelongsToMany[E, T, ?]): CountQuery[E] =
+    val subSql = buildPivotCountSql(rel, None)
+    new CountQuery(meta, codec, subSql, None, rootPredicate, orderEntries, limitOpt, offsetOpt)
+
+  def withCount[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => Frag)(using
+      relMeta: TableMeta[T]
+  ): CountQuery[E] =
+    val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
+    val subSql = buildPivotCountSql(rel, Some(relMeta))
+    new CountQuery(meta, codec, subSql, Some(f(cols)), rootPredicate, orderEntries, limitOpt, offsetOpt)
+
   def join[T](rel: Relationship[E, T])(using
       joinedMeta: TableMeta[T],
       joinedCodec: DbCodec[T]
@@ -239,6 +283,28 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
           cond.writer
         )
   end buildPivotExistsFrag
+
+  private def buildRelCountSql[T](
+      rel: Relationship[E, T],
+      relMeta: TableMeta[T]
+  ): String =
+    val correlation =
+      s"${relMeta.tableName}.${rel.pk.sqlName} = ${meta.tableName}.${rel.fk.sqlName}"
+    s"SELECT COUNT(*) FROM ${relMeta.tableName} WHERE $correlation"
+
+  private def buildPivotCountSql[T](
+      rel: BelongsToMany[E, T, ?],
+      targetMeta: Option[TableMeta[T]]
+  ): String =
+    val correlation =
+      s"${rel.pivotTable}.${rel.sourceFk} = ${meta.tableName}.${rel.sourcePk.sqlName}"
+    targetMeta match
+      case None =>
+        s"SELECT COUNT(*) FROM ${rel.pivotTable} WHERE $correlation"
+      case Some(tMeta) =>
+        val joinClause =
+          s"${rel.pivotTable}.${rel.targetFk} = ${tMeta.tableName}.${rel.targetPk.sqlName}"
+        s"SELECT COUNT(*) FROM ${rel.pivotTable} JOIN ${tMeta.tableName} ON $joinClause WHERE $correlation"
 
   def debugPrintSql(using DbCon): this.type =
     val frag = build

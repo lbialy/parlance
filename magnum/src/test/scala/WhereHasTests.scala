@@ -147,7 +147,6 @@ class WhereHasTests extends FunSuite:
       assertEquals(results.map(_.name), Vector("Alice", "Dave"))
 
   test("doesntHave + where combined"):
-    val userRoles = Relationship.belongsToMany[PvUser, PvRole]("pv_user_role", "user_id", "role_id")
     val t = xa()
     t.connect:
       val results = QueryBuilder
