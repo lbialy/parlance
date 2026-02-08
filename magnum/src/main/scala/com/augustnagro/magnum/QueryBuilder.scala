@@ -306,6 +306,43 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
           s"${rel.pivotTable}.${rel.targetFk} = ${tMeta.tableName}.${rel.targetPk.sqlName}"
         s"SELECT COUNT(*) FROM ${rel.pivotTable} JOIN ${tMeta.tableName} ON $joinClause WHERE $correlation"
 
+  def chunk(batchSize: Int)(using DbCon): Iterator[Vector[E]] =
+    require(batchSize > 0, "batchSize must be positive")
+    val startOffset = offsetOpt.getOrElse(0L)
+    val maxRows = limitOpt.map(_.toLong).getOrElse(Long.MaxValue)
+
+    new Iterator[Vector[E]]:
+      private var currentOffset = startOffset
+      private var fetched = 0L
+      private var done = false
+      private var prefetched: Vector[E] | Null = null
+
+      private def prefetch(): Unit =
+        if !done && prefetched == null then
+          val remaining = maxRows - fetched
+          val fetchSize = math.min(batchSize.toLong, remaining).toInt
+          if fetchSize <= 0 then
+            done = true
+          else
+            val batch = QueryBuilder.this.limit(fetchSize).offset(currentOffset).run()
+            if batch.isEmpty then
+              done = true
+            else
+              prefetched = batch
+              fetched += batch.size
+              currentOffset += batch.size
+              if batch.size < fetchSize then done = true
+
+      override def hasNext: Boolean =
+        prefetch()
+        !done || prefetched != null
+
+      override def next(): Vector[E] =
+        if !hasNext then throw new NoSuchElementException("chunk iterator exhausted")
+        val result = prefetched.nn
+        prefetched = null
+        result
+
   def debugPrintSql(using DbCon): this.type =
     val frag = build
     DebugSql.printDebug(Vector(frag))
