@@ -48,11 +48,6 @@ class MultiJoinQueryTests extends FunSuite:
   val authorCountry = Relationship.belongsTo[MjAuthor, MjCountry](_.countryId, _.id)
   val bookPublisher = Relationship.belongsTo[MjBook, MjPublisher](_.publisherId, _.id)
 
-  val country = Columns.of[MjCountry]
-  val author = Columns.of[MjAuthor]
-  val book = Columns.of[MjBook]
-  val publisher = Columns.of[MjPublisher]
-
   test("3-table linear join returns all tuples"):
     val t = xa()
     t.connect:
@@ -68,7 +63,7 @@ class MultiJoinQueryTests extends FunSuite:
     val t = xa()
     t.connect:
       val qb = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry)
-      val results = qb.where(qb.col(2, country.name) === "UK").run()
+      val results = qb.where(qb.of[MjCountry].name === "UK").run()
       assertEquals(results.size, 2)
       assert(results.forall(_._2.name == "Tolkien"))
       assert(results.forall(_._3.name == "UK"))
@@ -77,7 +72,7 @@ class MultiJoinQueryTests extends FunSuite:
     val t = xa()
     t.connect:
       val qb = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry)
-      val results = qb.orderBy(qb.col(2, country.name)).run()
+      val results = qb.orderBy(qb.of[MjCountry].name).run()
       // UK < USA — Tolkien's books first, then Asimov/Herbert
       assertEquals(results(0)._3.name, "UK")
       assertEquals(results(1)._3.name, "UK")
@@ -115,8 +110,8 @@ class MultiJoinQueryTests extends FunSuite:
     t.connect:
       val qb = QueryBuilder.from[MjBook].join(bookAuthor).join(bookPublisher)
       val results = qb
-        .where(qb.col(1, author.name) === "Asimov")
-        .where(qb.col(2, publisher.name) === "Gnome Press")
+        .where(qb.of[MjAuthor].name === "Asimov")
+        .where(qb.of[MjPublisher].name === "Gnome Press")
         .run()
       assertEquals(results.size, 2)
       assert(results.forall(_._1.authorId == 2L))
@@ -131,7 +126,7 @@ class MultiJoinQueryTests extends FunSuite:
     val t = xa()
     t.connect:
       val qb = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry)
-      val result = qb.where(qb.col(0, book.title) === "Dune").first()
+      val result = qb.where(qb.of[MjBook].title === "Dune").first()
       assert(result.isDefined)
       assertEquals(result.get._1.title, "Dune")
       assertEquals(result.get._2.name, "Herbert")

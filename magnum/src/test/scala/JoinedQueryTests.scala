@@ -9,8 +9,7 @@ import scala.util.Using
 case class JnAuthor(@Id id: Long, name: String) derives DbCodec, TableMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class JnBook(@Id id: Long, authorId: Long, title: String)
-    derives DbCodec, TableMeta
+case class JnBook(@Id id: Long, authorId: Long, title: String) derives DbCodec, TableMeta
 
 class JoinedQueryTests extends FunSuite:
 
@@ -128,14 +127,11 @@ class JoinedQueryTests extends FunSuite:
 
   // --- Phase 10: alias-qualified WHERE on joined tables ---
 
-  val b = Columns.of[JnBook]
-  val a = Columns.of[JnAuthor]
-
   test("whereJoined with typed operator"):
     val t = xa()
     t.connect:
       val qb = QueryBuilder.from[JnBook].join(bookAuthor)
-      val results = qb.where(qb.joinedCol(a.name) === "Tolkien").run()
+      val results = qb.where(qb.of[JnAuthor].name === "Tolkien").run()
       assertEquals(results.size, 2)
       assert(results.forall(_._2.name == "Tolkien"))
 
@@ -143,7 +139,7 @@ class JoinedQueryTests extends FunSuite:
     val t = xa()
     t.connect:
       val qb = QueryBuilder.from[JnBook].join(bookAuthor)
-      val results = qb.where(qb.rootCol(b.title) === "Dune").run()
+      val results = qb.where(qb.of[JnBook].title === "Dune").run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "Dune")
       assertEquals(results.head._2.name, "Herbert")
@@ -153,8 +149,8 @@ class JoinedQueryTests extends FunSuite:
     t.connect:
       val qb = QueryBuilder.from[JnBook].join(bookAuthor)
       val results = qb
-        .where(qb.joinedCol(a.name) === "Tolkien")
-        .where(qb.rootCol(b.title) === "The Hobbit")
+        .where(qb.of[JnAuthor].name === "Tolkien")
+        .where(qb.of[JnBook].title === "The Hobbit")
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "The Hobbit")
@@ -163,11 +159,11 @@ class JoinedQueryTests extends FunSuite:
     val t = xa()
     t.connect:
       val qb = QueryBuilder.from[JnBook].join(bookAuthor)
-      val results = qb.where(qb.rootCol(b.id) === 5L).run()
+      val results = qb.where(qb.of[JnBook].id === 5L).run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "Dune")
-      // also test joinedCol on id
-      val results2 = qb.where(qb.joinedCol(a.id) === 1L).run()
+      // also test joined table's id
+      val results2 = qb.where(qb.of[JnAuthor].id === 1L).run()
       assertEquals(results2.size, 2)
       assert(results2.forall(_._2.name == "Tolkien"))
 
@@ -175,7 +171,7 @@ class JoinedQueryTests extends FunSuite:
     val t = xa()
     t.connect:
       val qb = QueryBuilder.from[JnBook].join(bookAuthor)
-      val results = qb.orderBy(qb.joinedCol(a.name)).run()
+      val results = qb.orderBy(qb.of[JnAuthor].name).run()
       // Asimov < Herbert < Tolkien
       assertEquals(results(0)._2.name, "Asimov")
       assertEquals(results(1)._2.name, "Asimov")
@@ -186,8 +182,8 @@ class JoinedQueryTests extends FunSuite:
   test("build SQL shows qualified WHERE columns"):
     val qb = QueryBuilder.from[JnBook].join(bookAuthor)
     val frag = qb
-      .where(qb.rootCol(b.title) === "Dune")
-      .where(qb.joinedCol(a.name) === "Tolkien")
+      .where(qb.of[JnBook].title === "Dune")
+      .where(qb.of[JnAuthor].name === "Tolkien")
       .build
     val sql = frag.sqlString
     assert(sql.contains("t0.title = ?"), s"Expected t0.title = ? in: $sql")

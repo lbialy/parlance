@@ -1,18 +1,35 @@
 package com.augustnagro.magnum
 
-class PredicateGroupBuilder private (
+class PredicateGroupBuilder[C] private[magnum] (
+    private val cols: C,
     private val predicates: Vector[Predicate],
     private val mode: PredicateGroupBuilder.Mode
 ):
-  def and(frag: Frag): PredicateGroupBuilder =
+  def and(frag: Frag): PredicateGroupBuilder[C] =
     new PredicateGroupBuilder(
+      cols,
       predicates :+ Predicate.Leaf(frag),
       PredicateGroupBuilder.Mode.And
     )
 
-  def or(frag: Frag): PredicateGroupBuilder =
+  def and(f: C => Frag): PredicateGroupBuilder[C] =
     new PredicateGroupBuilder(
+      cols,
+      predicates :+ Predicate.Leaf(f(cols)),
+      PredicateGroupBuilder.Mode.And
+    )
+
+  def or(frag: Frag): PredicateGroupBuilder[C] =
+    new PredicateGroupBuilder(
+      cols,
       predicates :+ Predicate.Leaf(frag),
+      PredicateGroupBuilder.Mode.Or
+    )
+
+  def or(f: C => Frag): PredicateGroupBuilder[C] =
+    new PredicateGroupBuilder(
+      cols,
+      predicates :+ Predicate.Leaf(f(cols)),
       PredicateGroupBuilder.Mode.Or
     )
 
@@ -24,5 +41,5 @@ object PredicateGroupBuilder:
   private[magnum] enum Mode:
     case And, Or
 
-  val empty: PredicateGroupBuilder =
-    new PredicateGroupBuilder(Vector.empty, Mode.And)
+  private[magnum] def empty[C](cols: C): PredicateGroupBuilder[C] =
+    new PredicateGroupBuilder(cols, Vector.empty, Mode.And)

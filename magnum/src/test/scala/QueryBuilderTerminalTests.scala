@@ -30,19 +30,19 @@ class QueryBuilderTerminalTests extends FunSuite:
 
     Transactor(ds)
 
-  val u = Columns.of[QbUser]
+  // val u = Columns.of[QbUser]
 
   test("first() returns Some when rows exist"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbUser].orderBy(u.age).first()
+      val result = QueryBuilder.from[QbUser].orderBy(_.age).first()
       assert(result.isDefined)
       assertEquals(result.get.age, 17)
 
   test("first() returns None when no rows match"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbUser].where(u.age > 100).first()
+      val result = QueryBuilder.from[QbUser].where(_.age > 100).first()
       assertEquals(result, None)
 
   test("firstOrFail() returns entity"):
@@ -50,7 +50,7 @@ class QueryBuilderTerminalTests extends FunSuite:
     t.connect:
       val result = QueryBuilder
         .from[QbUser]
-        .where(u.firstName === Some("Alice"))
+        .where(_.firstName === Some("Alice"))
         .firstOrFail()
       assertEquals(result.firstName, Some("Alice"))
 
@@ -58,7 +58,7 @@ class QueryBuilderTerminalTests extends FunSuite:
     val t = xa()
     t.connect:
       intercept[QueryBuilderException]:
-        QueryBuilder.from[QbUser].where(u.age > 100).firstOrFail()
+        QueryBuilder.from[QbUser].where(_.age > 100).firstOrFail()
 
   test("count() returns total count"):
     val t = xa()
@@ -69,13 +69,13 @@ class QueryBuilderTerminalTests extends FunSuite:
   test("where(...).count() returns filtered count"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbUser].where(u.age > 18).count()
+      val result = QueryBuilder.from[QbUser].where(_.age > 18).count()
       assertEquals(result, 3L)
 
   test("exists() returns true/false"):
     val t = xa()
     t.connect:
       assert(QueryBuilder.from[QbUser].exists())
-      assert(!QueryBuilder.from[QbUser].where(u.age > 100).exists())
+      assert(!QueryBuilder.from[QbUser].where(_.age > 100).exists())
 
 end QueryBuilderTerminalTests

@@ -7,4 +7,6 @@ package com.augustnagro.magnum
   *   the Scala type of this column
   */
 trait ColRef[A] extends SqlLiteral:
+  def scalaName: String
+  def sqlName: String
   def queryRepr: String

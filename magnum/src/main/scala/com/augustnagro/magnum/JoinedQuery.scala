@@ -1,9 +1,11 @@
 package com.augustnagro.magnum
 
 import java.sql.{PreparedStatement, ResultSet}
+import scala.deriving.Mirror
+import scala.quoted.*
 
 class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
-    private val metas: Vector[TableMeta[?]],
+    private[magnum] val metas: Vector[TableMeta[?]],
     private val codecs: Vector[DbCodec[?]],
     private val joinClauses: Vector[JoinEntry],
     private val predicate: Option[Predicate],
@@ -38,14 +40,14 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     new JoinedQuery(metas, codecs, joinClauses, addOr(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
 
   def whereGroup(
-      f: PredicateGroupBuilder => PredicateGroupBuilder
+      f: PredicateGroupBuilder[Any] => PredicateGroupBuilder[Any]
   ): JoinedQuery[R] =
-    new JoinedQuery(metas, codecs, joinClauses, addAnd(f(PredicateGroupBuilder.empty).build), orderEntries, limitOpt, offsetOpt)
+    new JoinedQuery(metas, codecs, joinClauses, addAnd(f(PredicateGroupBuilder.empty(null)).build), orderEntries, limitOpt, offsetOpt)
 
   def orWhereGroup(
-      f: PredicateGroupBuilder => PredicateGroupBuilder
+      f: PredicateGroupBuilder[Any] => PredicateGroupBuilder[Any]
   ): JoinedQuery[R] =
-    new JoinedQuery(metas, codecs, joinClauses, addOr(f(PredicateGroupBuilder.empty).build), orderEntries, limitOpt, offsetOpt)
+    new JoinedQuery(metas, codecs, joinClauses, addOr(f(PredicateGroupBuilder.empty(null)).build), orderEntries, limitOpt, offsetOpt)
 
   def orderBy(col: ColRef[?], order: SortOrder = SortOrder.Asc): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, predicate, orderEntries :+ (col, order), limitOpt, offsetOpt)
@@ -165,5 +167,103 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     val (fromJoinWhereSql, params, writer) = buildFromJoinWhere
     Frag(s"SELECT EXISTS(SELECT 1 $fromJoinWhereSql)", params, writer)
       .query[Boolean].run().head
+
+end JoinedQuery
+
+object JoinedQuery:
+
+  extension [R <: NonEmptyTuple](jq: JoinedQuery[R])
+    transparent inline def of[T]: Any = ${ ofImpl[R, T] }
+
+  private[magnum] def ofImpl[R: Type, T: Type](using Quotes): Expr[Any] =
+    import quotes.reflect.*
+
+    val indices = tupleIndicesOf[T](TypeRepr.of[R], 0)
+    indices match
+      case Nil =>
+        report.errorAndAbort(
+          s"Type ${TypeRepr.of[T].show} is not in the join tuple ${TypeRepr.of[R].show}"
+        )
+      case _ :: _ :: _ =>
+        report.errorAndAbort(
+          s"Type ${TypeRepr.of[T].show} appears multiple times in ${TypeRepr.of[R].show}; use col(index, col) instead"
+        )
+      case idx :: Nil =>
+        val aliasExpr = Expr(s"t$idx")
+        buildAliasedColumns[T](aliasExpr)
+
+  private def buildAliasedColumns[E: Type](aliasExpr: Expr[String])(using Quotes): Expr[Any] =
+    import quotes.reflect.*
+
+    val metaExpr = Expr.summon[TableMeta[E]].getOrElse(
+      report.errorAndAbort(
+        s"No TableMeta found for ${TypeRepr.of[E].show}"
+      )
+    )
+
+    Expr.summon[Mirror.ProductOf[E]] match
+      case Some('{
+            $m: Mirror.ProductOf[E] {
+              type MirroredElemLabels = mels
+              type MirroredElemTypes = mets
+            }
+          }) =>
+        val names = macroElemNames[mels]()
+        val types = macroElemTypes[mets]()
+
+        val refinement =
+          names.zip(types).foldLeft(TypeRepr.of[Columns[E]]) {
+            case (tr, (name, tpe)) =>
+              tpe match
+                case '[t] => Refinement(tr, name, TypeRepr.of[BoundCol[t]])
+          }
+
+        refinement.asType match
+          case '[rt] =>
+            '{ Columns.aliased[E]($metaExpr, $aliasExpr).asInstanceOf[rt] }
+
+      case _ =>
+        report.errorAndAbort(
+          s"No Mirror.ProductOf for ${TypeRepr.of[E].show}"
+        )
+
+  private def tupleIndicesOf[T: Type](using Quotes)(
+      tpe: quotes.reflect.TypeRepr,
+      offset: Int
+  ): List[Int] =
+    import quotes.reflect.*
+    tpe.dealias match
+      case AppliedType(tycon, args) if tycon.typeSymbol.name == "*:" =>
+        val head = args(0)
+        val tail = args(1)
+        val here = if head =:= TypeRepr.of[T] then List(offset) else Nil
+        here ++ tupleIndicesOf[T](tail, offset + 1)
+      case AppliedType(tycon, args) =>
+        // TupleN form
+        args.zipWithIndex.collect {
+          case (arg, idx) if arg =:= TypeRepr.of[T] => offset + idx
+        }
+      case _ => Nil
+
+  private def macroElemNames[Mels: Type](res: List[String] = Nil)(using
+      Quotes
+  ): List[String] =
+    import quotes.reflect.*
+    Type.of[Mels] match
+      case '[mel *: melTail] =>
+        val melString = Type.valueOfConstant[mel].get.toString
+        macroElemNames[melTail](melString :: res)
+      case '[EmptyTuple] =>
+        res.reverse
+
+  private def macroElemTypes[Mets: Type](res: List[Type[?]] = Nil)(using
+      Quotes
+  ): List[Type[?]] =
+    import quotes.reflect.*
+    Type.of[Mets] match
+      case '[met *: metTail] =>
+        macroElemTypes[metTail](Type.of[met] :: res)
+      case '[EmptyTuple] =>
+        res.reverse
 
 end JoinedQuery

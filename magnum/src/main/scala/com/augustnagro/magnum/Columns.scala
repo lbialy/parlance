@@ -18,7 +18,7 @@ import scala.quoted.*
   *   val id: Col[Long] = cols.id
   * }}}
   */
-final class Columns[E](private val cols: IArray[Col[?]])
+final class Columns[E](private val cols: IArray[ColRef[?]])
     extends Selectable:
   def selectDynamic(name: String): Any =
     cols.find(_.scalaName == name).get
@@ -26,6 +26,12 @@ final class Columns[E](private val cols: IArray[Col[?]])
 object Columns:
   transparent inline def of[E](using TableMeta[E]): Any =
     ${ ofImpl[E] }
+
+  private[magnum] def aliased[E](meta: TableMeta[E], alias: String): Columns[E] =
+    val bounded: IArray[ColRef[?]] = IArray.from(
+      meta.columns.map(c => c.asInstanceOf[Col[Any]].bound(alias))
+    )
+    new Columns[E](bounded)
 
   private def ofImpl[E: Type](using Quotes): Expr[Any] =
     import quotes.reflect.*

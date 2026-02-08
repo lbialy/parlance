@@ -11,12 +11,10 @@ class ColumnsTests extends FunSuite:
     )
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class User(@Id id: Long, firstName: String, age: Int)
-      derives DbCodec, TableMeta
+  case class User(@Id id: Long, firstName: String, age: Int) derives DbCodec, TableMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class WithOptional(@Id id: Long, nickname: Option[String])
-      derives DbCodec, TableMeta
+  case class WithOptional(@Id id: Long, nickname: Option[String]) derives DbCodec, TableMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
   case class WithSqlName(

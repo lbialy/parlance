@@ -6,8 +6,7 @@ import java.nio.file.{Files, Path}
 import scala.util.Using
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class QbUser(@Id id: Long, firstName: Option[String], age: Int)
-    derives DbCodec, TableMeta
+case class QbUser(@Id id: Long, firstName: Option[String], age: Int) derives DbCodec, TableMeta
 
 class QueryBuilderBasicTests extends FunSuite:
 
@@ -34,7 +33,7 @@ class QueryBuilderBasicTests extends FunSuite:
 
     Transactor(ds)
 
-  val u = Columns.of[QbUser]
+  // val u = Columns.of[QbUser]
 
   test("from[QbUser].run() returns all rows"):
     val t = xa()
@@ -48,7 +47,7 @@ class QueryBuilderBasicTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.firstName === Some("Alice"))
+        .where(_.firstName === Some("Alice"))
         .run()
       assertEquals(results.length, 1)
       assertEquals(results.head.id, 1L)
@@ -59,8 +58,8 @@ class QueryBuilderBasicTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.age > 18)
-        .where(u.age < 30)
+        .where(_.age > 18)
+        .where(_.age < 30)
         .run()
       assertEquals(results.length, 2)
       val ids = results.map(_.id).sorted
@@ -71,7 +70,7 @@ class QueryBuilderBasicTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.firstName.isNull)
+        .where(_.firstName.isNull)
         .run()
       assertEquals(results.length, 1)
       assertEquals(results.head.id, 4L)
@@ -82,7 +81,7 @@ class QueryBuilderBasicTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.age.in(List(25, 30)))
+        .where(_.age.in(List(25, 30)))
         .run()
       assertEquals(results.length, 2)
       val ids = results.map(_.id).sorted
@@ -91,7 +90,7 @@ class QueryBuilderBasicTests extends FunSuite:
   test("build returns correct SQL"):
     val frag = QueryBuilder
       .from[QbUser]
-      .where(u.age > 18)
+      .where(_.age > 18)
       .build
     assertEquals(
       frag.sqlString,
@@ -103,8 +102,65 @@ class QueryBuilderBasicTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.age.in(List.empty[Int]))
+        .where(_.age.in(List.empty[Int]))
         .run()
       assertEquals(results.length, 0)
+
+  // --- Lambda syntax tests ---
+
+  test("lambda where: _.age > 18"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.age > 18)
+        .where(_.age < 30)
+        .run()
+      assertEquals(results.length, 2)
+      val ids = results.map(_.id).sorted
+      assertEquals(ids, Vector(1L, 4L))
+
+  test("lambda where: _.firstName === Some(Alice)"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.firstName === Some("Alice"))
+        .run()
+      assertEquals(results.length, 1)
+      assertEquals(results.head.firstName, Some("Alice"))
+
+  test("lambda orderBy: _.age"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .orderBy(_.age)
+        .run()
+      val ages = results.map(_.age)
+      assertEquals(ages, Vector(17, 22, 25, 30))
+
+  test("lambda where + orderBy + limit combined"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.age > 18)
+        .orderBy(_.age)
+        .limit(2)
+        .run()
+      assertEquals(results.length, 2)
+      assertEquals(results(0).age, 22)
+      assertEquals(results(1).age, 25)
+
+  test("lambda build SQL matches expected"):
+    val frag = QueryBuilder
+      .from[QbUser]
+      .where(_.age > 18)
+      .build
+    assertEquals(
+      frag.sqlString,
+      "SELECT id, first_name, age FROM qb_user WHERE age > ?"
+    )
 
 end QueryBuilderBasicTests

@@ -30,13 +30,11 @@ class PredicateGroupTests extends FunSuite:
 
     Transactor(ds)
 
-  val u = Columns.of[QbUser]
-
   test("orWhere SQL generation"):
     val frag = QueryBuilder
       .from[QbUser]
-      .where(u.age > 18)
-      .orWhere(u.age < 5)
+      .where(_.age > 18)
+      .orWhere(_.age < 5)
       .build
     assertEquals(
       frag.sqlString,
@@ -48,8 +46,8 @@ class PredicateGroupTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.firstName === Some("Alice"))
-        .orWhere(u.firstName === Some("Bob"))
+        .where(_.firstName === Some("Alice"))
+        .orWhere(_.firstName === Some("Bob"))
         .run()
       assertEquals(results.length, 2)
       val names = results.flatMap(_.firstName).sorted
@@ -58,8 +56,8 @@ class PredicateGroupTests extends FunSuite:
   test("whereGroup + orWhereGroup SQL generation"):
     val frag = QueryBuilder
       .from[QbUser]
-      .whereGroup(g => g.and(u.age > 20).and(u.age < 26))
-      .orWhereGroup(g => g.and(u.firstName === Some("Bob")))
+      .whereGroup(g => g.and(_.age > 20).and(_.age < 26))
+      .orWhereGroup(g => g.and(_.firstName === Some("Bob")))
       .build
     assertEquals(
       frag.sqlString,
@@ -71,8 +69,8 @@ class PredicateGroupTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .whereGroup(g => g.and(u.age > 20).and(u.age < 26))
-        .orWhereGroup(g => g.and(u.firstName === Some("Bob")))
+        .whereGroup(g => g.and(_.age > 20).and(_.age < 26))
+        .orWhereGroup(g => g.and(_.firstName === Some("Bob")))
         .run()
       assertEquals(results.length, 3)
       val ids = results.map(_.id).sorted
@@ -83,19 +81,19 @@ class PredicateGroupTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.age > 10)
+        .where(_.age > 10)
         .whereGroup(g =>
-          g.or(u.firstName === Some("Alice"))
-            .or(u.firstName === Some("Bob"))
+          g.or(_.firstName === Some("Alice"))
+            .or(_.firstName === Some("Bob"))
         )
         .run()
       assertEquals(results.length, 2)
       val frag = QueryBuilder
         .from[QbUser]
-        .where(u.age > 10)
+        .where(_.age > 10)
         .whereGroup(g =>
-          g.or(u.firstName === Some("Alice"))
-            .or(u.firstName === Some("Bob"))
+          g.or(_.firstName === Some("Alice"))
+            .or(_.firstName === Some("Bob"))
         )
         .build
       assertEquals(
@@ -108,8 +106,8 @@ class PredicateGroupTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.age > 18)
-        .where(u.age < 30)
+        .where(_.age > 18)
+        .where(_.age < 30)
         .run()
       assertEquals(results.length, 2)
       val ids = results.map(_.id).sorted
@@ -120,8 +118,8 @@ class PredicateGroupTests extends FunSuite:
     t.connect:
       val c = QueryBuilder
         .from[QbUser]
-        .where(u.age > 18)
-        .orWhere(u.firstName === Some("Charlie"))
+        .where(_.age > 18)
+        .orWhere(_.firstName === Some("Charlie"))
         .count()
       assertEquals(c, 4L)
 

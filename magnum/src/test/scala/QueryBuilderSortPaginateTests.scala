@@ -30,19 +30,19 @@ class QueryBuilderSortPaginateTests extends FunSuite:
 
     Transactor(ds)
 
-  val u = Columns.of[QbUser]
+  // val u = Columns.of[QbUser]
 
   test("orderBy age ascending"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder.from[QbUser].orderBy(u.age).run()
+      val results = QueryBuilder.from[QbUser].orderBy(_.age).run()
       assertEquals(results.map(_.age), Vector(17, 22, 25, 30))
 
   test("orderBy age descending"):
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[QbUser].orderBy(u.age, SortOrder.Desc).run()
+        QueryBuilder.from[QbUser].orderBy(_.age, SortOrder.Desc).run()
       assertEquals(results.map(_.age), Vector(30, 25, 22, 17))
 
   test("limit(2) returns exactly 2 rows"):
@@ -55,7 +55,7 @@ class QueryBuilderSortPaginateTests extends FunSuite:
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[QbUser].orderBy(u.age).offset(1).limit(2).run()
+        QueryBuilder.from[QbUser].orderBy(_.age).offset(1).limit(2).run()
       assertEquals(results.map(_.age), Vector(22, 25))
 
   test("where + orderBy + limit combined"):
@@ -63,8 +63,8 @@ class QueryBuilderSortPaginateTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .where(u.age > 18)
-        .orderBy(u.age)
+        .where(_.age > 18)
+        .orderBy(_.age)
         .limit(2)
         .run()
       assertEquals(results.length, 2)
@@ -73,8 +73,8 @@ class QueryBuilderSortPaginateTests extends FunSuite:
   test("multiple orderBy calls accumulate"):
     val frag = QueryBuilder
       .from[QbUser]
-      .orderBy(u.firstName)
-      .orderBy(u.age)
+      .orderBy(_.firstName)
+      .orderBy(_.age)
       .build
     assert(frag.sqlString.contains("ORDER BY first_name ASC, age ASC"))
 
@@ -83,8 +83,8 @@ class QueryBuilderSortPaginateTests extends FunSuite:
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .orderBy(u.firstName)
-        .orderBy(u.age)
+        .orderBy(_.firstName)
+        .orderBy(_.age)
         .run()
       assertEquals(
         results.map(_.firstName),
@@ -94,8 +94,8 @@ class QueryBuilderSortPaginateTests extends FunSuite:
   test("build SQL with ORDER BY, LIMIT, OFFSET"):
     val frag = QueryBuilder
       .from[QbUser]
-      .where(u.age > 18)
-      .orderBy(u.age, SortOrder.Desc)
+      .where(_.age > 18)
+      .orderBy(_.age, SortOrder.Desc)
       .limit(10)
       .offset(5)
       .build
