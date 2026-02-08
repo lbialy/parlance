@@ -8,7 +8,7 @@ class EagerQuery[E, T] private[magnum] (
     private val rootFrag: Frag,
     private val rootCodec: DbCodec[E],
     private val rootMeta: TableMeta[E],
-    private val rel: HasMany[E, T],
+    private val rel: HasMany[E, T, ?],
     private val childMeta: TableMeta[T],
     private val childCodec: DbCodec[T]
 ):
@@ -49,12 +49,12 @@ class EagerQuery[E, T] private[magnum] (
       val children = fetchChildren(Vector(key))
       (parent, children)
 
+  private def childQuerySql(placeholders: String): String =
+    val childCols = childMeta.columns.map(_.sqlName).mkString(", ")
+    s"SELECT $childCols FROM ${childMeta.tableName} WHERE ${rel.pk.sqlName} IN ($placeholders)"
+
   private def fetchChildren(keys: Vector[Any])(using con: DbCon): Vector[T] =
-    val childCols =
-      childMeta.columns.map(_.sqlName).mkString(", ")
-    val placeholders = keys.map(_ => "?").mkString(", ")
-    val childSql =
-      s"SELECT $childCols FROM ${childMeta.tableName} WHERE ${rel.pk.sqlName} IN ($placeholders)"
+    val childSql = childQuerySql(keys.map(_ => "?").mkString(", "))
 
     val writer: FragWriter = (ps: PreparedStatement, pos: Int) =>
       var i = pos
@@ -66,5 +66,13 @@ class EagerQuery[E, T] private[magnum] (
     Frag(childSql, keys, writer)
       .query[T](using childCodec)
       .run()
+
+  def buildQueries: Vector[Frag] =
+    val childSql = childQuerySql("?")
+    Vector(rootFrag, Frag(childSql, Seq.empty, FragWriter.empty))
+
+  def debugPrintSql(using DbCon): this.type =
+    DebugSql.printDebug(buildQueries)
+    this
 
 end EagerQuery

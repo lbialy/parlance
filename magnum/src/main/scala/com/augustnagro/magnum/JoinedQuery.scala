@@ -168,6 +168,10 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     Frag(s"SELECT EXISTS(SELECT 1 $fromJoinWhereSql)", params, writer)
       .query[Boolean].run().head
 
+  def debugPrintSql(using DbCon): this.type =
+    DebugSql.printDebug(Vector(build))
+    this
+
 end JoinedQuery
 
 object JoinedQuery:

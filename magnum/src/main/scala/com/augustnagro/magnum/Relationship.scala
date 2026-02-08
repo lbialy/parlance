@@ -1,5 +1,6 @@
 package com.augustnagro.magnum
 
+import scala.deriving.Mirror
 import scala.quoted.*
 
 sealed trait Relationship[Source, Target]:
@@ -8,7 +9,15 @@ sealed trait Relationship[Source, Target]:
 
 case class BelongsTo[S, T](fk: Col[?], pk: Col[?]) extends Relationship[S, T]
 case class HasOne[S, T](fk: Col[?], pk: Col[?]) extends Relationship[S, T]
-case class HasMany[S, T](fk: Col[?], pk: Col[?]) extends Relationship[S, T]
+case class HasMany[S, T, +CT <: Selectable](fk: Col[?], pk: Col[?]) extends Relationship[S, T]
+
+case class BelongsToMany[S, T, +CT <: Selectable](
+    pivotTable: String,
+    sourceFk: String,
+    targetFk: String,
+    sourcePk: Col[?],
+    targetPk: Col[?]
+)
 
 object Relationship:
   inline def belongsTo[S, T](
@@ -23,11 +32,24 @@ object Relationship:
   )(using TableMeta[S], TableMeta[T]): HasOne[S, T] =
     ${ hasOneImpl[S, T]('fk, 'pk) }
 
-  inline def hasMany[S, T](
+  transparent inline def hasMany[S, T](
       inline fk: S => Any,
       inline pk: T => Any
-  )(using TableMeta[S], TableMeta[T]): HasMany[S, T] =
+  )(using TableMeta[S], TableMeta[T]): Any =
     ${ hasManyImpl[S, T]('fk, 'pk) }
+
+  transparent inline def belongsToMany[S, T](
+      pivotTable: String,
+      sourceFkColumn: String,
+      targetFkColumn: String
+  )(using TableMeta[S], TableMeta[T]): Any =
+    ${ belongsToManyImpl[S, T]('pivotTable, 'sourceFkColumn, 'targetFkColumn) }
+
+  transparent inline def belongsToMany[S, T]()(using
+      TableMeta[S],
+      TableMeta[T]
+  ): Any =
+    ${ belongsToManyConventionImpl[S, T] }
 
   // --- Macro implementations ---
 
@@ -48,9 +70,111 @@ object Relationship:
   private def hasManyImpl[S: Type, T: Type](
       fk: Expr[S => Any],
       pk: Expr[T => Any]
-  )(using Quotes): Expr[HasMany[S, T]] =
+  )(using Quotes): Expr[Any] =
+    import quotes.reflect.*
     val (fkExpr, pkExpr) = resolveColumns[S, T](fk, pk)
-    '{ HasMany[S, T]($fkExpr, $pkExpr) }
+    val ct = computeColumnsRefinement[T]()
+    ct.asType match
+      case '[ctType] =>
+        '{ HasMany[S, T, ctType & Selectable]($fkExpr, $pkExpr) }
+
+  private def belongsToManyImpl[S: Type, T: Type](
+      pivotTable: Expr[String],
+      sourceFkColumn: Expr[String],
+      targetFkColumn: Expr[String]
+  )(using Quotes): Expr[Any] =
+    import quotes.reflect.*
+    val metaS = Expr.summon[TableMeta[S]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+    )
+    val metaT = Expr.summon[TableMeta[T]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+    )
+    val ct = computeColumnsRefinement[T]()
+    ct.asType match
+      case '[ctType] =>
+        '{ BelongsToMany[S, T, ctType & Selectable]($pivotTable, $sourceFkColumn, $targetFkColumn, $metaS.primaryKey, $metaT.primaryKey) }
+
+  private def belongsToManyConventionImpl[S: Type, T: Type](using
+      Quotes
+  ): Expr[Any] =
+    import quotes.reflect.*
+    val metaS = Expr.summon[TableMeta[S]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+    )
+    val metaT = Expr.summon[TableMeta[T]].getOrElse(
+      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+    )
+    val nameMapperS = DerivingUtil.tableAnnot[S] match
+      case Some(t) => '{ $t.nameMapper }
+      case None =>
+        report.errorAndAbort(
+          s"${TypeRepr.of[S].show} must have @Table annotation for convention-based belongsToMany"
+        )
+    val nameMapperT = DerivingUtil.tableAnnot[T] match
+      case Some(t) => '{ $t.nameMapper }
+      case None =>
+        report.errorAndAbort(
+          s"${TypeRepr.of[T].show} must have @Table annotation for convention-based belongsToMany"
+        )
+    val sName = Expr(TypeRepr.of[S].typeSymbol.name)
+    val tName = Expr(TypeRepr.of[T].typeSymbol.name)
+    val ct = computeColumnsRefinement[T]()
+    ct.asType match
+      case '[ctType] =>
+        '{
+          val sSnake = $nameMapperS.toColumnName($sName)
+          val tSnake = $nameMapperT.toColumnName($tName)
+          BelongsToMany[S, T, ctType & Selectable](
+            sSnake + "_" + tSnake,
+            sSnake + "_id",
+            tSnake + "_id",
+            $metaS.primaryKey,
+            $metaT.primaryKey
+          )
+        }
+
+  private def computeColumnsRefinement[T: Type]()(using Quotes): quotes.reflect.TypeRepr =
+    import quotes.reflect.*
+    Expr.summon[Mirror.ProductOf[T]] match
+      case Some('{
+            $mirror: Mirror.ProductOf[T] {
+              type MirroredElemLabels = eMels
+              type MirroredElemTypes = eMets
+            }
+          }) =>
+        val elemNames = relElemNames[eMels]()
+        val elemTypes = relElemTypes[eMets]()
+        elemNames.zip(elemTypes).foldLeft(TypeRepr.of[Columns[T]]) { case (typeRepr, (name, tpe)) =>
+          tpe match
+            case '[t] =>
+              Refinement(typeRepr, name, TypeRepr.of[Col[t]])
+        }
+      case _ =>
+        report.errorAndAbort(
+          s"A Mirror.ProductOf is required for ${TypeRepr.of[T].show}"
+        )
+
+  private def relElemNames[Mels: Type](res: List[String] = Nil)(using
+      Quotes
+  ): List[String] =
+    import quotes.reflect.*
+    Type.of[Mels] match
+      case '[mel *: melTail] =>
+        val melString = Type.valueOfConstant[mel].get.toString
+        relElemNames[melTail](melString :: res)
+      case '[EmptyTuple] =>
+        res.reverse
+
+  private def relElemTypes[Mets: Type](res: List[Type[?]] = Nil)(using
+      Quotes
+  ): List[Type[?]] =
+    import quotes.reflect.*
+    Type.of[Mets] match
+      case '[met *: metTail] =>
+        relElemTypes[metTail](Type.of[met] :: res)
+      case '[EmptyTuple] =>
+        res.reverse
 
   private def resolveColumns[S: Type, T: Type](
       fk: Expr[S => Any],

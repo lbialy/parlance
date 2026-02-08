@@ -116,11 +116,17 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       .run()
       .head
 
-  def withRelated[T](rel: HasMany[E, T])(using
+  def withRelated[T](rel: HasMany[E, T, ?])(using
       childMeta: TableMeta[T],
       childCodec: DbCodec[T]
   ): EagerQuery[E, T] =
     EagerQuery(build, codec, meta, rel, childMeta, childCodec)
+
+  def withRelated[T](rel: BelongsToMany[E, T, ?])(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): PivotEagerQuery[E, T] =
+    PivotEagerQuery(build, codec, meta, rel, targetMeta, targetCodec)
 
   def join[T](rel: Relationship[E, T])(using
       joinedMeta: TableMeta[T],
@@ -141,11 +147,103 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       offsetOpt
     )
 
-  def debugPrintSql(): this.type =
-    println(s"SQL: ${build.sqlString}")
-    println(s"Params: ${build.params.mkString(", ")}")
-    this
+  // --- whereHas / doesntHave for Relationship ---
 
+  def whereHas[T](rel: Relationship[E, T])(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    where(buildRelExistsFrag(rel, relMeta, None, negate = false))
+
+  def whereHas[T](rel: HasMany[E, T, ?])(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    where(buildRelExistsFrag(rel, relMeta, None, negate = false))
+
+  def whereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => Frag)(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
+    where(buildRelExistsFrag(rel, relMeta, Some(f(cols)), negate = false))
+
+  def doesntHave[T](rel: HasMany[E, T, ?])(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    where(buildRelExistsFrag(rel, relMeta, None, negate = true))
+
+  def doesntHave[T](rel: Relationship[E, T])(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    where(buildRelExistsFrag(rel, relMeta, None, negate = true))
+
+  // --- whereHas / doesntHave for BelongsToMany ---
+
+  def whereHas[T](rel: BelongsToMany[E, T, ?]): QueryBuilder[HasRoot, E, C] =
+    where(buildPivotExistsFrag(rel, None, negate = false))
+
+  def whereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => Frag)(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
+    where(buildPivotExistsFrag(rel, Some((f(cols), relMeta)), negate = false))
+
+  def doesntHave[T](rel: BelongsToMany[E, T, ?]): QueryBuilder[HasRoot, E, C] =
+    where(buildPivotExistsFrag(rel, None, negate = true))
+
+  // --- Private helpers ---
+
+  private def buildRelExistsFrag[T](
+      rel: Relationship[E, T],
+      relMeta: TableMeta[T],
+      condition: Option[Frag],
+      negate: Boolean
+  ): Frag =
+    val prefix = if negate then "NOT EXISTS" else "EXISTS"
+    val correlation =
+      s"${relMeta.tableName}.${rel.pk.sqlName} = ${meta.tableName}.${rel.fk.sqlName}"
+    condition match
+      case None =>
+        Frag(
+          s"$prefix (SELECT 1 FROM ${relMeta.tableName} WHERE $correlation)",
+          Seq.empty,
+          FragWriter.empty
+        )
+      case Some(cond) =>
+        Frag(
+          s"$prefix (SELECT 1 FROM ${relMeta.tableName} WHERE $correlation AND ${cond.sqlString})",
+          cond.params,
+          cond.writer
+        )
+  end buildRelExistsFrag
+
+  private def buildPivotExistsFrag[T](
+      rel: BelongsToMany[E, T, ?],
+      conditionWithMeta: Option[(Frag, TableMeta[T])],
+      negate: Boolean
+  ): Frag =
+    val prefix = if negate then "NOT EXISTS" else "EXISTS"
+    val correlation =
+      s"${rel.pivotTable}.${rel.sourceFk} = ${meta.tableName}.${rel.sourcePk.sqlName}"
+    conditionWithMeta match
+      case None =>
+        Frag(
+          s"$prefix (SELECT 1 FROM ${rel.pivotTable} WHERE $correlation)",
+          Seq.empty,
+          FragWriter.empty
+        )
+      case Some((cond, relMeta)) =>
+        val joinClause =
+          s"${rel.pivotTable}.${rel.targetFk} = ${relMeta.tableName}.${rel.targetPk.sqlName}"
+        Frag(
+          s"$prefix (SELECT 1 FROM ${rel.pivotTable} JOIN ${relMeta.tableName} ON $joinClause WHERE $correlation AND ${cond.sqlString})",
+          cond.params,
+          cond.writer
+        )
+  end buildPivotExistsFrag
+
+  def debugPrintSql(using DbCon): this.type =
+    val frag = build
+    DebugSql.printDebug(Vector(frag))
+    this
 end QueryBuilder
 
 object QueryBuilder:
