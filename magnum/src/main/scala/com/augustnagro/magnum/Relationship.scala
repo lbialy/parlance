@@ -8,6 +8,7 @@ sealed trait Relationship[Source, Target]:
 
 case class BelongsTo[S, T](fk: Col[?], pk: Col[?]) extends Relationship[S, T]
 case class HasOne[S, T](fk: Col[?], pk: Col[?]) extends Relationship[S, T]
+case class HasMany[S, T](fk: Col[?], pk: Col[?]) extends Relationship[S, T]
 
 object Relationship:
   inline def belongsTo[S, T](
@@ -21,6 +22,12 @@ object Relationship:
       inline pk: T => Any
   )(using TableMeta[S], TableMeta[T]): HasOne[S, T] =
     ${ hasOneImpl[S, T]('fk, 'pk) }
+
+  inline def hasMany[S, T](
+      inline fk: S => Any,
+      inline pk: T => Any
+  )(using TableMeta[S], TableMeta[T]): HasMany[S, T] =
+    ${ hasManyImpl[S, T]('fk, 'pk) }
 
   // --- Macro implementations ---
 
@@ -37,6 +44,13 @@ object Relationship:
   )(using Quotes): Expr[HasOne[S, T]] =
     val (fkExpr, pkExpr) = resolveColumns[S, T](fk, pk)
     '{ HasOne[S, T]($fkExpr, $pkExpr) }
+
+  private def hasManyImpl[S: Type, T: Type](
+      fk: Expr[S => Any],
+      pk: Expr[T => Any]
+  )(using Quotes): Expr[HasMany[S, T]] =
+    val (fkExpr, pkExpr) = resolveColumns[S, T](fk, pk)
+    '{ HasMany[S, T]($fkExpr, $pkExpr) }
 
   private def resolveColumns[S: Type, T: Type](
       fk: Expr[S => Any],

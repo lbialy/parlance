@@ -116,6 +116,12 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       .run()
       .head
 
+  def withRelated[T](rel: HasMany[E, T])(using
+      childMeta: TableMeta[T],
+      childCodec: DbCodec[T]
+  ): EagerQuery[E, T] =
+    EagerQuery(build, codec, meta, rel, childMeta, childCodec)
+
   def join[T](rel: Relationship[E, T])(using
       joinedMeta: TableMeta[T],
       joinedCodec: DbCodec[T]
