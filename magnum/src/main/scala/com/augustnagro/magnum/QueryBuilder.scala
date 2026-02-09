@@ -116,6 +116,51 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       .run()
       .head
 
+  def sum[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
+    val col = f(cols)
+    val baseSql = s"SELECT SUM(${col.queryRepr}) FROM ${meta.tableName}"
+    val (whereSql, params, writer) = buildWhere
+    Frag(baseSql + whereSql, params, writer)
+      .query[Option[A]]
+      .run()
+      .head
+
+  def avg(f: C => ColRef[?])(using DbCon): Option[Double] =
+    val col = f(cols)
+    val baseSql = s"SELECT AVG(${col.queryRepr}) FROM ${meta.tableName}"
+    val (whereSql, params, writer) = buildWhere
+    Frag(baseSql + whereSql, params, writer)
+      .query[Option[Double]]
+      .run()
+      .head
+
+  def min[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
+    val col = f(cols)
+    val baseSql = s"SELECT MIN(${col.queryRepr}) FROM ${meta.tableName}"
+    val (whereSql, params, writer) = buildWhere
+    Frag(baseSql + whereSql, params, writer)
+      .query[Option[A]]
+      .run()
+      .head
+
+  def max[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
+    val col = f(cols)
+    val baseSql = s"SELECT MAX(${col.queryRepr}) FROM ${meta.tableName}"
+    val (whereSql, params, writer) = buildWhere
+    Frag(baseSql + whereSql, params, writer)
+      .query[Option[A]]
+      .run()
+      .head
+
+  def count(f: C => ColRef[?])(using DbCon): Long =
+    val col = f(cols)
+    val baseSql = s"SELECT COUNT(${col.queryRepr}) FROM ${meta.tableName}"
+    val (whereSql, params, writer) = buildWhere
+    Frag(baseSql + whereSql, params, writer)
+      .query[Long]
+      .run()
+      .head
+
   def withRelated[T](rel: HasMany[E, T, ?])(using
       childMeta: TableMeta[T],
       childCodec: DbCodec[T]
