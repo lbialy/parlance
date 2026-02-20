@@ -1,45 +1,124 @@
 package com.augustnagro.magnum
 
-class EagerQuery[E, T] private[magnum] (
-    protected val rootFrag: Frag,
-    protected val rootCodec: DbCodec[E],
-    protected val rootMeta: TableMeta[E],
-    private val rel: HasMany[E, T, ?],
-    private val childMeta: TableMeta[T],
-    private val childCodec: DbCodec[T]
-) extends EagerQueryBase[E, T]:
+import scala.collection.mutable
 
-  private def parentKeyIndex: Int =
-    resolveColumnIndex(rootMeta, rel.fk.scalaName)
+class EagerQuery[E, R <: Tuple] private[magnum] (
+    private val rootFrag: Frag,
+    private val rootCodec: DbCodec[E],
+    private val rootMeta: TableMeta[E],
+    private val defs: Vector[EagerQueryDef]
+):
 
-  private def childFkIndex: Int =
-    resolveColumnIndex(childMeta, rel.pk.scalaName)
+  import EagerQueryDef.*
 
-  private def childQuerySql(placeholders: String): String =
-    val childCols = childMeta.columns.map(_.sqlName).mkString(", ")
-    s"SELECT $childCols FROM ${childMeta.tableName} WHERE ${rel.pk.sqlName} IN ($placeholders)"
+  // --- Unconstrained withRelated ---
 
-  def run()(using DbCon): Vector[(E, Vector[T])] =
-    val parents = fetchParents()
+  def withRelated[T](rel: HasMany[E, T, ?])(using
+      childMeta: TableMeta[T],
+      childCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val d = DirectEagerDef(rootMeta, rel, childMeta, childCodec, None)
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  def withRelated[T](rel: BelongsToMany[E, T, ?])(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val d = PivotEagerDef(rootMeta, rel, targetMeta, targetCodec, None)
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  def withRelated[T](rel: HasManyThrough[E, T, ?])(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val d = ThroughEagerDef(rootMeta, rel.intermediateTable, rel.sourceFk,
+      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
+      rel.sourcePk.scalaName, targetMeta, targetCodec, None)
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  def withRelated[T](rel: HasOneThrough[E, T, ?])(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val d = ThroughEagerDef(rootMeta, rel.intermediateTable, rel.sourceFk,
+      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
+      rel.sourcePk.scalaName, targetMeta, targetCodec, None)
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  // --- Constrained withRelated ---
+
+  def withRelated[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => Frag)(using
+      childMeta: TableMeta[T],
+      childCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val cols = new Columns[T](childMeta.columns).asInstanceOf[CT]
+    val d = DirectEagerDef(rootMeta, rel, childMeta, childCodec, Some(f(cols)))
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  def withRelated[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => Frag)(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
+    val d = PivotEagerDef(rootMeta, rel, targetMeta, targetCodec, Some(f(cols)))
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  def withRelated[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(f: CT => Frag)(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
+    val d = ThroughEagerDef(rootMeta, rel.intermediateTable, rel.sourceFk,
+      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
+      rel.sourcePk.scalaName, targetMeta, targetCodec, Some(f(cols)))
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: CT => Frag)(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
+    val d = ThroughEagerDef(rootMeta, rel.intermediateTable, rel.sourceFk,
+      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
+      rel.sourcePk.scalaName, targetMeta, targetCodec, Some(f(cols)))
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  // --- Execution ---
+
+  def run()(using DbCon): Vector[E *: R] =
+    val parents = rootFrag.query[E](using rootCodec).run()
     if parents.isEmpty then return Vector.empty
 
-    val pkIdx = parentKeyIndex
-    val parentKeys = extractKeys(parents, pkIdx)
-    val children = fetchByKeys(childQuerySql, parentKeys, childCodec)
-    val grouped = groupByKey(children, childMeta, childFkIndex)
+    val groupedResults: Vector[mutable.LinkedHashMap[Any, Vector[Any]]] =
+      defs.map: d =>
+        val pkIdx = resolveColumnIndex(rootMeta, d.parentKeyScalaName)
+        val parentKeys = parents.map(p => extractKey(p, rootMeta, pkIdx))
+        d.fetchGrouped(parentKeys)
 
     parents.map: parent =>
-      val key = extractKey(parent, rootMeta, pkIdx)
-      (parent, grouped.getOrElse(key, Vector.empty))
+      val tail = defs.zipWithIndex.foldRight[Tuple](EmptyTuple): (pair, acc) =>
+        val (d, i) = pair
+        val pkIdx = resolveColumnIndex(rootMeta, d.parentKeyScalaName)
+        val key = extractKey(parent, rootMeta, pkIdx)
+        val children = groupedResults(i).getOrElse(key, Vector.empty)
+        children *: acc
+      (parent *: tail).asInstanceOf[E *: R]
 
-  def first()(using DbCon): Option[(E, Vector[T])] =
-    fetchParents().headOption.map: parent =>
-      val pkIdx = parentKeyIndex
-      val key = extractKey(parent, rootMeta, pkIdx)
-      val children = fetchByKeys(childQuerySql, Vector(key), childCodec)
-      (parent, children)
+  def first()(using DbCon): Option[E *: R] =
+    rootFrag.query[E](using rootCodec).run().headOption.map: parent =>
+      val tail = defs.foldRight[Tuple](EmptyTuple): (d, acc) =>
+        val pkIdx = resolveColumnIndex(rootMeta, d.parentKeyScalaName)
+        val key = extractKey(parent, rootMeta, pkIdx)
+        val grouped = d.fetchGrouped(Vector(key))
+        val children = grouped.getOrElse(key, Vector.empty)
+        children *: acc
+      (parent *: tail).asInstanceOf[E *: R]
 
   def buildQueries: Vector[Frag] =
-    Vector(rootFrag, Frag(childQuerySql("?"), Seq.empty, FragWriter.empty))
+    rootFrag +: defs.flatMap(_.representativeQueries)
+
+  def debugPrintSql(using DbCon): this.type =
+    DebugSql.printDebug(buildQueries)
+    this
 
 end EagerQuery

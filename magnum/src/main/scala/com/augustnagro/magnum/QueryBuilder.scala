@@ -144,30 +144,72 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def withRelated[T](rel: HasMany[E, T, ?])(using
       childMeta: TableMeta[T],
       childCodec: DbCodec[T]
-  ): EagerQuery[E, T] =
-    EagerQuery(build, codec, meta, rel, childMeta, childCodec)
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val d = DirectEagerDef(meta, rel, childMeta, childCodec, None)
+    EagerQuery(build, codec, meta, Vector(d))
 
   def withRelated[T](rel: BelongsToMany[E, T, ?])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
-  ): PivotEagerQuery[E, T] =
-    PivotEagerQuery(build, codec, meta, rel, targetMeta, targetCodec)
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, None)
+    EagerQuery(build, codec, meta, Vector(d))
 
   def withRelated[T](rel: HasManyThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
-  ): ThroughQuery[E, T] =
-    ThroughQuery(build, codec, meta, rel.intermediateTable, rel.sourceFk,
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val d = ThroughEagerDef(meta, rel.intermediateTable, rel.sourceFk,
       rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec)
+      rel.sourcePk.scalaName, targetMeta, targetCodec, None)
+    EagerQuery(build, codec, meta, Vector(d))
 
   def withRelated[T](rel: HasOneThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
-  ): ThroughQuery[E, T] =
-    ThroughQuery(build, codec, meta, rel.intermediateTable, rel.sourceFk,
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val d = ThroughEagerDef(meta, rel.intermediateTable, rel.sourceFk,
       rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec)
+      rel.sourcePk.scalaName, targetMeta, targetCodec, None)
+    EagerQuery(build, codec, meta, Vector(d))
+
+  // --- Constrained withRelated ---
+
+  def withRelated[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => Frag)(using
+      childMeta: TableMeta[T],
+      childCodec: DbCodec[T]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val relCols = new Columns[T](childMeta.columns).asInstanceOf[CT]
+    val d = DirectEagerDef(meta, rel, childMeta, childCodec, Some(f(relCols)))
+    EagerQuery(build, codec, meta, Vector(d))
+
+  def withRelated[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => Frag)(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
+    val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, Some(f(relCols)))
+    EagerQuery(build, codec, meta, Vector(d))
+
+  def withRelated[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(f: CT => Frag)(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
+    val d = ThroughEagerDef(meta, rel.intermediateTable, rel.sourceFk,
+      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
+      rel.sourcePk.scalaName, targetMeta, targetCodec, Some(f(relCols)))
+    EagerQuery(build, codec, meta, Vector(d))
+
+  def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: CT => Frag)(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
+    val d = ThroughEagerDef(meta, rel.intermediateTable, rel.sourceFk,
+      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
+      rel.sourcePk.scalaName, targetMeta, targetCodec, Some(f(relCols)))
+    EagerQuery(build, codec, meta, Vector(d))
 
   // --- withCount for HasMany ---
 
