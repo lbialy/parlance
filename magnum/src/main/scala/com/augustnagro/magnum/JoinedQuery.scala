@@ -76,6 +76,25 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
       predicate, orderEntries, limitOpt, offsetOpt
     )
 
+  def leftJoin[S, U](rel: Relationship[S, U])(using
+      sMeta: TableMeta[S],
+      uMeta: TableMeta[U],
+      uCodec: DbCodec[U]
+  ): JoinedQuery[Tuple.Append[R, Option[U]]] =
+    val sourceIdx = metas.indexWhere(_.tableName == sMeta.tableName)
+    require(sourceIdx >= 0, s"Table ${sMeta.tableName} not in join chain")
+    val newIdx = metas.size
+    val optCodec = DbCodec.OptionCodec[U](using uCodec)
+    val entry = JoinEntry(
+      TableRef(uMeta.tableName, s"t$newIdx", uMeta.tableName),
+      JoinType.Left,
+      Frag(s"t$sourceIdx.${rel.fk.sqlName} = t$newIdx.${rel.pk.sqlName}", Seq.empty, FragWriter.empty)
+    )
+    new JoinedQuery[Tuple.Append[R, Option[U]]](
+      metas :+ uMeta, codecs :+ optCodec, joinClauses :+ entry,
+      predicate, orderEntries, limitOpt, offsetOpt
+    )
+
   private def resultCodec: DbCodec[R] =
     new DbCodec[R]:
       val cols: IArray[Int] = IArray.from(codecs.flatMap(_.cols.toSeq))
@@ -178,6 +197,7 @@ object JoinedQuery:
 
   extension [R <: NonEmptyTuple](jq: JoinedQuery[R])
     transparent inline def of[T]: Any = ${ ofImpl[R, T] }
+    transparent inline def ofLeft[T]: Any = ${ ofLeftImpl[R, T] }
 
   private[magnum] def ofImpl[R: Type, T: Type](using Quotes): Expr[Any] =
     import quotes.reflect.*
@@ -195,6 +215,40 @@ object JoinedQuery:
       case idx :: Nil =>
         val aliasExpr = Expr(s"t$idx")
         buildAliasedColumns[T](aliasExpr)
+
+  private[magnum] def ofLeftImpl[R: Type, T: Type](using Quotes): Expr[Any] =
+    import quotes.reflect.*
+
+    val indices = tupleIndicesOfOption[T](TypeRepr.of[R], 0)
+    indices match
+      case Nil =>
+        report.errorAndAbort(
+          s"Type Option[${TypeRepr.of[T].show}] is not in the join tuple ${TypeRepr.of[R].show}"
+        )
+      case _ :: _ :: _ =>
+        report.errorAndAbort(
+          s"Type Option[${TypeRepr.of[T].show}] appears multiple times in ${TypeRepr.of[R].show}; use col(index, col) instead"
+        )
+      case idx :: Nil =>
+        val aliasExpr = Expr(s"t$idx")
+        buildAliasedColumns[T](aliasExpr)
+
+  private def tupleIndicesOfOption[T: Type](using Quotes)(
+      tpe: quotes.reflect.TypeRepr,
+      offset: Int
+  ): List[Int] =
+    import quotes.reflect.*
+    tpe.dealias match
+      case AppliedType(tycon, args) if tycon.typeSymbol.name == "*:" =>
+        val head = args(0)
+        val tail = args(1)
+        val here = if head =:= TypeRepr.of[Option[T]] then List(offset) else Nil
+        here ++ tupleIndicesOfOption[T](tail, offset + 1)
+      case AppliedType(tycon, args) =>
+        args.zipWithIndex.collect {
+          case (arg, idx) if arg =:= TypeRepr.of[Option[T]] => offset + idx
+        }
+      case _ => Nil
 
   private def buildAliasedColumns[E: Type](aliasExpr: Expr[String])(using Quotes): Expr[Any] =
     import quotes.reflect.*

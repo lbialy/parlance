@@ -258,6 +258,26 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       offsetOpt
     )
 
+  def leftJoin[T](rel: Relationship[E, T])(using
+      joinedMeta: TableMeta[T],
+      joinedCodec: DbCodec[T]
+  ): JoinedQuery[(E, Option[T])] =
+    val optCodec = DbCodec.OptionCodec[T](using joinedCodec)
+    val entry = JoinEntry(
+      TableRef(joinedMeta.tableName, "t1", joinedMeta.tableName),
+      JoinType.Left,
+      Frag(s"t0.${rel.fk.sqlName} = t1.${rel.pk.sqlName}", Seq.empty, FragWriter.empty)
+    )
+    new JoinedQuery[(E, Option[T])](
+      Vector(meta, joinedMeta),
+      Vector(codec, optCodec),
+      Vector(entry),
+      rootPredicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt
+    )
+
   // --- whereHas / doesntHave for Relationship ---
 
   def whereHas[T](rel: Relationship[E, T])(using
