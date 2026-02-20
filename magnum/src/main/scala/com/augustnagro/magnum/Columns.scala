@@ -21,7 +21,11 @@ import scala.quoted.*
 final class Columns[E](private val cols: IArray[ColRef[?]])
     extends Selectable:
   def selectDynamic(name: String): Any =
-    cols.find(_.scalaName == name).get
+    cols.find(_.scalaName == name).getOrElse(
+      throw QueryBuilderException(
+        s"Column '$name' not found in columns: ${cols.map(_.scalaName).mkString(", ")}"
+      )
+    )
 
 object Columns:
   transparent inline def of[E](using TableMeta[E]): Any =
@@ -49,11 +53,11 @@ object Columns:
               type MirroredElemTypes = eMets
             }
           }) =>
-        val elemNames = columnsElemNames[eMels]()
-        val elemTypes = columnsElemTypes[eMets]()
+        val names = elemNames[eMels]()
+        val types = elemTypes[eMets]()
 
         val refinement =
-          elemNames.zip(elemTypes).foldLeft(TypeRepr.of[Columns[E]]) {
+          names.zip(types).foldLeft(TypeRepr.of[Columns[E]]) {
             case (typeRepr, (name, tpe)) =>
               tpe match
                 case '[t] =>
@@ -70,26 +74,5 @@ object Columns:
         )
     end match
   end ofImpl
-
-  private def columnsElemNames[Mels: Type](res: List[String] = Nil)(using
-      Quotes
-  ): List[String] =
-    import quotes.reflect.*
-    Type.of[Mels] match
-      case '[mel *: melTail] =>
-        val melString = Type.valueOfConstant[mel].get.toString
-        columnsElemNames[melTail](melString :: res)
-      case '[EmptyTuple] =>
-        res.reverse
-
-  private def columnsElemTypes[Mets: Type](res: List[Type[?]] = Nil)(using
-      Quotes
-  ): List[Type[?]] =
-    import quotes.reflect.*
-    Type.of[Mets] match
-      case '[met *: metTail] =>
-        columnsElemTypes[metTail](Type.of[met] :: res)
-      case '[EmptyTuple] =>
-        res.reverse
 
 end Columns

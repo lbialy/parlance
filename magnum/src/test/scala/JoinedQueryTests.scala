@@ -1,9 +1,4 @@
 import com.augustnagro.magnum.*
-import munit.{FunSuite, Tag}
-import org.h2.jdbcx.JdbcDataSource
-
-import java.nio.file.{Files, Path}
-import scala.util.Using
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 case class JnAuthor(@Id id: Long, name: String) derives DbCodec, TableMeta
@@ -11,30 +6,9 @@ case class JnAuthor(@Id id: Long, name: String) derives DbCodec, TableMeta
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 case class JnBook(@Id id: Long, authorId: Long, title: String) derives DbCodec, TableMeta
 
-class JoinedQueryTests extends FunSuite:
+class JoinedQueryTests extends QbTestBase:
 
-  override def munitTestTransforms: List[TestTransform] =
-    super.munitTestTransforms :+ new TestTransform(
-      "QB",
-      test => test.withTags(test.tags + new Tag("QB"))
-    )
-
-  lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
-
-  def xa(): Transactor =
-    val ds = JdbcDataSource()
-    ds.setURL("jdbc:h2:" + h2DbPath)
-    ds.setUser("sa")
-    ds.setPassword("")
-    val ddl = Files.readString(
-      Path.of(getClass.getResource("/h2/qb-join.sql").toURI)
-    )
-    Using.Manager: use =>
-      val con = use(ds.getConnection)
-      val stmt = use(con.createStatement)
-      stmt.execute(ddl)
-
-    Transactor(ds)
+  val h2Ddls = Seq("/h2/qb-join.sql")
 
   val bookAuthor = Relationship.belongsTo[JnBook, JnAuthor](_.authorId, _.id)
 
@@ -78,8 +52,8 @@ class JoinedQueryTests extends FunSuite:
       .join(bookAuthor)
       .build
     val sql = frag.sqlString
-    assert(sql.contains("t0."), s"Expected t0. alias in: $sql")
-    assert(sql.contains("t1."), s"Expected t1. alias in: $sql")
+    assert(sql.matches(".*\\bt0\\.\\w+.*"), s"Expected t0.<col> alias in: $sql")
+    assert(sql.matches(".*\\bt1\\.\\w+.*"), s"Expected t1.<col> alias in: $sql")
     assert(sql.contains("INNER JOIN"), s"Expected INNER JOIN in: $sql")
     assert(
       sql.contains("ON t0.author_id = t1.id"),

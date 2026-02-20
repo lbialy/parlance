@@ -1,9 +1,4 @@
 import com.augustnagro.magnum.*
-import munit.{FunSuite, Tag}
-import org.h2.jdbcx.JdbcDataSource
-
-import java.nio.file.{Files, Path}
-import scala.util.Using
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 case class MjCountry(@Id id: Long, name: String) derives DbCodec, TableMeta
@@ -19,30 +14,9 @@ case class MjAuthor(@Id id: Long, name: String, countryId: Long)
 case class MjBook(@Id id: Long, authorId: Long, publisherId: Long, title: String)
     derives DbCodec, TableMeta
 
-class MultiJoinQueryTests extends FunSuite:
+class MultiJoinQueryTests extends QbTestBase:
 
-  override def munitTestTransforms: List[TestTransform] =
-    super.munitTestTransforms :+ new TestTransform(
-      "QB",
-      test => test.withTags(test.tags + new Tag("QB"))
-    )
-
-  lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
-
-  def xa(): Transactor =
-    val ds = JdbcDataSource()
-    ds.setURL("jdbc:h2:" + h2DbPath)
-    ds.setUser("sa")
-    ds.setPassword("")
-    val ddl = Files.readString(
-      Path.of(getClass.getResource("/h2/qb-multi-join.sql").toURI)
-    )
-    Using.Manager: use =>
-      val con = use(ds.getConnection)
-      val stmt = use(con.createStatement)
-      stmt.execute(ddl)
-
-    Transactor(ds)
+  val h2Ddls = Seq("/h2/qb-multi-join.sql")
 
   val bookAuthor = Relationship.belongsTo[MjBook, MjAuthor](_.authorId, _.id)
   val authorCountry = Relationship.belongsTo[MjAuthor, MjCountry](_.countryId, _.id)

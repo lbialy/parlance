@@ -1,38 +1,8 @@
 import com.augustnagro.magnum.*
-import munit.{FunSuite, Tag}
-import org.h2.jdbcx.JdbcDataSource
 
-import java.nio.file.{Files, Path}
-import scala.util.Using
+class AggregateTests extends QbTestBase:
 
-class AggregateTests extends FunSuite:
-
-  override def munitTestTransforms: List[TestTransform] =
-    super.munitTestTransforms :+ new TestTransform(
-      "QB",
-      test => test.withTags(test.tags + new Tag("QB"))
-    )
-
-  lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
-
-  def xa(): Transactor =
-    val ds = JdbcDataSource()
-    ds.setURL("jdbc:h2:" + h2DbPath)
-    ds.setUser("sa")
-    ds.setPassword("")
-    val chunkDdl = Files.readString(
-      Path.of(getClass.getResource("/h2/qb-chunk.sql").toURI)
-    )
-    val userDdl = Files.readString(
-      Path.of(getClass.getResource("/h2/qb-user.sql").toURI)
-    )
-    Using.Manager: use =>
-      val con = use(ds.getConnection)
-      val stmt = use(con.createStatement)
-      stmt.execute(chunkDdl)
-      stmt.execute(userDdl)
-
-    Transactor(ds)
+  val h2Ddls = Seq("/h2/qb-chunk.sql", "/h2/qb-user.sql")
 
   // --- SUM ---
 
@@ -64,7 +34,8 @@ class AggregateTests extends FunSuite:
     val t = xa()
     t.connect:
       val result = QueryBuilder.from[QbItem].avg(_.amount)
-      assertEquals(result, Some(505.0))
+      assert(result.isDefined, "avg should return Some")
+      assertEqualsDouble(result.get, 505.0, 0.01)
 
   test("avg with where"):
     val t = xa()
@@ -72,7 +43,8 @@ class AggregateTests extends FunSuite:
       val result = QueryBuilder.from[QbItem]
         .where(_.amount > 500)
         .avg(_.amount)
-      assertEquals(result, Some(755.0))
+      assert(result.isDefined, "avg with where should return Some")
+      assertEqualsDouble(result.get, 755.0, 0.01)
 
   test("avg on empty returns None"):
     val t = xa()

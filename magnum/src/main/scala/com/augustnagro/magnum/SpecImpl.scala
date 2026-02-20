@@ -8,7 +8,6 @@ private trait SpecImpl:
       case SortOrder.Default => ""
       case SortOrder.Asc     => " ASC"
       case SortOrder.Desc    => " DESC"
-      case _                 => throw UnsupportedOperationException()
     val nullOrder = sort.nullOrder match
       case NullOrder.Default => ""
       case NullOrder.First   => " NULLS FIRST"
@@ -71,12 +70,10 @@ private trait SpecImpl:
     val orderByClauseStr = orderByClause.toString
     if orderByClauseStr.nonEmpty then finalSj.add(orderByClauseStr)
 
-    for offsetLimit <- offsetLimitSql(spec.offset, spec.limit) do
-      finalSj.add(offsetLimit)
+    for offsetLimit <- offsetLimitSql(spec.offset, spec.limit) do finalSj.add(offsetLimit)
 
     val allFrags = prefixFrag +: whereFrags
-    val fragWriter: FragWriter = (ps, startingPos) =>
-      allFrags.foldLeft(startingPos)((pos, frag) => frag.writer.write(ps, pos))
+    val fragWriter: FragWriter = (ps, startingPos) => allFrags.foldLeft(startingPos)((pos, frag) => frag.writer.write(ps, pos))
 
     Frag(finalSj.toString, allParams.result(), fragWriter)
       .query[E]

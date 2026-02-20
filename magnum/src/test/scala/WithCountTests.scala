@@ -1,34 +1,8 @@
 import com.augustnagro.magnum.*
-import munit.{FunSuite, Tag}
-import org.h2.jdbcx.JdbcDataSource
 
-import java.nio.file.{Files, Path}
-import scala.util.Using
+class WithCountTests extends QbTestBase:
 
-class WithCountTests extends FunSuite:
-
-  override def munitTestTransforms: List[TestTransform] =
-    super.munitTestTransforms :+ new TestTransform(
-      "QB",
-      test => test.withTags(test.tags + new Tag("QB"))
-    )
-
-  lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
-
-  def xa(): Transactor =
-    val ds = JdbcDataSource()
-    ds.setURL("jdbc:h2:" + h2DbPath)
-    ds.setUser("sa")
-    ds.setPassword("")
-    val ddl = Files.readString(
-      Path.of(getClass.getResource("/h2/qb-where-has.sql").toURI)
-    )
-    Using.Manager: use =>
-      val con = use(ds.getConnection)
-      val stmt = use(con.createStatement)
-      stmt.execute(ddl)
-
-    Transactor(ds)
+  val h2Ddls = Seq("/h2/qb-where-has.sql")
 
   val authorBooks =
     Relationship.hasMany[ElAuthor, ElBook](_.id, _.authorId)

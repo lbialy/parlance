@@ -46,7 +46,7 @@ object TableMeta:
             case Some(sqlName) => '{ $sqlName.name }
             case None => '{ $nameMapper.toTableName($tableNameScalaExpr) }
 
-        val eElemNames: List[String] = metaElemNames[eMels]()
+        val eElemNames: List[String] = elemNames[eMels]()
         val eElemNamesSql: List[Expr[String]] = eElemNames.map(elemName =>
           metaSqlNameAnnot[E](elemName) match
             case Some(sqlName) => '{ $sqlName.name }
@@ -84,17 +84,6 @@ object TableMeta:
         )
     end match
   end derivedImpl
-
-  private def metaElemNames[Mels: Type](res: List[String] = Nil)(using
-      Quotes
-  ): List[String] =
-    import quotes.reflect.*
-    Type.of[Mels] match
-      case '[mel *: melTail] =>
-        val melString = Type.valueOfConstant[mel].get.toString
-        metaElemNames[melTail](melString :: res)
-      case '[EmptyTuple] =>
-        res.reverse
 
   private def metaSqlNameAnnot[T: Type](elemName: String)(using
       Quotes

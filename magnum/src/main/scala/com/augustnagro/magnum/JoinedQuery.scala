@@ -212,8 +212,8 @@ object JoinedQuery:
               type MirroredElemTypes = mets
             }
           }) =>
-        val names = macroElemNames[mels]()
-        val types = macroElemTypes[mets]()
+        val names = elemNames[mels]()
+        val types = elemTypes[mets]()
 
         val refinement =
           names.zip(types).foldLeft(TypeRepr.of[Columns[E]]) {
@@ -248,26 +248,5 @@ object JoinedQuery:
           case (arg, idx) if arg =:= TypeRepr.of[T] => offset + idx
         }
       case _ => Nil
-
-  private def macroElemNames[Mels: Type](res: List[String] = Nil)(using
-      Quotes
-  ): List[String] =
-    import quotes.reflect.*
-    Type.of[Mels] match
-      case '[mel *: melTail] =>
-        val melString = Type.valueOfConstant[mel].get.toString
-        macroElemNames[melTail](melString :: res)
-      case '[EmptyTuple] =>
-        res.reverse
-
-  private def macroElemTypes[Mets: Type](res: List[Type[?]] = Nil)(using
-      Quotes
-  ): List[Type[?]] =
-    import quotes.reflect.*
-    Type.of[Mets] match
-      case '[met *: metTail] =>
-        macroElemTypes[metTail](Type.of[met] :: res)
-      case '[EmptyTuple] =>
-        res.reverse
 
 end JoinedQuery

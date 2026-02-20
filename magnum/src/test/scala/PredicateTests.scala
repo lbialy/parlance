@@ -42,15 +42,17 @@ class PredicateTests extends FunSuite:
     val result = pred.toFrag
     assertEquals(result.sqlString, "((a = 1 AND b = 2) OR (c = 3 AND d = 4))")
 
-  test("empty AND is a no-op (empty sql)"):
+  test("empty AND is a no-op (empty sql, no params)"):
     val pred = Predicate.And(Vector.empty)
     val result = pred.toFrag
     assertEquals(result.sqlString, "")
+    assert(result.params.isEmpty, "empty AND should have no params")
 
-  test("empty OR is a no-op (empty sql)"):
+  test("empty OR is a no-op (empty sql, no params)"):
     val pred = Predicate.Or(Vector.empty)
     val result = pred.toFrag
     assertEquals(result.sqlString, "")
+    assert(result.params.isEmpty, "empty OR should have no params")
 
   test("single-child AND renders without parentheses"):
     val a = Predicate.Leaf(Frag("x = 1", Seq.empty, FragWriter.empty))

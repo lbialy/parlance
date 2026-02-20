@@ -1,37 +1,11 @@
 import com.augustnagro.magnum.*
-import munit.{FunSuite, Tag}
-import org.h2.jdbcx.JdbcDataSource
-
-import java.nio.file.{Files, Path}
-import scala.util.Using
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 case class QbItem(@Id id: Long, amount: Int) derives DbCodec, TableMeta
 
-class ChunkTests extends FunSuite:
+class ChunkTests extends QbTestBase:
 
-  override def munitTestTransforms: List[TestTransform] =
-    super.munitTestTransforms :+ new TestTransform(
-      "QB",
-      test => test.withTags(test.tags + new Tag("QB"))
-    )
-
-  lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
-
-  def xa(): Transactor =
-    val ds = JdbcDataSource()
-    ds.setURL("jdbc:h2:" + h2DbPath)
-    ds.setUser("sa")
-    ds.setPassword("")
-    val ddl = Files.readString(
-      Path.of(getClass.getResource("/h2/qb-chunk.sql").toURI)
-    )
-    Using.Manager: use =>
-      val con = use(ds.getConnection)
-      val stmt = use(con.createStatement)
-      stmt.execute(ddl)
-
-    Transactor(ds)
+  val h2Ddls = Seq("/h2/qb-chunk.sql")
 
   test("chunk(25) over 100 rows yields exactly 4 batches of 25"):
     val t = xa()

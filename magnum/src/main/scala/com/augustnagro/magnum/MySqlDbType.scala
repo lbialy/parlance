@@ -21,7 +21,6 @@ object MySqlDbType extends DbType:
         case SortOrder.Default => ""
         case SortOrder.Asc     => " ASC"
         case SortOrder.Desc    => " DESC"
-        case _                 => throw UnsupportedOperationException()
       nullSort + column + dir
 
     override def offsetLimitSql(
@@ -131,9 +130,7 @@ object MySqlDbType extends DbType:
 
       def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
         deleteAllById(
-          entities.map(e =>
-            e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID]
-          )
+          entities.map(e => e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID])
         )
 
       def deleteAllById(ids: Iterable[ID])(using

@@ -344,7 +344,7 @@ private def idAnnotIndex[E: Type](using q: Quotes): Expr[Int] =
     case x  => x
   Expr(index)
 
-private def elemNames[Mels: Type](res: List[String] = Nil)(using
+private[magnum] def elemNames[Mels: Type](res: List[String] = Nil)(using
     Quotes
 ): List[String] =
   import quotes.reflect.*
@@ -352,6 +352,16 @@ private def elemNames[Mels: Type](res: List[String] = Nil)(using
     case '[mel *: melTail] =>
       val melString = Type.valueOfConstant[mel].get.toString
       elemNames[melTail](melString :: res)
+    case '[EmptyTuple] =>
+      res.reverse
+
+private[magnum] def elemTypes[Mets: Type](res: List[Type[?]] = Nil)(using
+    Quotes
+): List[Type[?]] =
+  import quotes.reflect.*
+  Type.of[Mets] match
+    case '[met *: metTail] =>
+      elemTypes[metTail](Type.of[met] :: res)
     case '[EmptyTuple] =>
       res.reverse
 

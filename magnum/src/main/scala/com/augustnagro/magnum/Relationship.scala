@@ -245,9 +245,9 @@ object Relationship:
               type MirroredElemTypes = eMets
             }
           }) =>
-        val elemNames = relElemNames[eMels]()
-        val elemTypes = relElemTypes[eMets]()
-        elemNames.zip(elemTypes).foldLeft(TypeRepr.of[Columns[T]]) { case (typeRepr, (name, tpe)) =>
+        val names = elemNames[eMels]()
+        val types = elemTypes[eMets]()
+        names.zip(types).foldLeft(TypeRepr.of[Columns[T]]) { case (typeRepr, (name, tpe)) =>
           tpe match
             case '[t] =>
               Refinement(typeRepr, name, TypeRepr.of[Col[t]])
@@ -256,27 +256,6 @@ object Relationship:
         report.errorAndAbort(
           s"A Mirror.ProductOf is required for ${TypeRepr.of[T].show}"
         )
-
-  private def relElemNames[Mels: Type](res: List[String] = Nil)(using
-      Quotes
-  ): List[String] =
-    import quotes.reflect.*
-    Type.of[Mels] match
-      case '[mel *: melTail] =>
-        val melString = Type.valueOfConstant[mel].get.toString
-        relElemNames[melTail](melString :: res)
-      case '[EmptyTuple] =>
-        res.reverse
-
-  private def relElemTypes[Mets: Type](res: List[Type[?]] = Nil)(using
-      Quotes
-  ): List[Type[?]] =
-    import quotes.reflect.*
-    Type.of[Mets] match
-      case '[met *: metTail] =>
-        relElemTypes[metTail](Type.of[met] :: res)
-      case '[EmptyTuple] =>
-        res.reverse
 
   private def resolveColumns[S: Type, T: Type](
       fk: Expr[S => Any],

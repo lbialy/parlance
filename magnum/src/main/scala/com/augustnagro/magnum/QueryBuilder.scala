@@ -57,9 +57,11 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), SortOrder.Asc), limitOpt, offsetOpt)
 
   def limit(n: Int): QueryBuilder[S, E, C] =
+    if n < 0 then throw QueryBuilderException("limit must not be negative")
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, Some(n), offsetOpt)
 
   def offset(n: Long): QueryBuilder[S, E, C] =
+    if n < 0 then throw QueryBuilderException("offset must not be negative")
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, Some(n))
 
   private def buildWhere: (String, Seq[Any], FragWriter) =
@@ -103,63 +105,41 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def count()(using DbCon): Long =
     val baseSql = s"SELECT COUNT(*) FROM ${meta.tableName}"
     val (whereSql, params, writer) = buildWhere
-    Frag(baseSql + whereSql, params, writer)
-      .query[Long]
-      .run()
-      .head
+    QueryBuilderException.requireNonEmpty(
+      Frag(baseSql + whereSql, params, writer).query[Long].run(),
+      s"Aggregate query on ${meta.tableName}"
+    )
 
   def exists()(using DbCon): Boolean =
     val innerSql = s"SELECT 1 FROM ${meta.tableName}"
     val (whereSql, params, writer) = buildWhere
-    Frag(s"SELECT EXISTS($innerSql$whereSql)", params, writer)
-      .query[Boolean]
-      .run()
-      .head
+    QueryBuilderException.requireNonEmpty(
+      Frag(s"SELECT EXISTS($innerSql$whereSql)", params, writer).query[Boolean].run(),
+      s"Aggregate query on ${meta.tableName}"
+    )
 
   def sum[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
-    val col = f(cols)
-    val baseSql = s"SELECT SUM(${col.queryRepr}) FROM ${meta.tableName}"
-    val (whereSql, params, writer) = buildWhere
-    Frag(baseSql + whereSql, params, writer)
-      .query[Option[A]]
-      .run()
-      .head
+    runAgg[Option[A]]("SUM", f(cols).queryRepr)
 
   def avg(f: C => ColRef[?])(using DbCon): Option[Double] =
-    val col = f(cols)
-    val baseSql = s"SELECT AVG(${col.queryRepr}) FROM ${meta.tableName}"
-    val (whereSql, params, writer) = buildWhere
-    Frag(baseSql + whereSql, params, writer)
-      .query[Option[Double]]
-      .run()
-      .head
+    runAgg[Option[Double]]("AVG", f(cols).queryRepr)
 
   def min[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
-    val col = f(cols)
-    val baseSql = s"SELECT MIN(${col.queryRepr}) FROM ${meta.tableName}"
-    val (whereSql, params, writer) = buildWhere
-    Frag(baseSql + whereSql, params, writer)
-      .query[Option[A]]
-      .run()
-      .head
+    runAgg[Option[A]]("MIN", f(cols).queryRepr)
 
   def max[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
-    val col = f(cols)
-    val baseSql = s"SELECT MAX(${col.queryRepr}) FROM ${meta.tableName}"
-    val (whereSql, params, writer) = buildWhere
-    Frag(baseSql + whereSql, params, writer)
-      .query[Option[A]]
-      .run()
-      .head
+    runAgg[Option[A]]("MAX", f(cols).queryRepr)
 
   def count(f: C => ColRef[?])(using DbCon): Long =
-    val col = f(cols)
-    val baseSql = s"SELECT COUNT(${col.queryRepr}) FROM ${meta.tableName}"
+    runAgg[Long]("COUNT", f(cols).queryRepr)(using DbCodec.LongCodec)
+
+  private def runAgg[R](fn: String, colRepr: String)(using DbCodec[R], DbCon): R =
+    val baseSql = s"SELECT $fn($colRepr) FROM ${meta.tableName}"
     val (whereSql, params, writer) = buildWhere
-    Frag(baseSql + whereSql, params, writer)
-      .query[Long]
-      .run()
-      .head
+    QueryBuilderException.requireNonEmpty(
+      Frag(baseSql + whereSql, params, writer).query[R].run(),
+      s"Aggregate query on ${meta.tableName}"
+    )
 
   def withRelated[T](rel: HasMany[E, T, ?])(using
       childMeta: TableMeta[T],
@@ -280,76 +260,60 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 
   // --- Private helpers ---
 
+  private def buildExistsFrag(
+      fromClause: String,
+      correlation: String,
+      condition: Option[Frag],
+      negate: Boolean
+  ): Frag =
+    val prefix = if negate then "NOT EXISTS" else "EXISTS"
+    condition match
+      case None =>
+        Frag(s"$prefix (SELECT 1 FROM $fromClause WHERE $correlation)", Seq.empty, FragWriter.empty)
+      case Some(cond) =>
+        Frag(s"$prefix (SELECT 1 FROM $fromClause WHERE $correlation AND ${cond.sqlString})", cond.params, cond.writer)
+
+  private def buildCountSql(fromClause: String, correlation: String): String =
+    s"SELECT COUNT(*) FROM $fromClause WHERE $correlation"
+
   private def buildRelExistsFrag[T](
       rel: Relationship[E, T],
       relMeta: TableMeta[T],
       condition: Option[Frag],
       negate: Boolean
   ): Frag =
-    val prefix = if negate then "NOT EXISTS" else "EXISTS"
-    val correlation =
-      s"${relMeta.tableName}.${rel.pk.sqlName} = ${meta.tableName}.${rel.fk.sqlName}"
-    condition match
-      case None =>
-        Frag(
-          s"$prefix (SELECT 1 FROM ${relMeta.tableName} WHERE $correlation)",
-          Seq.empty,
-          FragWriter.empty
-        )
-      case Some(cond) =>
-        Frag(
-          s"$prefix (SELECT 1 FROM ${relMeta.tableName} WHERE $correlation AND ${cond.sqlString})",
-          cond.params,
-          cond.writer
-        )
-  end buildRelExistsFrag
+    val correlation = s"${relMeta.tableName}.${rel.pk.sqlName} = ${meta.tableName}.${rel.fk.sqlName}"
+    buildExistsFrag(relMeta.tableName, correlation, condition, negate)
 
   private def buildPivotExistsFrag[T](
       rel: BelongsToMany[E, T, ?],
       conditionWithMeta: Option[(Frag, TableMeta[T])],
       negate: Boolean
   ): Frag =
-    val prefix = if negate then "NOT EXISTS" else "EXISTS"
-    val correlation =
-      s"${rel.pivotTable}.${rel.sourceFk} = ${meta.tableName}.${rel.sourcePk.sqlName}"
-    conditionWithMeta match
-      case None =>
-        Frag(
-          s"$prefix (SELECT 1 FROM ${rel.pivotTable} WHERE $correlation)",
-          Seq.empty,
-          FragWriter.empty
-        )
-      case Some((cond, relMeta)) =>
-        val joinClause =
-          s"${rel.pivotTable}.${rel.targetFk} = ${relMeta.tableName}.${rel.targetPk.sqlName}"
-        Frag(
-          s"$prefix (SELECT 1 FROM ${rel.pivotTable} JOIN ${relMeta.tableName} ON $joinClause WHERE $correlation AND ${cond.sqlString})",
-          cond.params,
-          cond.writer
-        )
-  end buildPivotExistsFrag
+    val correlation = s"${rel.pivotTable}.${rel.sourceFk} = ${meta.tableName}.${rel.sourcePk.sqlName}"
+    val fromClause = conditionWithMeta match
+      case None => rel.pivotTable
+      case Some((_, tMeta)) =>
+        s"${rel.pivotTable} JOIN ${tMeta.tableName} ON ${rel.pivotTable}.${rel.targetFk} = ${tMeta.tableName}.${rel.targetPk.sqlName}"
+    buildExistsFrag(fromClause, correlation, conditionWithMeta.map(_._1), negate)
 
   private def buildRelCountSql[T](
       rel: Relationship[E, T],
       relMeta: TableMeta[T]
   ): String =
-    val correlation =
-      s"${relMeta.tableName}.${rel.pk.sqlName} = ${meta.tableName}.${rel.fk.sqlName}"
-    s"SELECT COUNT(*) FROM ${relMeta.tableName} WHERE $correlation"
+    val correlation = s"${relMeta.tableName}.${rel.pk.sqlName} = ${meta.tableName}.${rel.fk.sqlName}"
+    buildCountSql(relMeta.tableName, correlation)
 
   private def buildPivotCountSql[T](
       rel: BelongsToMany[E, T, ?],
       targetMeta: Option[TableMeta[T]]
   ): String =
-    val correlation =
-      s"${rel.pivotTable}.${rel.sourceFk} = ${meta.tableName}.${rel.sourcePk.sqlName}"
-    targetMeta match
-      case None =>
-        s"SELECT COUNT(*) FROM ${rel.pivotTable} WHERE $correlation"
+    val correlation = s"${rel.pivotTable}.${rel.sourceFk} = ${meta.tableName}.${rel.sourcePk.sqlName}"
+    val fromClause = targetMeta match
+      case None => rel.pivotTable
       case Some(tMeta) =>
-        val joinClause =
-          s"${rel.pivotTable}.${rel.targetFk} = ${tMeta.tableName}.${rel.targetPk.sqlName}"
-        s"SELECT COUNT(*) FROM ${rel.pivotTable} JOIN ${tMeta.tableName} ON $joinClause WHERE $correlation"
+        s"${rel.pivotTable} JOIN ${tMeta.tableName} ON ${rel.pivotTable}.${rel.targetFk} = ${tMeta.tableName}.${rel.targetPk.sqlName}"
+    buildCountSql(fromClause, correlation)
 
   def chunk(batchSize: Int)(using DbCon): Iterator[Vector[E]] =
     require(batchSize > 0, "batchSize must be positive")
@@ -420,11 +384,11 @@ object QueryBuilder:
               type MirroredElemTypes = eMets
             }
           }) =>
-        val elemNames = metaElemNames[eMels]()
-        val elemTypes = metaElemTypes[eMets]()
+        val names = elemNames[eMels]()
+        val types = elemTypes[eMets]()
 
         val colsRefinement =
-          elemNames.zip(elemTypes).foldLeft(TypeRepr.of[Columns[E]]) { case (typeRepr, (name, tpe)) =>
+          names.zip(types).foldLeft(TypeRepr.of[Columns[E]]) { case (typeRepr, (name, tpe)) =>
             tpe match
               case '[t] =>
                 Refinement(typeRepr, name, TypeRepr.of[Col[t]])
@@ -444,24 +408,4 @@ object QueryBuilder:
     end match
   end fromImpl
 
-  private def metaElemNames[Mels: Type](res: List[String] = Nil)(using
-      Quotes
-  ): List[String] =
-    import quotes.reflect.*
-    Type.of[Mels] match
-      case '[mel *: melTail] =>
-        val melString = Type.valueOfConstant[mel].get.toString
-        metaElemNames[melTail](melString :: res)
-      case '[EmptyTuple] =>
-        res.reverse
-
-  private def metaElemTypes[Mets: Type](res: List[Type[?]] = Nil)(using
-      Quotes
-  ): List[Type[?]] =
-    import quotes.reflect.*
-    Type.of[Mets] match
-      case '[met *: metTail] =>
-        metaElemTypes[metTail](Type.of[met] :: res)
-      case '[EmptyTuple] =>
-        res.reverse
 end QueryBuilder
