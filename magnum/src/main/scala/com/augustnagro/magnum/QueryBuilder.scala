@@ -408,4 +408,50 @@ object QueryBuilder:
     end match
   end fromImpl
 
+  transparent inline def fromWithScopes[E](
+      scopes: Vector[Scope[E]]
+  )(using
+      inline meta: TableMeta[E],
+      codec: DbCodec[E]
+  ): Any = ${ fromWithScopesImpl[E]('meta, 'codec, 'scopes) }
+
+  private def fromWithScopesImpl[E: Type](
+      meta: Expr[TableMeta[E]],
+      codec: Expr[DbCodec[E]],
+      scopes: Expr[Vector[Scope[E]]]
+  )(using Quotes): Expr[Any] =
+    import quotes.reflect.*
+
+    Expr.summon[Mirror.ProductOf[E]] match
+      case Some('{
+            $mirror: Mirror.ProductOf[E] {
+              type MirroredElemLabels = eMels
+              type MirroredElemTypes = eMets
+            }
+          }) =>
+        val names = elemNames[eMels]()
+        val types = elemTypes[eMets]()
+
+        val colsRefinement =
+          names.zip(types).foldLeft(TypeRepr.of[Columns[E]]) { case (typeRepr, (name, tpe)) =>
+            tpe match
+              case '[t] =>
+                Refinement(typeRepr, name, TypeRepr.of[Col[t]])
+          }
+
+        colsRefinement.asType match
+          case '[ct] =>
+            '{
+              val cols = new Columns[E]($meta.columns).asInstanceOf[ct & Selectable]
+              val qb = build0[E, ct & Selectable]($meta, $codec, cols)
+              $scopes.foldLeft(qb)((q, s) => s.apply(q))
+            }
+
+      case _ =>
+        report.errorAndAbort(
+          s"A Mirror.ProductOf is required for QueryBuilder.fromWithScopes[${TypeRepr.of[E].show}]"
+        )
+    end match
+  end fromWithScopesImpl
+
 end QueryBuilder

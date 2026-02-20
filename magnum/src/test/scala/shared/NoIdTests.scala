@@ -16,7 +16,7 @@ def noIdTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
       createdAt: OffsetDateTime,
       userName: String,
       userAction: String
-  ) derives DbCodec
+  ) derives DbCodec, TableMeta
 
   val noIdRepo = Repo[NoId, NoId, Null]()
 

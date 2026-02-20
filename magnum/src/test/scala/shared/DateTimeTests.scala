@@ -27,9 +27,9 @@ def dateTimeTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
       b: LocalDate,
       c: LocalTime,
       d: LocalDateTime
-  ) derives DbCodec
+  ) derives DbCodec, TableMeta
 
-  val myTimeRepo = Repo[MyTime, MyTime, Null]
+  val myTimeRepo = Repo[MyTime, MyTime, Null]()
 
   val all = Vector(
     MyTime(

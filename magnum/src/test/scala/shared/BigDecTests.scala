@@ -10,9 +10,9 @@ def bigDecTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
   import suite.*
 
   @Table(dbType, SqlNameMapper.CamelToSnakeCase)
-  case class BigDec(id: Int, myBigDec: Option[BigDecimal]) derives DbCodec
+  case class BigDec(id: Int, myBigDec: Option[BigDecimal]) derives DbCodec, TableMeta
 
-  val bigDecRepo = Repo[BigDec, BigDec, Int]
+  val bigDecRepo = Repo[BigDec, BigDec, Int]()
 
   test("option of bigdecimal"):
     xa().transact:

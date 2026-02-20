@@ -19,9 +19,9 @@ def sqlNameTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
       @SqlName("vin") vinNumber: Option[Int],
       color: Color,
       created: OffsetDateTime
-  ) derives DbCodec
+  ) derives DbCodec, TableMeta
 
-  val customCarRepo = Repo[CustomCar, CustomCar, Long]
+  val customCarRepo = Repo[CustomCar, CustomCar, Long]()
 
   test("count with manual table name"):
     val count = connect(xa())(customCarRepo.count)

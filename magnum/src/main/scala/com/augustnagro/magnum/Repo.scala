@@ -12,8 +12,13 @@ import javax.sql.DataSource
   * @tparam ID
   *   id type of E
   */
-open class Repo[EC, E, ID](using defaults: RepoDefaults[EC, E, ID])
-    extends ImmutableRepo[E, ID]:
+open class Repo[EC, E, ID](
+    injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]]
+)(using
+    defaults: RepoDefaults[EC, E, ID],
+    tableMeta: TableMeta[E],
+    eCodec: DbCodec[E]
+) extends ImmutableRepo[E, ID](injectedScopes):
 
   /** Deletes an entity using its id */
   def delete(entity: E)(using DbCon): Unit = defaults.delete(entity)
@@ -52,5 +57,15 @@ open class Repo[EC, E, ID](using defaults: RepoDefaults[EC, E, ID])
   /** Update all entities */
   def updateAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
     defaults.updateAll(entities)
+
+  /** Re-fetch the entity from the database using its primary key. */
+  def refresh(entity: E)(using DbCon): E =
+    val pkIdx = tableMeta.columns.indexWhere(
+      _.scalaName == tableMeta.primaryKey.scalaName
+    )
+    val id = entity.asInstanceOf[Product].productElement(pkIdx).asInstanceOf[ID]
+    defaults.findById(id).getOrElse(
+      throw QueryBuilderException(s"Entity not found for refresh")
+    )
 
 end Repo

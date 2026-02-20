@@ -20,10 +20,10 @@ def optionalProductTests(
       @SqlName("vin") vinNumber: Option[Int],
       color: Color,
       created: OffsetDateTime
-  ) derives DbCodec
+  ) derives DbCodec, TableMeta
 
   @Table(dbType, SqlNameMapper.CamelToSnakeCase)
-  case class BigDec(id: Int, myBigDec: Option[BigDecimal]) derives DbCodec
+  case class BigDec(id: Int, myBigDec: Option[BigDecimal]) derives DbCodec, TableMeta
 
   test("left join with optional product type"):
     assume(dbType != ClickhouseDbType)

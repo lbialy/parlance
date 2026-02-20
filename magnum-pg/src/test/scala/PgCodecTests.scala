@@ -17,7 +17,7 @@ import javax.sql.DataSource
 import scala.util.Using.Manager
 
 class PgCodecTests extends FunSuite, TestContainersFixtures:
-  val userRepo = Repo[MagUser, MagUser, Long]
+  val userRepo = Repo[MagUser, MagUser, Long]()
 
   val allUsers = Vector(
     MagUser(
@@ -78,7 +78,7 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
     )
   )
 
-  val carRepo = Repo[MagCar, MagCar, Long]
+  val carRepo = Repo[MagCar, MagCar, Long]()
 
   val allCars = Vector(
     MagCar(

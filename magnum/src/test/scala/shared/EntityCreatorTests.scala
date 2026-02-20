@@ -15,9 +15,9 @@ def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(
   case class MyUserCreator(firstName: String) derives DbCodec
 
   @Table(dbType, SqlNameMapper.CamelToSnakeCase)
-  case class MyUser(firstName: String, id: Long) derives DbCodec
+  case class MyUser(firstName: String, id: Long) derives DbCodec, TableMeta
 
-  val userRepo = Repo[MyUserCreator, MyUser, Long]
+  val userRepo = Repo[MyUserCreator, MyUser, Long]()
   val user = TableInfo[MyUserCreator, MyUser, Long]
 
   test("insert EntityCreator"):
