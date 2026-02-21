@@ -10,8 +10,7 @@ class TableMetaTests extends FunSuite:
     )
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class User(@Id id: Long, firstName: String, age: Int)
-      derives DbCodec, TableMeta
+  case class User(@Id id: Long, firstName: String, age: Int) derives DbCodec, TableMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
   case class Product(

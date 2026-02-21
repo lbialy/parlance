@@ -323,8 +323,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
             .returningKeys[Long]("id")
             .run()
             .head
-        else
-          sql"""insert into person (id, first_name, last_name, created, is_admin)
+        else sql"""insert into person (id, first_name, last_name, created, is_admin)
                 values (9, 'Arton', 'Senna', now(), 'Y') RETURNING id
                 """.returning[Long].run().head
       assert(personRepo.findById(personId).get.lastName == "Senna")
@@ -346,8 +345,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
               person.created
             )
             .run()
-        else
-          sql"""insert into person (id, first_name, last_name, created, is_admin) values
+        else sql"""insert into person (id, first_name, last_name, created, is_admin) values
                (9, 'Arton', 'Senna', now(), true),
                (10, 'Demo', 'User', now(), false)
                RETURNING id, created

@@ -10,13 +10,7 @@ import javax.sql.DataSource
 import scala.collection.mutable as m
 import scala.util.{Failure, Success, Try, Using, boundary}
 import scala.deriving.Mirror
-import scala.compiletime.{
-  constValue,
-  constValueTuple,
-  erasedValue,
-  error,
-  summonInline
-}
+import scala.compiletime.{constValue, constValueTuple, erasedValue, error, summonInline}
 import scala.compiletime.ops.any.==
 import scala.compiletime.ops.boolean.&&
 import scala.concurrent.duration.FiniteDuration
@@ -294,7 +288,7 @@ private def tableExprs[EC: Type, E: Type, ID: Type](using
           val tableNameScalaExpr = Expr(tableNameScala)
           val tableNameSql = DerivingUtil.sqlTableNameAnnot[E] match
             case Some(sqlName) => '{ $sqlName.name }
-            case None => '{ $nameMapper.toTableName($tableNameScalaExpr) }
+            case None          => '{ $nameMapper.toTableName($tableNameScalaExpr) }
           val eElemNames = elemNames[eMels]()
           val eElemNamesSql = eElemNames.map(elemName =>
             sqlNameAnnot[E](elemName) match

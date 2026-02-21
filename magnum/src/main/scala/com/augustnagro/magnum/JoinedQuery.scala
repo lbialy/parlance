@@ -23,15 +23,13 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     Some(predicate match
       case None                          => pred
       case Some(Predicate.And(children)) => Predicate.And(children :+ pred)
-      case Some(other)                   => Predicate.And(Vector(other, pred))
-    )
+      case Some(other)                   => Predicate.And(Vector(other, pred)))
 
   private def addOr(pred: Predicate): Option[Predicate] =
     Some(predicate match
       case None                         => pred
       case Some(Predicate.Or(children)) => Predicate.Or(children :+ pred)
-      case Some(other)                  => Predicate.Or(Vector(other, pred))
-    )
+      case Some(other)                  => Predicate.Or(Vector(other, pred)))
 
   def where(frag: Frag): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
@@ -72,9 +70,15 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
       Frag(s"t$sourceIdx.${rel.fk.sqlName} = t$newIdx.${rel.pk.sqlName}", Seq.empty, FragWriter.empty)
     )
     new JoinedQuery[Tuple.Append[R, U]](
-      metas :+ uMeta, codecs :+ uCodec, joinClauses :+ entry,
-      predicate, orderEntries, limitOpt, offsetOpt
+      metas :+ uMeta,
+      codecs :+ uCodec,
+      joinClauses :+ entry,
+      predicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt
     )
+  end join
 
   def leftJoin[S, U](rel: Relationship[S, U])(using
       sMeta: TableMeta[S],
@@ -91,9 +95,15 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
       Frag(s"t$sourceIdx.${rel.fk.sqlName} = t$newIdx.${rel.pk.sqlName}", Seq.empty, FragWriter.empty)
     )
     new JoinedQuery[Tuple.Append[R, Option[U]]](
-      metas :+ uMeta, codecs :+ optCodec, joinClauses :+ entry,
-      predicate, orderEntries, limitOpt, offsetOpt
+      metas :+ uMeta,
+      codecs :+ optCodec,
+      joinClauses :+ entry,
+      predicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt
     )
+  end leftJoin
 
   private def resultCodec: DbCodec[R] =
     new DbCodec[R]:
@@ -126,14 +136,16 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
   private def buildFromJoinWhere: (String, Seq[Any], FragWriter) =
     val fromSql = s"FROM ${metas(0).tableName} t0"
 
-    val joinsSql = joinClauses.map { entry =>
-      val kw = entry.joinType match
-        case JoinType.Inner => "INNER JOIN"
-        case JoinType.Left  => "LEFT JOIN"
-        case JoinType.Right => "RIGHT JOIN"
-        case JoinType.Cross => "CROSS JOIN"
-      s"$kw ${entry.tableRef.tableName} ${entry.tableRef.alias} ON ${entry.onCondition.sqlString}"
-    }.mkString(" ", " ", "")
+    val joinsSql = joinClauses
+      .map { entry =>
+        val kw = entry.joinType match
+          case JoinType.Inner => "INNER JOIN"
+          case JoinType.Left  => "LEFT JOIN"
+          case JoinType.Right => "RIGHT JOIN"
+          case JoinType.Cross => "CROSS JOIN"
+        s"$kw ${entry.tableRef.tableName} ${entry.tableRef.alias} ON ${entry.onCondition.sqlString}"
+      }
+      .mkString(" ", " ", "")
 
     val fromJoinSql = fromSql + joinsSql
 
@@ -143,6 +155,7 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
         val frag = pred.toFrag
         if frag.sqlString.isEmpty then (fromJoinSql, Seq.empty, FragWriter.empty)
         else (fromJoinSql + " WHERE " + frag.sqlString, frag.params, frag.writer)
+  end buildFromJoinWhere
 
   def build: Frag =
     val selectParts = metas.zipWithIndex.map { (meta, idx) =>
@@ -180,12 +193,16 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
   def count()(using DbCon): Long =
     val (fromJoinWhereSql, params, writer) = buildFromJoinWhere
     Frag(s"SELECT COUNT(*) $fromJoinWhereSql", params, writer)
-      .query[Long].run().head
+      .query[Long]
+      .run()
+      .head
 
   def exists()(using DbCon): Boolean =
     val (fromJoinWhereSql, params, writer) = buildFromJoinWhere
     Frag(s"SELECT EXISTS(SELECT 1 $fromJoinWhereSql)", params, writer)
-      .query[Boolean].run().head
+      .query[Boolean]
+      .run()
+      .head
 
   def debugPrintSql(using DbCon): this.type =
     DebugSql.printDebug(Vector(build))
@@ -233,7 +250,9 @@ object JoinedQuery:
         val aliasExpr = Expr(s"t$idx")
         buildAliasedColumns[T](aliasExpr)
 
-  private def tupleIndicesOfOption[T: Type](using Quotes)(
+  private def tupleIndicesOfOption[T: Type](using
+      Quotes
+  )(
       tpe: quotes.reflect.TypeRepr,
       offset: Int
   ): List[Int] =
@@ -253,11 +272,13 @@ object JoinedQuery:
   private def buildAliasedColumns[E: Type](aliasExpr: Expr[String])(using Quotes): Expr[Any] =
     import quotes.reflect.*
 
-    val metaExpr = Expr.summon[TableMeta[E]].getOrElse(
-      report.errorAndAbort(
-        s"No TableMeta found for ${TypeRepr.of[E].show}"
+    val metaExpr = Expr
+      .summon[TableMeta[E]]
+      .getOrElse(
+        report.errorAndAbort(
+          s"No TableMeta found for ${TypeRepr.of[E].show}"
+        )
       )
-    )
 
     Expr.summon[Mirror.ProductOf[E]] match
       case Some('{
@@ -270,10 +291,9 @@ object JoinedQuery:
         val types = elemTypes[mets]()
 
         val refinement =
-          names.zip(types).foldLeft(TypeRepr.of[Columns[E]]) {
-            case (tr, (name, tpe)) =>
-              tpe match
-                case '[t] => Refinement(tr, name, TypeRepr.of[BoundCol[t]])
+          names.zip(types).foldLeft(TypeRepr.of[Columns[E]]) { case (tr, (name, tpe)) =>
+            tpe match
+              case '[t] => Refinement(tr, name, TypeRepr.of[BoundCol[t]])
           }
 
         refinement.asType match
@@ -284,8 +304,12 @@ object JoinedQuery:
         report.errorAndAbort(
           s"No Mirror.ProductOf for ${TypeRepr.of[E].show}"
         )
+    end match
+  end buildAliasedColumns
 
-  private def tupleIndicesOf[T: Type](using Quotes)(
+  private def tupleIndicesOf[T: Type](using
+      Quotes
+  )(
       tpe: quotes.reflect.TypeRepr,
       offset: Int
   ): List[Int] =

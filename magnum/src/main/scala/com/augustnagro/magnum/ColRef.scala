@@ -1,7 +1,7 @@
 package com.augustnagro.magnum
 
-/** Shared trait for column references, both unbound (Col) and alias-bound
-  * (BoundCol). Enables ColumnOps (===, >, <, in, etc.) to work with either.
+/** Shared trait for column references, both unbound (Col) and alias-bound (BoundCol). Enables ColumnOps (===, >, <, in, etc.) to work with
+  * either.
   *
   * @tparam A
   *   the Scala type of this column

@@ -25,7 +25,8 @@ class ChunkTests extends QbTestBase:
     val t = xa()
     t.connect:
       // amount > 500 means id > 50, so 50 rows
-      val batches = QueryBuilder.from[QbItem]
+      val batches = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 500)
         .orderBy(_.id)
         .chunk(20)
@@ -38,7 +39,8 @@ class ChunkTests extends QbTestBase:
   test("chunk with .limit respects total maximum"):
     val t = xa()
     t.connect:
-      val batches = QueryBuilder.from[QbItem]
+      val batches = QueryBuilder
+        .from[QbItem]
         .orderBy(_.id)
         .limit(50)
         .chunk(20)
@@ -55,7 +57,8 @@ class ChunkTests extends QbTestBase:
     val t = xa()
     t.connect:
       // offset 80 means rows 81-100, so 20 rows
-      val batches = QueryBuilder.from[QbItem]
+      val batches = QueryBuilder
+        .from[QbItem]
         .orderBy(_.id)
         .offset(80)
         .chunk(25)
@@ -68,7 +71,8 @@ class ChunkTests extends QbTestBase:
   test("chunk preserves orderBy within and across batches"):
     val t = xa()
     t.connect:
-      val all = QueryBuilder.from[QbItem]
+      val all = QueryBuilder
+        .from[QbItem]
         .orderBy(_.id, SortOrder.Desc)
         .chunk(30)
         .flatMap(identity)
@@ -86,7 +90,8 @@ class ChunkTests extends QbTestBase:
   test("chunk on empty result set returns empty iterator"):
     val t = xa()
     t.connect:
-      val batches = QueryBuilder.from[QbItem]
+      val batches = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 99999)
         .chunk(10)
         .toVector

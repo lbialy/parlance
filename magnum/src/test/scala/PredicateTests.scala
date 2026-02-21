@@ -78,10 +78,12 @@ class PredicateTests extends FunSuite:
     val b = Predicate.Leaf(Frag("b = ?", Seq("hello"), FragWriter.empty))
     val c = Predicate.Leaf(Frag("c = ?", Seq(3), FragWriter.empty))
     val d = Predicate.Leaf(Frag("d = ?", Seq(4), FragWriter.empty))
-    val pred = Predicate.Or(Vector(
-      Predicate.And(Vector(a, b)),
-      Predicate.And(Vector(c, d))
-    ))
+    val pred = Predicate.Or(
+      Vector(
+        Predicate.And(Vector(a, b)),
+        Predicate.And(Vector(c, d))
+      )
+    )
     val result = pred.toFrag
     assertEquals(result.params.toList, List(1, "hello", 3, 4))
 

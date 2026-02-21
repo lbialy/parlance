@@ -5,8 +5,7 @@ import scala.quoted.*
 
 /** Compile-time table metadata derived from @Table-annotated case classes.
   *
-  * Provides typed column list, table name, and primary key for use by the query
-  * builder.
+  * Provides typed column list, table name, and primary key for use by the query builder.
   */
 trait TableMeta[E]:
   def tableName: String
@@ -44,7 +43,7 @@ object TableMeta:
         val tableNameSql: Expr[String] =
           DerivingUtil.sqlTableNameAnnot[E] match
             case Some(sqlName) => '{ $sqlName.name }
-            case None => '{ $nameMapper.toTableName($tableNameScalaExpr) }
+            case None          => '{ $nameMapper.toTableName($tableNameScalaExpr) }
 
         val eElemNames: List[String] = elemNames[eMels]()
         val eElemNamesSql: List[Expr[String]] = eElemNames.map(elemName =>

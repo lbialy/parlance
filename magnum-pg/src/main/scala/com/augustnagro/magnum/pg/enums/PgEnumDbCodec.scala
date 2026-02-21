@@ -4,14 +4,7 @@ import com.augustnagro.magnum.{DbCodec, DerivingUtil}
 
 import java.sql.{JDBCType, PreparedStatement, ResultSet, Types}
 import scala.deriving.Mirror
-import scala.compiletime.{
-  constValue,
-  constValueTuple,
-  erasedValue,
-  error,
-  summonFrom,
-  summonInline
-}
+import scala.compiletime.{constValue, constValueTuple, erasedValue, error, summonFrom, summonInline}
 import scala.quoted.*
 import scala.reflect.ClassTag
 
@@ -42,9 +35,7 @@ private def pgEnumDbCodecImpl[A: Type](using Quotes): Expr[DbCodec[A]] =
           .orElse(
             DerivingUtil
               .tableAnnot[A]
-              .map(tableExpr =>
-                '{ $tableExpr.nameMapper.toTableName($melExpr) }
-              )
+              .map(tableExpr => '{ $tableExpr.nameMapper.toTableName($melExpr) })
           )
           .getOrElse(melExpr)
       '{

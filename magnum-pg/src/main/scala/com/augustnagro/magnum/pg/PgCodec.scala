@@ -1,15 +1,7 @@
 package com.augustnagro.magnum.pg
 
 import com.augustnagro.magnum.DbCodec
-import org.postgresql.geometric.{
-  PGbox,
-  PGcircle,
-  PGline,
-  PGlseg,
-  PGpath,
-  PGpoint,
-  PGpolygon
-}
+import org.postgresql.geometric.{PGbox, PGcircle, PGline, PGlseg, PGpath, PGpoint, PGpolygon}
 import org.postgresql.util.PGInterval
 
 import java.sql
@@ -27,10 +19,8 @@ object PgCodec:
   ): DbCodec[Array[A]] =
     inline erasedValue[A] match
       // https://jdbc.postgresql.org/documentation/server-prepare/#arrays
-      case _: Short | _: java.lang.Short | _: Int | _: java.lang.Integer |
-          _: Long | _: java.lang.Long | _: Float | _: java.lang.Float |
-          _: Double | _: java.lang.Double | _: Boolean | _: java.lang.Boolean |
-          _: String | _: IArray[Byte] | _: Array[Byte] =>
+      case _: Short | _: java.lang.Short | _: Int | _: java.lang.Integer | _: Long | _: java.lang.Long | _: Float | _: java.lang.Float |
+          _: Double | _: java.lang.Double | _: Boolean | _: java.lang.Boolean | _: String | _: IArray[Byte] | _: Array[Byte] =>
         arrayFastPath(aCodec, aArrayCodec, cTag)
       case _ =>
         arraySlowPath(aCodec, aArrayCodec, cTag)
@@ -42,10 +32,8 @@ object PgCodec:
   ): DbCodec[IArray[A]] =
     inline erasedValue[A] match
       // https://jdbc.postgresql.org/documentation/server-prepare/#arrays
-      case _: Short | _: java.lang.Short | _: Int | _: java.lang.Integer |
-          _: Long | _: java.lang.Long | _: Float | _: java.lang.Float |
-          _: Double | _: java.lang.Double | _: Boolean | _: java.lang.Boolean |
-          _: String | _: IArray[Byte] | _: Array[Byte] =>
+      case _: Short | _: java.lang.Short | _: Int | _: java.lang.Integer | _: Long | _: java.lang.Long | _: Float | _: java.lang.Float |
+          _: Double | _: java.lang.Double | _: Boolean | _: java.lang.Boolean | _: String | _: IArray[Byte] | _: Array[Byte] =>
         iArrayFastPath(aCodec, aArrayCodec, cTag)
       case _ =>
         iArraySlowPath(aCodec, aArrayCodec, cTag)

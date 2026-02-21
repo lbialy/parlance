@@ -35,3 +35,4 @@ object RelationshipDef:
       intermediateFk: Col[?],
       targetPk: Col[?]
   ) extends RelationshipDef
+end RelationshipDef

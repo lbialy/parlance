@@ -5,8 +5,7 @@ private[magnum] object DebugSql:
   def printDebug(frags: Vector[Frag])(using dbCon: DbCon): Unit =
     frags.foreach: frag =>
       println(s"SQL: ${frag.sqlString}")
-      if frag.params.nonEmpty then
-        println(s"Params: ${frag.params.mkString(", ")}")
+      if frag.params.nonEmpty then println(s"Params: ${frag.params.mkString(", ")}")
 
     val tablePattern = "(?i)(?:FROM|JOIN)\\s+(\\w+)".r
     val allTables = frags
@@ -51,6 +50,8 @@ private[magnum] object DebugSql:
         allRows.foreach(r => println(row(r)))
         println(bot)
       finally stmt.close()
+      end try
     end for
+  end printDebug
 
 end DebugSql

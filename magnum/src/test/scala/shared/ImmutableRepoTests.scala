@@ -7,8 +7,7 @@ import java.sql.{Connection, PreparedStatement, ResultSet}
 import java.time.{OffsetDateTime, ZoneOffset}
 import scala.util.Using
 
-def immutableRepoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(
-    using
+def immutableRepoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
     Location,
     DbCodec[OffsetDateTime]
 ): Unit =

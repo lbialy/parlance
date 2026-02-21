@@ -6,8 +6,7 @@ import scala.concurrent.duration.FiniteDuration
 /** Trait to provide logging of Magnum SQL statements.
   */
 trait SqlLogger:
-  /** Log a successful SQL statement execution. If a query fails a
-    * [[SqlException]] will be thrown, and this logger will not be triggered.
+  /** Log a successful SQL statement execution. If a query fails a [[SqlException]] will be thrown, and this logger will not be triggered.
     */
   def log(successEvent: SqlSuccessEvent): Unit
 
@@ -41,8 +40,7 @@ object SqlLogger:
         )
 
     override def exceptionMsg(exceptionEvent: SqlExceptionEvent): String =
-      if Log.isLoggable(System.Logger.Level.TRACE) then
-        s"""Error executing query:
+      if Log.isLoggable(System.Logger.Level.TRACE) then s"""Error executing query:
            |${exceptionEvent.sql}
            |With message:
            |${exceptionEvent.cause.getMessage}

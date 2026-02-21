@@ -23,11 +23,11 @@ trait RepoDefaults[EC, E, ID]:
   def insertAllReturning(entityCreators: Iterable[EC])(using DbCon): Vector[E]
   def update(entity: E)(using DbCon): Unit
   def updateAll(entities: Iterable[E])(using DbCon): BatchUpdateResult
+  def updatePartial(original: E, current: E)(using DbCon): Unit
 
 object RepoDefaults:
 
-  inline given genImmutableRepo[E: DbCodec: Mirror.Of, ID]
-      : RepoDefaults[E, E, ID] =
+  inline given genImmutableRepo[E: DbCodec: Mirror.Of, ID]: RepoDefaults[E, E, ID] =
     genRepo[E, E, ID]
 
   inline given genRepo[
@@ -45,15 +45,11 @@ object RepoDefaults:
     val eCodec = Expr.summon[DbCodec[E]].get
     val ecCodec = Expr.summon[DbCodec[EC]].get
     val idCodec =
-      if TypeRepr.of[ID] =:= TypeRepr.of[Null] then
-        '{ DbCodec.AnyCodec.asInstanceOf[DbCodec[ID]] }
-      else Expr.summon[DbCodec[ID]].get
+      if TypeRepr.of[ID] =:= TypeRepr.of[Null] then '{ DbCodec.AnyCodec.asInstanceOf[DbCodec[ID]] } else Expr.summon[DbCodec[ID]].get
     val eClassTag = Expr.summon[ClassTag[E]].get
     val ecClassTag = Expr.summon[ClassTag[EC]].get
     val idClassTag =
-      if TypeRepr.of[ID] =:= TypeRepr.of[Null] then
-        '{ ClassTag.Any.asInstanceOf[ClassTag[ID]] }
-      else Expr.summon[ClassTag[ID]].get
+      if TypeRepr.of[ID] =:= TypeRepr.of[Null] then '{ ClassTag.Any.asInstanceOf[ClassTag[ID]] } else Expr.summon[ClassTag[ID]].get
     '{
       ${ exprs.tableAnnot }.dbType.buildRepoDefaults[EC, E, ID](
         ${ exprs.tableNameSql },
@@ -94,7 +90,7 @@ object RepoDefaults:
       case '[met *: metTail] =>
         Expr.summon[DbCodec[met]] match
           case Some(codec) => getProductCodecs[metTail](res :+ codec)
-          case None => getProductCodecs[metTail](res :+ '{ DbCodec.AnyCodec })
+          case None        => getProductCodecs[metTail](res :+ '{ DbCodec.AnyCodec })
       case '[EmptyTuple] => Expr.ofSeq(res)
 
 end RepoDefaults

@@ -6,5 +6,4 @@ package com.augustnagro.magnum
   * @param columnNames
   *   The column names.
   */
-class ColumnNames(val queryRepr: String, val columnNames: IArray[ColumnName])
-    extends SqlLiteral
+class ColumnNames(val queryRepr: String, val columnNames: IArray[ColumnName]) extends SqlLiteral

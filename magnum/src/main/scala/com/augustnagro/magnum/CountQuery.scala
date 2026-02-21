@@ -48,6 +48,7 @@ class CountQuery[E] private[magnum] (
       whereWriter.write(ps, afterCount)
 
     Frag(fullSql, combinedParams, combinedWriter)
+  end build
 
   def run()(using DbCon): Vector[(E, Long)] =
     given DbCodec[E] = rootCodec
@@ -55,8 +56,7 @@ class CountQuery[E] private[magnum] (
 
   def first()(using DbCon): Option[(E, Long)] =
     given DbCodec[E] = rootCodec
-    val q = new CountQuery(meta, rootCodec, countSubquerySql, countCondition,
-      rootPredicate, orderEntries, Some(1), offsetOpt)
+    val q = new CountQuery(meta, rootCodec, countSubquerySql, countCondition, rootPredicate, orderEntries, Some(1), offsetOpt)
     q.build.query[(E, Long)].run().headOption
 
   def buildQueries: Vector[Frag] = Vector(build)

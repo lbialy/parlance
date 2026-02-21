@@ -23,6 +23,7 @@ enum Predicate:
         case 0 => Frag("", Seq.empty, FragWriter.empty)
         case 1 => nonEmpty.head
         case _ => Predicate.joinFrags(nonEmpty, " OR ")
+end Predicate
 
 object Predicate:
   val empty: Predicate = And(Vector.empty)
@@ -48,3 +49,5 @@ object Predicate:
       currentPos
 
     Frag(sb.result(), allParams.result(), combinedWriter)
+  end joinFrags
+end Predicate

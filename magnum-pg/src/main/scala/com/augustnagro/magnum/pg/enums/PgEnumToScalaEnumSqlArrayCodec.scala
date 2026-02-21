@@ -5,19 +5,11 @@ import com.augustnagro.magnum.pg.SqlArrayCodec
 
 import java.sql.JDBCType
 import scala.deriving.Mirror
-import scala.compiletime.{
-  constValue,
-  constValueTuple,
-  erasedValue,
-  error,
-  summonFrom,
-  summonInline
-}
+import scala.compiletime.{constValue, constValueTuple, erasedValue, error, summonFrom, summonInline}
 import scala.quoted.*
 import scala.reflect.ClassTag
 
-/** Supports mapping between Postgres Enums and Scala Enums in multi-dimensional
-  * arrays, such as between
+/** Supports mapping between Postgres Enums and Scala Enums in multi-dimensional arrays, such as between
   * {{{create type Color as enum ('Red', 'Green', 'Blue');}}} and
   * {{{
   *   enum Color:
@@ -56,9 +48,7 @@ private def pgEnumToScalaEnumSqlArrayCodecImpl[A: Type](using
           .orElse(
             DerivingUtil
               .tableAnnot[A]
-              .map(tableExpr =>
-                '{ $tableExpr.nameMapper.toTableName($melExpr) }
-              )
+              .map(tableExpr => '{ $tableExpr.nameMapper.toTableName($melExpr) })
           )
           .getOrElse(melExpr)
       '{

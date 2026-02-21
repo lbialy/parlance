@@ -2,15 +2,7 @@ import com.augustnagro.magnum.{DbCodec, Id, PostgresDbType, SqlName, Table}
 import com.augustnagro.magnum.pg.PgCodec.given
 import com.augustnagro.magnum.pg.enums.PgEnumToScalaEnumSqlArrayCodec
 import com.augustnagro.magnum.pg.enums.PgEnumDbCodec
-import org.postgresql.geometric.{
-  PGbox,
-  PGcircle,
-  PGline,
-  PGlseg,
-  PGpath,
-  PGpoint,
-  PGpolygon
-}
+import org.postgresql.geometric.{PGbox, PGcircle, PGline, PGlseg, PGpath, PGpoint, PGpolygon}
 import org.postgresql.util.PGInterval
 
 import java.time.OffsetDateTime

@@ -7,12 +7,10 @@ case class MjCountry(@Id id: Long, name: String) derives DbCodec, TableMeta
 case class MjPublisher(@Id id: Long, name: String) derives DbCodec, TableMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class MjAuthor(@Id id: Long, name: String, countryId: Long)
-    derives DbCodec, TableMeta
+case class MjAuthor(@Id id: Long, name: String, countryId: Long) derives DbCodec, TableMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class MjBook(@Id id: Long, authorId: Long, publisherId: Long, title: String)
-    derives DbCodec, TableMeta
+case class MjBook(@Id id: Long, authorId: Long, publisherId: Long, title: String) derives DbCodec, TableMeta
 
 class MultiJoinQueryTests extends QbTestBase:
 

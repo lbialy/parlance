@@ -1,23 +1,14 @@
 package com.augustnagro.magnum
 
 import scala.deriving.Mirror
-import scala.compiletime.{
-  constValue,
-  constValueTuple,
-  erasedValue,
-  error,
-  summonFrom,
-  summonInline
-}
+import scala.compiletime.{constValue, constValueTuple, erasedValue, error, summonFrom, summonInline}
 import scala.quoted.*
 import scala.reflect.ClassTag
 
-/** Not useful for typical user code; provided to help implement custom DbCodecs
-  * and associated typeclasses
+/** Not useful for typical user code; provided to help implement custom DbCodecs and associated typeclasses
   */
 object DerivingUtil:
-  /** For a Simple (non-ADT) enum type E, constructs a sequence of mappings from
-    * sql string representation to enum value. For example,
+  /** For a Simple (non-ADT) enum type E, constructs a sequence of mappings from sql string representation to enum value. For example,
     *
     * {{{
     *   @Table(PostgresDbType, SqlNameMapper.CamelToUpperSnakeCase)
@@ -80,8 +71,8 @@ object DerivingUtil:
     Expr.ofSeq(sqlNameExprs)
   end buildSqlNameMapForEnum
 
-  private def getScalaNames[Mels: Type](res: Vector[String] = Vector.empty)(
-      using Quotes
+  private def getScalaNames[Mels: Type](res: Vector[String] = Vector.empty)(using
+      Quotes
   ): Vector[String] =
     import quotes.reflect.*
     Type.of[Mels] match

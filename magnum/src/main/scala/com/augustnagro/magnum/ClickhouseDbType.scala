@@ -93,9 +93,7 @@ object ClickhouseDbType extends DbType:
 
       def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
         deleteAllById(
-          entities.map(e =>
-            e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID]
-          )
+          entities.map(e => e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID])
         )
 
       def deleteAllById(ids: Iterable[ID])(using
@@ -137,6 +135,9 @@ object ClickhouseDbType extends DbType:
               entityCreators.toVector.asInstanceOf[Vector[E]]
 
       def update(entity: E)(using DbCon): Unit =
+        throw UnsupportedOperationException()
+
+      def updatePartial(original: E, current: E)(using DbCon): Unit =
         throw UnsupportedOperationException()
 
       def updateAll(entities: Iterable[E])(using

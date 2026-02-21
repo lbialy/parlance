@@ -5,8 +5,8 @@ import munit.{FunSuite, Location}
 
 import java.util.UUID
 
-def embeddedFragTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(
-    using Location
+def embeddedFragTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+    Location
 ): Unit =
   import suite.*
 

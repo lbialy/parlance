@@ -6,8 +6,8 @@ import munit.{FunSuite, Location}
 
 import scala.util.Using
 
-def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(
-    using Location
+def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+    Location
 ): Unit =
   import suite.*
   if dbType == ClickhouseDbType then return

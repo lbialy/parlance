@@ -35,6 +35,11 @@ case class HasOneThrough[S, T, +CT <: Selectable](
     sourcePk: Col[?]
 )
 
+case class ComposedRelationship[Root, Intermediate, Target, +CT <: Selectable](
+    inner: Relationship[Root, Intermediate],
+    outer: HasMany[Intermediate, Target, CT]
+)
+
 object Relationship:
   inline def belongsTo[S, T](
       inline fk: S => Any,
@@ -112,27 +117,36 @@ object Relationship:
       targetFkColumn: Expr[String]
   )(using Quotes): Expr[Any] =
     import quotes.reflect.*
-    val metaS = Expr.summon[TableMeta[S]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
-    )
-    val metaT = Expr.summon[TableMeta[T]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
-    )
+    val metaS = Expr
+      .summon[TableMeta[S]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+      )
+    val metaT = Expr
+      .summon[TableMeta[T]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+      )
     val ct = computeColumnsRefinement[T]()
     ct.asType match
       case '[ctType] =>
         '{ BelongsToMany[S, T, ctType & Selectable]($pivotTable, $sourceFkColumn, $targetFkColumn, $metaS.primaryKey, $metaT.primaryKey) }
+  end belongsToManyImpl
 
   private def belongsToManyConventionImpl[S: Type, T: Type](using
       Quotes
   ): Expr[Any] =
     import quotes.reflect.*
-    val metaS = Expr.summon[TableMeta[S]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
-    )
-    val metaT = Expr.summon[TableMeta[T]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
-    )
+    val metaS = Expr
+      .summon[TableMeta[S]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+      )
+    val metaT = Expr
+      .summon[TableMeta[T]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+      )
     val nameMapperS = DerivingUtil.tableAnnot[S] match
       case Some(t) => '{ $t.nameMapper }
       case None =>
@@ -161,21 +175,28 @@ object Relationship:
             $metaT.primaryKey
           )
         }
+  end belongsToManyConventionImpl
 
   private def hasManyThroughImpl[S: Type, I: Type, T: Type](
       intermediateFk: Expr[I => Any],
       targetFk: Expr[T => Any]
   )(using Quotes): Expr[Any] =
     import quotes.reflect.*
-    val metaS = Expr.summon[TableMeta[S]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
-    )
-    val metaI = Expr.summon[TableMeta[I]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[I].show}")
-    )
-    val metaT = Expr.summon[TableMeta[T]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
-    )
+    val metaS = Expr
+      .summon[TableMeta[S]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+      )
+    val metaI = Expr
+      .summon[TableMeta[I]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[I].show}")
+      )
+    val metaT = Expr
+      .summon[TableMeta[T]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+      )
     val iFkName = extractFieldName(intermediateFk.asTerm)
     val tFkName = extractFieldName(targetFk.asTerm)
     val iFkNameExpr = Expr(iFkName)
@@ -184,12 +205,16 @@ object Relationship:
     ct.asType match
       case '[ctType] =>
         '{
-          val iFkCol = $metaI.columnByName($iFkNameExpr).getOrElse(
-            throw RuntimeException("Column " + $iFkNameExpr + " not found on intermediate")
-          )
-          val tFkCol = $metaT.columnByName($tFkNameExpr).getOrElse(
-            throw RuntimeException("Column " + $tFkNameExpr + " not found on target")
-          )
+          val iFkCol = $metaI
+            .columnByName($iFkNameExpr)
+            .getOrElse(
+              throw RuntimeException("Column " + $iFkNameExpr + " not found on intermediate")
+            )
+          val tFkCol = $metaT
+            .columnByName($tFkNameExpr)
+            .getOrElse(
+              throw RuntimeException("Column " + $tFkNameExpr + " not found on target")
+            )
           HasManyThrough[S, T, ctType & Selectable](
             $metaI.tableName,
             iFkCol.sqlName,
@@ -198,21 +223,29 @@ object Relationship:
             $metaS.primaryKey
           )
         }
+    end match
+  end hasManyThroughImpl
 
   private def hasOneThroughImpl[S: Type, I: Type, T: Type](
       intermediateFk: Expr[I => Any],
       targetFk: Expr[T => Any]
   )(using Quotes): Expr[Any] =
     import quotes.reflect.*
-    val metaS = Expr.summon[TableMeta[S]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
-    )
-    val metaI = Expr.summon[TableMeta[I]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[I].show}")
-    )
-    val metaT = Expr.summon[TableMeta[T]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
-    )
+    val metaS = Expr
+      .summon[TableMeta[S]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+      )
+    val metaI = Expr
+      .summon[TableMeta[I]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[I].show}")
+      )
+    val metaT = Expr
+      .summon[TableMeta[T]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+      )
     val iFkName = extractFieldName(intermediateFk.asTerm)
     val tFkName = extractFieldName(targetFk.asTerm)
     val iFkNameExpr = Expr(iFkName)
@@ -221,12 +254,16 @@ object Relationship:
     ct.asType match
       case '[ctType] =>
         '{
-          val iFkCol = $metaI.columnByName($iFkNameExpr).getOrElse(
-            throw RuntimeException("Column " + $iFkNameExpr + " not found on intermediate")
-          )
-          val tFkCol = $metaT.columnByName($tFkNameExpr).getOrElse(
-            throw RuntimeException("Column " + $tFkNameExpr + " not found on target")
-          )
+          val iFkCol = $metaI
+            .columnByName($iFkNameExpr)
+            .getOrElse(
+              throw RuntimeException("Column " + $iFkNameExpr + " not found on intermediate")
+            )
+          val tFkCol = $metaT
+            .columnByName($tFkNameExpr)
+            .getOrElse(
+              throw RuntimeException("Column " + $tFkNameExpr + " not found on target")
+            )
           HasOneThrough[S, T, ctType & Selectable](
             $metaI.tableName,
             iFkCol.sqlName,
@@ -235,6 +272,8 @@ object Relationship:
             $metaS.primaryKey
           )
         }
+    end match
+  end hasOneThroughImpl
 
   private def computeColumnsRefinement[T: Type]()(using Quotes): quotes.reflect.TypeRepr =
     import quotes.reflect.*
@@ -256,6 +295,7 @@ object Relationship:
         report.errorAndAbort(
           s"A Mirror.ProductOf is required for ${TypeRepr.of[T].show}"
         )
+  end computeColumnsRefinement
 
   private def resolveColumns[S: Type, T: Type](
       fk: Expr[S => Any],
@@ -264,27 +304,38 @@ object Relationship:
     import quotes.reflect.*
     val fkName = extractFieldName(fk.asTerm)
     val pkName = extractFieldName(pk.asTerm)
-    val metaS = Expr.summon[TableMeta[S]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
-    )
-    val metaT = Expr.summon[TableMeta[T]].getOrElse(
-      report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
-    )
+    val metaS = Expr
+      .summon[TableMeta[S]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[S].show}")
+      )
+    val metaT = Expr
+      .summon[TableMeta[T]]
+      .getOrElse(
+        report.errorAndAbort(s"No TableMeta for ${TypeRepr.of[T].show}")
+      )
     val fkNameExpr = Expr(fkName)
     val pkNameExpr = Expr(pkName)
     val fkExpr = '{
-      $metaS.columnByName($fkNameExpr).getOrElse(
-        throw RuntimeException("Column " + $fkNameExpr + " not found")
-      )
+      $metaS
+        .columnByName($fkNameExpr)
+        .getOrElse(
+          throw RuntimeException("Column " + $fkNameExpr + " not found")
+        )
     }
     val pkExpr = '{
-      $metaT.columnByName($pkNameExpr).getOrElse(
-        throw RuntimeException("Column " + $pkNameExpr + " not found")
-      )
+      $metaT
+        .columnByName($pkNameExpr)
+        .getOrElse(
+          throw RuntimeException("Column " + $pkNameExpr + " not found")
+        )
     }
     (fkExpr, pkExpr)
+  end resolveColumns
 
-  private def extractFieldName(using Quotes)(
+  private def extractFieldName(using
+      Quotes
+  )(
       term: quotes.reflect.Term
   ): String =
     import quotes.reflect.*
@@ -297,14 +348,25 @@ object Relationship:
           s"Expected a field selector like _.fieldName, got: ${term.show}"
         )
 
-  private def extractFieldBody(using Quotes)(
+  private def extractFieldBody(using
+      Quotes
+  )(
       term: quotes.reflect.Term
   ): String =
     import quotes.reflect.*
     term match
-      case Select(_, name)     => name
+      case Select(_, name)      => name
       case Inlined(_, _, inner) => extractFieldBody(inner)
       case _ =>
         report.errorAndAbort(
           s"Expected a field selector like _.fieldName, got: ${term.show}"
         )
+  extension [A, B, CT <: Selectable](outer: HasMany[A, B, CT])
+    def via[Z](inner: BelongsTo[Z, A]): ComposedRelationship[Z, A, B, CT] =
+      ComposedRelationship(inner, outer)
+    def via[Z](inner: HasOne[Z, A]): ComposedRelationship[Z, A, B, CT] =
+      ComposedRelationship(inner, outer)
+    def via[Z, ICT <: Selectable](inner: HasMany[Z, A, ICT]): ComposedRelationship[Z, A, B, CT] =
+      ComposedRelationship(inner, outer)
+
+end Relationship

@@ -68,9 +68,7 @@ object TableInfo:
     import quotes.reflect.*
     val exprs = tableExprs[EC, E, ID]
     val refinement = exprs.eElemNames
-      .foldLeft(TypeRepr.of[TableInfo[EC, E, ID]])((typeRepr, elemName) =>
-        Refinement(typeRepr, elemName, TypeRepr.of[ColumnName])
-      )
+      .foldLeft(TypeRepr.of[TableInfo[EC, E, ID]])((typeRepr, elemName) => Refinement(typeRepr, elemName, TypeRepr.of[ColumnName]))
 
     val allColumnsExpr = Expr.ofSeq(
       exprs.eElemNames

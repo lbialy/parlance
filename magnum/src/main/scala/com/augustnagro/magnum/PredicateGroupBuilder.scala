@@ -36,6 +36,7 @@ class PredicateGroupBuilder[C] private[magnum] (
   private[magnum] def build: Predicate = mode match
     case PredicateGroupBuilder.Mode.And => Predicate.And(predicates)
     case PredicateGroupBuilder.Mode.Or  => Predicate.Or(predicates)
+end PredicateGroupBuilder
 
 object PredicateGroupBuilder:
   private[magnum] enum Mode:

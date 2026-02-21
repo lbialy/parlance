@@ -16,6 +16,8 @@ def sharedTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
 ): Unit =
   immutableRepoTests(suite, dbType, xa)
   repoTests(suite, dbType, xa)
+  partialUpdateTests(suite, dbType, xa)
+  saveTests(suite, dbType, xa)
   entityCreatorTests(suite, dbType, xa)
   specTests(suite, dbType, xa)
   sqlNameTests(suite, dbType, xa)
@@ -26,4 +28,5 @@ def sharedTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
   optionalProductTests(suite, dbType, xa)
   dateTimeTests(suite, dbType, xa)
   tupleTests(suite, dbType, xa)
+  entityExtensionTests(suite, dbType, xa)
 end sharedTests

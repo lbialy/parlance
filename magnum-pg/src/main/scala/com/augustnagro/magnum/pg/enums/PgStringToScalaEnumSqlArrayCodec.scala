@@ -5,19 +5,11 @@ import com.augustnagro.magnum.pg.SqlArrayCodec
 
 import java.sql.JDBCType
 import scala.deriving.Mirror
-import scala.compiletime.{
-  constValue,
-  constValueTuple,
-  erasedValue,
-  error,
-  summonFrom,
-  summonInline
-}
+import scala.compiletime.{constValue, constValueTuple, erasedValue, error, summonFrom, summonInline}
 import scala.quoted.*
 import scala.reflect.ClassTag
 
-/** Supports mapping between Postgres Strings (Varchar, text, etc) and Scala
-  * Enums in multi-dimensional arrays.
+/** Supports mapping between Postgres Strings (Varchar, text, etc) and Scala Enums in multi-dimensional arrays.
   */
 inline given PgStringToScalaEnumSqlArrayCodec[
     A <: scala.reflect.Enum: Mirror.SumOf: ClassTag

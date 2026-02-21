@@ -2,27 +2,11 @@ package com.augustnagro.magnum
 
 import java.net.URL
 import java.sql.{JDBCType, PreparedStatement, ResultSet, Types}
-import java.time.{
-  Instant,
-  LocalDate,
-  LocalDateTime,
-  LocalTime,
-  OffsetDateTime,
-  ZoneId,
-  ZoneOffset
-}
+import java.time.{Instant, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, ZoneId, ZoneOffset}
 import java.util.UUID
 import scala.annotation.implicitNotFound
 import scala.deriving.Mirror
-import scala.compiletime.{
-  constValue,
-  constValueTuple,
-  erasedValue,
-  error,
-  summonAll,
-  summonFrom,
-  summonInline
-}
+import scala.compiletime.{constValue, constValueTuple, erasedValue, error, summonAll, summonFrom, summonInline}
 import scala.quoted.*
 import scala.reflect.ClassTag
 import scala.util.boundary
@@ -38,37 +22,31 @@ trait DbCodec[E]:
     *
     * DbCodec[(String, Boolean)].queryRepr = "(?, ?)"
     *
-    * case class User(id: Long, name: String) derives DbCodec
-    * DbCodec[User].queryRepr = "? ?"
+    * case class User(id: Long, name: String) derives DbCodec DbCodec[User].queryRepr = "? ?"
     */
   def queryRepr: String
 
-  /** The `java.sql.Types` constant for every "?" in `queryRepr`. For mapping
-    * database-specific types, Types.JAVA_OBJECT is recommended.
+  /** The `java.sql.Types` constant for every "?" in `queryRepr`. For mapping database-specific types, Types.JAVA_OBJECT is recommended.
     */
   def cols: IArray[Int]
 
-  /** Read an E from the ResultSet starting at position `pos` and ending after
-    * reading `cols` number of columns. Make sure the ResultSet is in a valid
-    * state (ie, ResultSet::next has been called).
+  /** Read an E from the ResultSet starting at position `pos` and ending after reading `cols` number of columns. Make sure the ResultSet is
+    * in a valid state (ie, ResultSet::next has been called).
     */
   def readSingle(resultSet: ResultSet, pos: Int): E
 
-  /** Build an E from the ResultSet starting at position 1 and ending after
-    * reading `cols` number of columns. Make sure the ResultSet is in a valid
-    * state (ie, ResultSet::next has been called).
+  /** Build an E from the ResultSet starting at position 1 and ending after reading `cols` number of columns. Make sure the ResultSet is in
+    * a valid state (ie, ResultSet::next has been called).
     */
   def readSingle(resultSet: ResultSet): E = readSingle(resultSet, 1)
 
-  /** Read an Option[E] from the ResultSet starting at position `pos` and ending
-    * after reading `cols` number of columns. Make sure the ResultSet is in a
-    * valid state (ie, ResultSet::next has been called).
+  /** Read an Option[E] from the ResultSet starting at position `pos` and ending after reading `cols` number of columns. Make sure the
+    * ResultSet is in a valid state (ie, ResultSet::next has been called).
     */
   def readSingleOption(resultSet: ResultSet, pos: Int): Option[E]
 
-  /** Build every row in the ResultSet into a sequence of E. The ResultSet
-    * should be in its initial position before calling (ie, ResultSet::next not
-    * called).
+  /** Build every row in the ResultSet into a sequence of E. The ResultSet should be in its initial position before calling (ie,
+    * ResultSet::next not called).
     */
   def read(resultSet: ResultSet): Vector[E] =
     val res = Vector.newBuilder[E]
@@ -82,8 +60,7 @@ trait DbCodec[E]:
   def writeSingle(entity: E, ps: PreparedStatement): Unit =
     writeSingle(entity, ps, 1)
 
-  /** Writes multiple entities to the preparedStatement via
-    * PreparedStatement::addBatch
+  /** Writes multiple entities to the preparedStatement via PreparedStatement::addBatch
     */
   def write(entities: Iterable[E], ps: PreparedStatement): Unit =
     for e <- entities do

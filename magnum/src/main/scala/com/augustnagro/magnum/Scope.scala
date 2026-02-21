@@ -2,11 +2,9 @@ package com.augustnagro.magnum
 
 /** A reusable query scope that can be injected into repositories.
   *
-  * Scopes modify QueryBuilder instances by adding WHERE clauses, ordering, etc.
-  * They compose with other scopes via `finalScopes` on repos.
+  * Scopes modify QueryBuilder instances by adding WHERE clauses, ordering, etc. They compose with other scopes via `finalScopes` on repos.
   *
-  * Since the column type `C` is erased at the scope level, use the raw `Frag`
-  * overload of `where`: `qb.where(sql"...")`.
+  * Since the column type `C` is erased at the scope level, use the raw `Frag` overload of `where`: `qb.where(sql"...")`.
   *
   * @tparam E
   *   the entity type this scope applies to

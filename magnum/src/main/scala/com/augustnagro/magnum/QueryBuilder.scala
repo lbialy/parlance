@@ -159,18 +159,36 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
-    val d = ThroughEagerDef(meta, rel.intermediateTable, rel.sourceFk,
-      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec, None)
+    val d = ThroughEagerDef(
+      meta,
+      rel.intermediateTable,
+      rel.sourceFk,
+      rel.intermediatePk.sqlName,
+      rel.targetFk.scalaName,
+      rel.targetFk.sqlName,
+      rel.sourcePk.scalaName,
+      targetMeta,
+      targetCodec,
+      None
+    )
     EagerQuery(build, codec, meta, Vector(d))
 
   def withRelated[T](rel: HasOneThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
-    val d = ThroughEagerDef(meta, rel.intermediateTable, rel.sourceFk,
-      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec, None)
+    val d = ThroughEagerDef(
+      meta,
+      rel.intermediateTable,
+      rel.sourceFk,
+      rel.intermediatePk.sqlName,
+      rel.targetFk.scalaName,
+      rel.targetFk.sqlName,
+      rel.sourcePk.scalaName,
+      targetMeta,
+      targetCodec,
+      None
+    )
     EagerQuery(build, codec, meta, Vector(d))
 
   // --- Constrained withRelated ---
@@ -196,9 +214,18 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val d = ThroughEagerDef(meta, rel.intermediateTable, rel.sourceFk,
-      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec, Some(f(relCols)))
+    val d = ThroughEagerDef(
+      meta,
+      rel.intermediateTable,
+      rel.sourceFk,
+      rel.intermediatePk.sqlName,
+      rel.targetFk.scalaName,
+      rel.targetFk.sqlName,
+      rel.sourcePk.scalaName,
+      targetMeta,
+      targetCodec,
+      Some(f(relCols))
+    )
     EagerQuery(build, codec, meta, Vector(d))
 
   def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: CT => Frag)(using
@@ -206,9 +233,39 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val d = ThroughEagerDef(meta, rel.intermediateTable, rel.sourceFk,
-      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec, Some(f(relCols)))
+    val d = ThroughEagerDef(
+      meta,
+      rel.intermediateTable,
+      rel.sourceFk,
+      rel.intermediatePk.sqlName,
+      rel.targetFk.scalaName,
+      rel.targetFk.sqlName,
+      rel.sourcePk.scalaName,
+      targetMeta,
+      targetCodec,
+      Some(f(relCols))
+    )
+    EagerQuery(build, codec, meta, Vector(d))
+
+  // --- Composed (via) withRelated ---
+
+  def withRelated[I, T](rel: ComposedRelationship[E, I, T, ?])(using
+      intermediateMeta: TableMeta[I],
+      intermediateCodec: DbCodec[I],
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val d = ComposedEagerDef(meta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, None)
+    EagerQuery(build, codec, meta, Vector(d))
+
+  def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: CT => Frag)(using
+      intermediateMeta: TableMeta[I],
+      intermediateCodec: DbCodec[I],
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
+    val d = ComposedEagerDef(meta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, Some(f(relCols)))
     EagerQuery(build, codec, meta, Vector(d))
 
   // --- withCount for HasMany ---
@@ -320,6 +377,38 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def doesntHave[T](rel: BelongsToMany[E, T, ?]): QueryBuilder[HasRoot, E, C] =
     where(buildPivotExistsFrag(rel, None, negate = true))
 
+  // --- has with count threshold ---
+
+  // HasMany — unconstrained
+  def has[T](rel: HasMany[E, T, ?])(f: CountExpr => Frag)(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    val countSql = buildRelCountSql(rel, relMeta)
+    where(f(CountExpr(countSql)))
+
+  // HasMany — constrained
+  def has[T, CT <: Selectable](rel: HasMany[E, T, CT], cond: CT => Frag)(f: CountExpr => Frag)(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    val countSql = buildRelCountSql(rel, relMeta)
+    val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
+    val condFrag = cond(relCols)
+    where(f(CountExpr(s"$countSql AND ${condFrag.sqlString}", condFrag.params, condFrag.writer)))
+
+  // BelongsToMany — unconstrained
+  def has[T](rel: BelongsToMany[E, T, ?])(f: CountExpr => Frag): QueryBuilder[HasRoot, E, C] =
+    val countSql = buildPivotCountSql(rel, None)
+    where(f(CountExpr(countSql)))
+
+  // BelongsToMany — constrained
+  def has[T, CT <: Selectable](rel: BelongsToMany[E, T, CT], cond: CT => Frag)(f: CountExpr => Frag)(using
+      relMeta: TableMeta[T]
+  ): QueryBuilder[HasRoot, E, C] =
+    val countSql = buildPivotCountSql(rel, Some(relMeta))
+    val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
+    val condFrag = cond(relCols)
+    where(f(CountExpr(s"$countSql AND ${condFrag.sqlString}", condFrag.params, condFrag.writer)))
+
   // --- Private helpers ---
 
   private def buildExistsFrag(
@@ -392,12 +481,10 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
         if !done && prefetched == null then
           val remaining = maxRows - fetched
           val fetchSize = math.min(batchSize.toLong, remaining).toInt
-          if fetchSize <= 0 then
-            done = true
+          if fetchSize <= 0 then done = true
           else
             val batch = QueryBuilder.this.limit(fetchSize).offset(currentOffset).run()
-            if batch.isEmpty then
-              done = true
+            if batch.isEmpty then done = true
             else
               prefetched = batch
               fetched += batch.size
@@ -413,6 +500,8 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
         val result = prefetched.nn
         prefetched = null
         result
+    end new
+  end chunk
 
   def debugPrintSql(using DbCon): this.type =
     val frag = build

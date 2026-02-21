@@ -1,7 +1,6 @@
 package com.augustnagro.magnum
 
-/** A SQL string that is interpolated directly into a sql"" query (and not as a
-  * PreparedStatement parameter)
+/** A SQL string that is interpolated directly into a sql"" query (and not as a PreparedStatement parameter)
   *
   * For example,
   *

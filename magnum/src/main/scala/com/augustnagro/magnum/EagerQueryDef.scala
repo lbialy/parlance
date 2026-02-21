@@ -50,6 +50,7 @@ object EagerQueryDef:
         Frag(sql, allParams, writer)
           .query[A](using codec)
           .run()
+  end fetchByKeys
 
   def fetchPairsByKeys(
       buildSql: String => String,
@@ -70,9 +71,9 @@ object EagerQueryDef:
     Using.resource(con.connection.prepareStatement(frag.sqlString)): ps =>
       frag.writer.write(ps, 1)
       Using.resource(ps.executeQuery()): rs =>
-        while rs.next() do
-          pairs += ((rs.getObject(1), rs.getObject(2)))
+        while rs.next() do pairs += ((rs.getObject(1), rs.getObject(2)))
     pairs.result()
+  end fetchPairsByKeys
 
   def groupByKey[A](
       entities: Vector[A],
@@ -166,11 +167,14 @@ class PivotEagerDef[E, T](
 
     val result = mutable.LinkedHashMap.empty[Any, Vector[Any]]
     pivotPairs.foreach: (srcKey, tgtKey) =>
-      targetByKey.get(tgtKey).foreach: target =>
-        result.updateWith(srcKey):
-          case Some(existing) => Some(existing :+ target)
-          case None           => Some(Vector(target))
+      targetByKey
+        .get(tgtKey)
+        .foreach: target =>
+          result.updateWith(srcKey):
+            case Some(existing) => Some(existing :+ target)
+            case None           => Some(Vector(target))
     result
+  end fetchGrouped
 
   def representativeQueries: Vector[Frag] =
     Vector(
@@ -220,10 +224,12 @@ class ThroughEagerDef[E, T](
 
     val result = mutable.LinkedHashMap.empty[Any, Vector[Any]]
     intermediatePairs.foreach: (srcKey, intKey) =>
-      targetsByIntermediateKey.getOrElse(intKey, Vector.empty).foreach: target =>
-        result.updateWith(srcKey):
-          case Some(existing) => Some(existing :+ target)
-          case None           => Some(Vector(target))
+      targetsByIntermediateKey
+        .getOrElse(intKey, Vector.empty)
+        .foreach: target =>
+          result.updateWith(srcKey):
+            case Some(existing) => Some(existing :+ target)
+            case None           => Some(Vector(target))
     result
 
   def representativeQueries: Vector[Frag] =
@@ -233,3 +239,76 @@ class ThroughEagerDef[E, T](
     )
 
 end ThroughEagerDef
+
+class ComposedEagerDef[Root, Intermediate, Target](
+    private val rootMeta: TableMeta[Root],
+    private val innerRel: Relationship[Root, Intermediate],
+    private val intermediateMeta: TableMeta[Intermediate],
+    private val intermediateCodec: DbCodec[Intermediate],
+    private val outerRel: HasMany[Intermediate, Target, ?],
+    private val targetMeta: TableMeta[Target],
+    private val targetCodec: DbCodec[Target],
+    private val filter: Option[Frag]
+) extends EagerQueryDef:
+
+  import EagerQueryDef.*
+
+  def parentKeyScalaName: String = innerRel.fk.scalaName
+
+  private def innerPkIndex: Int =
+    resolveColumnIndex(intermediateMeta, innerRel.pk.scalaName)
+
+  private def outerFkIndex: Int =
+    resolveColumnIndex(intermediateMeta, outerRel.fk.scalaName)
+
+  private def outerPkIndex: Int =
+    resolveColumnIndex(targetMeta, outerRel.pk.scalaName)
+
+  private def intermediateQuerySql(placeholders: String): String =
+    val cols = intermediateMeta.columns.map(_.sqlName).mkString(", ")
+    s"SELECT $cols FROM ${intermediateMeta.tableName} WHERE ${innerRel.pk.sqlName} IN ($placeholders)"
+
+  private def targetQuerySql(placeholders: String): String =
+    val cols = targetMeta.columns.map(_.sqlName).mkString(", ")
+    s"SELECT $cols FROM ${targetMeta.tableName} WHERE ${outerRel.pk.sqlName} IN ($placeholders)"
+
+  def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]] =
+    val intermediates = fetchByKeys(intermediateQuerySql, parentKeys, intermediateCodec, None)
+    if intermediates.isEmpty then return mutable.LinkedHashMap.empty
+
+    val iPkIdx = innerPkIndex
+    val intermediatesByInnerPk = mutable.LinkedHashMap.empty[Any, Vector[Intermediate]]
+    intermediates.foreach: i =>
+      val key = extractKey(i, intermediateMeta, iPkIdx)
+      intermediatesByInnerPk.updateWith(key):
+        case Some(existing) => Some(existing :+ i)
+        case None           => Some(Vector(i))
+
+    val oFkIdx = outerFkIndex
+    val outerFkValues = intermediates.map(i => extractKey(i, intermediateMeta, oFkIdx)).distinct
+    val targets = fetchByKeys(targetQuerySql, outerFkValues, targetCodec, filter)
+
+    val oPkIdx = outerPkIndex
+    val targetsByOuterPk = mutable.LinkedHashMap.empty[Any, Vector[Target]]
+    targets.foreach: t =>
+      val key = extractKey(t, targetMeta, oPkIdx)
+      targetsByOuterPk.updateWith(key):
+        case Some(existing) => Some(existing :+ t)
+        case None           => Some(Vector(t))
+
+    val result = mutable.LinkedHashMap.empty[Any, Vector[Any]]
+    parentKeys.distinct.foreach: rootKey =>
+      val myIntermediates = intermediatesByInnerPk.getOrElse(rootKey, Vector.empty)
+      val myTargets = myIntermediates.flatMap: i =>
+        val outerFkVal = extractKey(i, intermediateMeta, oFkIdx)
+        targetsByOuterPk.getOrElse(outerFkVal, Vector.empty)
+      if myTargets.nonEmpty then result(rootKey) = myTargets
+    result.asInstanceOf[mutable.LinkedHashMap[Any, Vector[Any]]]
+
+  def representativeQueries: Vector[Frag] =
+    Vector(
+      Frag(intermediateQuerySql("?"), Seq.empty, FragWriter.empty),
+      Frag(targetQuerySql("?"), Seq.empty, FragWriter.empty)
+    )
+
+end ComposedEagerDef

@@ -13,8 +13,7 @@ class Returning[E] private[magnum] (
   def run()(using con: DbCon): Vector[E] =
     withResultSet(reader.read)
 
-  /** Streaming [[Iterator]]. Set [[fetchSize]] to give the JDBC driver a hint
-    * as to how many rows to fetch per request
+  /** Streaming [[Iterator]]. Set [[fetchSize]] to give the JDBC driver a hint as to how many rows to fetch per request
     */
   def iterator(
       fetchSize: Int = 0

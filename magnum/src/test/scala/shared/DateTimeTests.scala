@@ -4,13 +4,7 @@ import com.augustnagro.magnum.*
 import munit.{FunSuite, Location}
 
 import java.sql.Connection
-import java.time.{
-  LocalDate,
-  LocalDateTime,
-  LocalTime,
-  OffsetDateTime,
-  ZoneOffset
-}
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, ZoneOffset}
 import scala.util.Using
 
 def dateTimeTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using

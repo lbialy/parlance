@@ -29,9 +29,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
 
   val clickHouseContainer = ForAllContainerFixture(
     ClickHouseContainer
-      .Def(dockerImageName =
-        DockerImageName.parse("clickhouse/clickhouse-server:24.3.12.75")
-      )
+      .Def(dockerImageName = DockerImageName.parse("clickhouse/clickhouse-server:24.3.12.75"))
       .createContainer()
   )
 

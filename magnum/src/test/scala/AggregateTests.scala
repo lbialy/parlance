@@ -15,7 +15,8 @@ class AggregateTests extends QbTestBase:
   test("sum with where"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbItem]
+      val result = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 500)
         .sum(_.amount)
       assertEquals(result, Some(37750))
@@ -23,7 +24,8 @@ class AggregateTests extends QbTestBase:
   test("sum on empty returns None"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbItem]
+      val result = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 99999)
         .sum(_.amount)
       assertEquals(result, None)
@@ -40,7 +42,8 @@ class AggregateTests extends QbTestBase:
   test("avg with where"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbItem]
+      val result = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 500)
         .avg(_.amount)
       assert(result.isDefined, "avg with where should return Some")
@@ -49,7 +52,8 @@ class AggregateTests extends QbTestBase:
   test("avg on empty returns None"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbItem]
+      val result = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 99999)
         .avg(_.amount)
       assertEquals(result, None)
@@ -65,7 +69,8 @@ class AggregateTests extends QbTestBase:
   test("min with where"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbItem]
+      val result = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 500)
         .min(_.amount)
       assertEquals(result, Some(510))
@@ -81,7 +86,8 @@ class AggregateTests extends QbTestBase:
   test("max with where"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[QbItem]
+      val result = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 500)
         .max(_.amount)
       assertEquals(result, Some(1000))
@@ -91,10 +97,12 @@ class AggregateTests extends QbTestBase:
   test("min/max on empty returns None"):
     val t = xa()
     t.connect:
-      val minResult = QueryBuilder.from[QbItem]
+      val minResult = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 99999)
         .min(_.amount)
-      val maxResult = QueryBuilder.from[QbItem]
+      val maxResult = QueryBuilder
+        .from[QbItem]
         .where(_.amount > 99999)
         .max(_.amount)
       assertEquals(minResult, None)

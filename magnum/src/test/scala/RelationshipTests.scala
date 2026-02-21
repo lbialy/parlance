@@ -14,12 +14,10 @@ class RelationshipTests extends FunSuite:
   case class RAuthor(@Id id: Long, name: String) derives DbCodec, TableMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class RBook(@Id id: Long, authorId: Long, title: String)
-      derives DbCodec, TableMeta
+  case class RBook(@Id id: Long, authorId: Long, title: String) derives DbCodec, TableMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class RBookDetail(@Id id: Long, bookId: Long, isbn: String)
-      derives DbCodec, TableMeta
+  case class RBookDetail(@Id id: Long, bookId: Long, isbn: String) derives DbCodec, TableMeta
 
   test("belongsTo compiles and stores correct metadata"):
     val rel = Relationship.belongsTo[RBook, RAuthor](_.authorId, _.id)

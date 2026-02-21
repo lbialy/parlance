@@ -31,18 +31,36 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
-    val d = ThroughEagerDef(rootMeta, rel.intermediateTable, rel.sourceFk,
-      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec, None)
+    val d = ThroughEagerDef(
+      rootMeta,
+      rel.intermediateTable,
+      rel.sourceFk,
+      rel.intermediatePk.sqlName,
+      rel.targetFk.scalaName,
+      rel.targetFk.sqlName,
+      rel.sourcePk.scalaName,
+      targetMeta,
+      targetCodec,
+      None
+    )
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[T](rel: HasOneThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
-    val d = ThroughEagerDef(rootMeta, rel.intermediateTable, rel.sourceFk,
-      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec, None)
+    val d = ThroughEagerDef(
+      rootMeta,
+      rel.intermediateTable,
+      rel.sourceFk,
+      rel.intermediatePk.sqlName,
+      rel.targetFk.scalaName,
+      rel.targetFk.sqlName,
+      rel.sourcePk.scalaName,
+      targetMeta,
+      targetCodec,
+      None
+    )
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   // --- Constrained withRelated ---
@@ -68,9 +86,18 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val d = ThroughEagerDef(rootMeta, rel.intermediateTable, rel.sourceFk,
-      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec, Some(f(cols)))
+    val d = ThroughEagerDef(
+      rootMeta,
+      rel.intermediateTable,
+      rel.sourceFk,
+      rel.intermediatePk.sqlName,
+      rel.targetFk.scalaName,
+      rel.targetFk.sqlName,
+      rel.sourcePk.scalaName,
+      targetMeta,
+      targetCodec,
+      Some(f(cols))
+    )
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: CT => Frag)(using
@@ -78,9 +105,39 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val d = ThroughEagerDef(rootMeta, rel.intermediateTable, rel.sourceFk,
-      rel.intermediatePk.sqlName, rel.targetFk.scalaName, rel.targetFk.sqlName,
-      rel.sourcePk.scalaName, targetMeta, targetCodec, Some(f(cols)))
+    val d = ThroughEagerDef(
+      rootMeta,
+      rel.intermediateTable,
+      rel.sourceFk,
+      rel.intermediatePk.sqlName,
+      rel.targetFk.scalaName,
+      rel.targetFk.sqlName,
+      rel.sourcePk.scalaName,
+      targetMeta,
+      targetCodec,
+      Some(f(cols))
+    )
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  // --- Composed (via) withRelated ---
+
+  def withRelated[I, T](rel: ComposedRelationship[E, I, T, ?])(using
+      intermediateMeta: TableMeta[I],
+      intermediateCodec: DbCodec[I],
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val d = ComposedEagerDef(rootMeta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, None)
+    EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
+
+  def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: CT => Frag)(using
+      intermediateMeta: TableMeta[I],
+      intermediateCodec: DbCodec[I],
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
+    val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
+    val d = ComposedEagerDef(rootMeta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, Some(f(cols)))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   // --- Execution ---
@@ -105,14 +162,18 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       (parent *: tail).asInstanceOf[E *: R]
 
   def first()(using DbCon): Option[E *: R] =
-    rootFrag.query[E](using rootCodec).run().headOption.map: parent =>
-      val tail = defs.foldRight[Tuple](EmptyTuple): (d, acc) =>
-        val pkIdx = resolveColumnIndex(rootMeta, d.parentKeyScalaName)
-        val key = extractKey(parent, rootMeta, pkIdx)
-        val grouped = d.fetchGrouped(Vector(key))
-        val children = grouped.getOrElse(key, Vector.empty)
-        children *: acc
-      (parent *: tail).asInstanceOf[E *: R]
+    rootFrag
+      .query[E](using rootCodec)
+      .run()
+      .headOption
+      .map: parent =>
+        val tail = defs.foldRight[Tuple](EmptyTuple): (d, acc) =>
+          val pkIdx = resolveColumnIndex(rootMeta, d.parentKeyScalaName)
+          val key = extractKey(parent, rootMeta, pkIdx)
+          val grouped = d.fetchGrouped(Vector(key))
+          val children = grouped.getOrElse(key, Vector.empty)
+          children *: acc
+        (parent *: tail).asInstanceOf[E *: R]
 
   def buildQueries: Vector[Frag] =
     rootFrag +: defs.flatMap(_.representativeQueries)

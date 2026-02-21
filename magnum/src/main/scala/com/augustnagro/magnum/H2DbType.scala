@@ -125,9 +125,7 @@ object H2DbType extends DbType:
 
       def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
         deleteAllById(
-          entities.map(e =>
-            e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID]
-          )
+          entities.map(e => e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID])
         )
 
       def deleteAllById(ids: Iterable[ID])(using
@@ -192,6 +190,46 @@ object H2DbType extends DbType:
               codec.writeSingle(field, ps, pos)
               pos += codec.cols.length
             timed(ps.executeUpdate())
+
+      def updatePartial(original: E, current: E)(using con: DbCon): Unit =
+        val origProduct = original.asInstanceOf[Product]
+        val currProduct = current.asInstanceOf[Product]
+
+        val origId = origProduct.productElement(idIndex)
+        val currId = currProduct.productElement(idIndex)
+        require(
+          origId == currId,
+          s"updatePartial requires same id, got $origId != $currId"
+        )
+
+        val arity = origProduct.productArity
+        val changed = Vector.newBuilder[Int]
+        var i = 0
+        while i < arity do
+          if i != idIndex && origProduct.productElement(i) != currProduct
+              .productElement(i)
+          then changed += i
+          i += 1
+        val changedIndices = changed.result()
+
+        if changedIndices.isEmpty then return
+
+        val setClauses = changedIndices
+          .map(idx => eElemNamesSql(idx) + " = " + eElemCodecs(idx).queryRepr)
+          .mkString(", ")
+        val sql =
+          s"UPDATE $tableNameSql SET $setClauses WHERE $idName = ${idCodec.queryRepr}"
+
+        handleQuery(sql, current):
+          Using(con.connection.prepareStatement(sql)): ps =>
+            var pos = 1
+            for idx <- changedIndices do
+              val codec = eElemCodecs(idx).asInstanceOf[DbCodec[Any]]
+              codec.writeSingle(currProduct.productElement(idx), ps, pos)
+              pos += codec.cols.length
+            idCodec.writeSingle(currId.asInstanceOf[ID], ps, pos)
+            timed(ps.executeUpdate())
+      end updatePartial
 
       def updateAll(entities: Iterable[E])(using
           con: DbCon

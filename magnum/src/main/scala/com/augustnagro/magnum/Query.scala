@@ -17,8 +17,7 @@ class Query[E] private[magnum] (val frag: Frag, reader: DbCodec[E]):
           val rs = use(ps.executeQuery())
           reader.read(rs)
 
-  /** Streaming [[Iterator]]. Set [[fetchSize]] to give the JDBC driver a hint
-    * as to how many rows to fetch per request
+  /** Streaming [[Iterator]]. Set [[fetchSize]] to give the JDBC driver a hint as to how many rows to fetch per request
     */
   def iterator(
       fetchSize: Int = 0

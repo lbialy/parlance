@@ -58,6 +58,7 @@ extension [A](col: ColRef[A])
           currentPos += codec.cols.length
         currentPos
       Frag(s"${col.queryRepr} IN ($placeholders)", vals, writer)
+end extension
 
 extension (col: ColRef[String])
   def like(pattern: String)(using codec: DbCodec[String]): Frag =
