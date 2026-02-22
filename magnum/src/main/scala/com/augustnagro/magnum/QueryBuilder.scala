@@ -11,7 +11,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     private val codec: DbCodec[E],
     private val cols: C,
     private val rootPredicate: Option[Predicate],
-    private val orderEntries: Vector[(ColRef[?], SortOrder)],
+    private val orderEntries: Vector[(ColRef[?], SortOrder, NullOrder)],
     private val limitOpt: Option[Int],
     private val offsetOpt: Option[Long]
 ):
@@ -50,11 +50,11 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   ): QueryBuilder[HasRoot, E, C] =
     new QueryBuilder(meta, codec, cols, addOr(f(PredicateGroupBuilder.empty(cols)).build), orderEntries, limitOpt, offsetOpt)
 
-  def orderBy(f: C => ColRef[?], order: SortOrder = SortOrder.Asc): QueryBuilder[S, E, C] =
-    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), order), limitOpt, offsetOpt)
+  def orderBy(f: C => ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): QueryBuilder[S, E, C] =
+    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), order, nullOrder), limitOpt, offsetOpt)
 
   def orderBy(f: C => ColRef[?]): QueryBuilder[S, E, C] =
-    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), SortOrder.Asc), limitOpt, offsetOpt)
+    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), SortOrder.Asc, NullOrder.Default), limitOpt, offsetOpt)
 
   def limit(n: Int): QueryBuilder[S, E, C] =
     if n < 0 then throw QueryBuilderException("limit must not be negative")
@@ -81,7 +81,10 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val orderBySql =
       if orderEntries.isEmpty then ""
       else
-        val entries = orderEntries.map((col, ord) => s"${col.queryRepr} ${ord.queryRepr}")
+        val entries = orderEntries.map((col, ord, nullOrd) =>
+          val base = s"${col.queryRepr} ${ord.queryRepr}"
+          if nullOrd.queryRepr.isEmpty then base else s"$base ${nullOrd.queryRepr}"
+        )
         " ORDER BY " + entries.mkString(", ")
 
     val limitSql = limitOpt.fold("")(n => s" LIMIT $n")
@@ -465,6 +468,41 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       case Some(tMeta) =>
         s"${rel.pivotTable} JOIN ${tMeta.tableName} ON ${rel.pivotTable}.${rel.targetFk} = ${tMeta.tableName}.${rel.targetPk.sqlName}"
     buildCountSql(fromClause, correlation)
+
+  def paginate(page: Int, perPage: Int)(using DbCon): OffsetPage[E] =
+    if page < 1 then throw QueryBuilderException("page must be >= 1")
+    if perPage < 1 then throw QueryBuilderException("perPage must be >= 1")
+    val total = count()
+    val items = this.limit(perPage).offset((page - 1).toLong * perPage).run()
+    OffsetPage(items, total, page, perPage)
+
+  def keysetPaginate[K <: NonEmptyTuple](perPage: Int)(
+      f: KeysetColumns[E, C, EmptyTuple] => KeysetColumns[E, C, K]
+  ): KeysetPaginator[E, UnwrapSingle[K]] =
+    if perPage < 1 then throw QueryBuilderException("perPage must be >= 1")
+    val builder = new KeysetColumns[E, C, EmptyTuple](cols, meta, Vector.empty)
+    val result = f(builder)
+    val entries = result.entries
+    val arity = entries.size
+
+    val keyExtractor: E => UnwrapSingle[K] =
+      if arity == 1 then
+        val idx = entries.head.colIndex
+        (e: E) => e.asInstanceOf[Product].productElement(idx).asInstanceOf[UnwrapSingle[K]]
+      else
+        val indices = entries.map(_.colIndex)
+        (e: E) =>
+          val prod = e.asInstanceOf[Product]
+          val values = indices.map(i => prod.productElement(i).asInstanceOf[AnyRef])
+          val tuple = scala.runtime.Tuples.fromIArray(IArray.unsafeFromArray(values.toArray))
+          tuple.asInstanceOf[UnwrapSingle[K]]
+
+    val keyToValues: UnwrapSingle[K] => Vector[Any] =
+      if arity == 1 then (k: UnwrapSingle[K]) => Vector(k)
+      else (k: UnwrapSingle[K]) => k.asInstanceOf[Product].productIterator.toVector
+
+    new KeysetPaginator(meta, codec, rootPredicate, perPage, entries, keyExtractor, keyToValues, None)
+  end keysetPaginate
 
   def chunk(batchSize: Int)(using DbCon): Iterator[Vector[E]] =
     require(batchSize > 0, "batchSize must be positive")

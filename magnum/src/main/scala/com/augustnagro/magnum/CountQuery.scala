@@ -6,7 +6,7 @@ class CountQuery[E] private[magnum] (
     private val countSubquerySql: String,
     private val countCondition: Option[Frag],
     private val rootPredicate: Option[Predicate],
-    private val orderEntries: Vector[(ColRef[?], SortOrder)],
+    private val orderEntries: Vector[(ColRef[?], SortOrder, NullOrder)],
     private val limitOpt: Option[Int],
     private val offsetOpt: Option[Long]
 ):
@@ -30,7 +30,10 @@ class CountQuery[E] private[magnum] (
     val orderBySql =
       if orderEntries.isEmpty then ""
       else
-        val entries = orderEntries.map((col, ord) => s"${col.queryRepr} ${ord.queryRepr}")
+        val entries = orderEntries.map((col, ord, nullOrd) =>
+          val base = s"${col.queryRepr} ${ord.queryRepr}"
+          if nullOrd.queryRepr.isEmpty then base else s"$base ${nullOrd.queryRepr}"
+        )
         " ORDER BY " + entries.mkString(", ")
 
     val limitSql = limitOpt.fold("")(n => s" LIMIT $n")

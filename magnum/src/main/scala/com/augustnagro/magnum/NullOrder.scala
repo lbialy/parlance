@@ -1,8 +1,8 @@
 package com.augustnagro.magnum
 
-trait NullOrder
-
-object NullOrder:
-  case object Default extends NullOrder
-  case object First extends NullOrder
-  case object Last extends NullOrder
+enum NullOrder extends SqlLiteral:
+  case Default, First, Last
+  def queryRepr: String = this match
+    case Default => ""
+    case First   => "NULLS FIRST"
+    case Last    => "NULLS LAST"

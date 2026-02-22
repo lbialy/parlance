@@ -9,7 +9,7 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     private val codecs: Vector[DbCodec[?]],
     private val joinClauses: Vector[JoinEntry],
     private val predicate: Option[Predicate],
-    private val orderEntries: Vector[(ColRef[?], SortOrder)],
+    private val orderEntries: Vector[(ColRef[?], SortOrder, NullOrder)],
     private val limitOpt: Option[Int],
     private val offsetOpt: Option[Long]
 ):
@@ -47,8 +47,8 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
   ): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, addOr(f(PredicateGroupBuilder.empty(null)).build), orderEntries, limitOpt, offsetOpt)
 
-  def orderBy(col: ColRef[?], order: SortOrder = SortOrder.Asc): JoinedQuery[R] =
-    new JoinedQuery(metas, codecs, joinClauses, predicate, orderEntries :+ (col, order), limitOpt, offsetOpt)
+  def orderBy(col: ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): JoinedQuery[R] =
+    new JoinedQuery(metas, codecs, joinClauses, predicate, orderEntries :+ (col, order, nullOrder), limitOpt, offsetOpt)
 
   def limit(n: Int): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, predicate, orderEntries, Some(n), offsetOpt)
@@ -168,7 +168,10 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     val orderBySql =
       if orderEntries.isEmpty then ""
       else
-        val entries = orderEntries.map((col, ord) => s"${col.queryRepr} ${ord.queryRepr}")
+        val entries = orderEntries.map((col, ord, nullOrd) =>
+          val base = s"${col.queryRepr} ${ord.queryRepr}"
+          if nullOrd.queryRepr.isEmpty then base else s"$base ${nullOrd.queryRepr}"
+        )
         " ORDER BY " + entries.mkString(", ")
 
     val limitSql = limitOpt.fold("")(n => s" LIMIT $n")
