@@ -41,7 +41,7 @@ class ErrorPathTests extends QbTestBase:
         QueryBuilder
           .from[JnBook]
           .join(bookAuthor)
-          .where(sql"title = ${"NonExistent"}")
+          .where(sql"title = ${"NonExistent"}".unsafeAsWhere)
           .firstOrFail()
 
   // --- firstOrFail() error message includes table name ---

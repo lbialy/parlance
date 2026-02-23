@@ -27,7 +27,7 @@ class JoinedQueryTests extends QbTestBase:
       val results = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .where(sql"title = ${"Dune"}")
+        .where(sql"title = ${"Dune"}".unsafeAsWhere)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "Dune")
@@ -72,7 +72,7 @@ class JoinedQueryTests extends QbTestBase:
       val result = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .where(sql"name = ${"Tolkien"}")
+        .where(sql"name = ${"Tolkien"}".unsafeAsWhere)
         .count()
       assertEquals(result, 2L)
 
@@ -84,7 +84,7 @@ class JoinedQueryTests extends QbTestBase:
         !QueryBuilder
           .from[JnBook]
           .join(bookAuthor)
-          .where(sql"name = ${"Nobody"}")
+          .where(sql"name = ${"Nobody"}".unsafeAsWhere)
           .exists()
       )
 
@@ -94,7 +94,7 @@ class JoinedQueryTests extends QbTestBase:
       val (book, author) = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .where(sql"title = ${"Foundation"}")
+        .where(sql"title = ${"Foundation"}".unsafeAsWhere)
         .firstOrFail()
       assertEquals(book.title, "Foundation")
       assertEquals(author.name, "Asimov")

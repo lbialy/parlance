@@ -31,10 +31,10 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
       case Some(Predicate.Or(children)) => Predicate.Or(children :+ pred)
       case Some(other)                  => Predicate.Or(Vector(other, pred)))
 
-  def where(frag: Frag): JoinedQuery[R] =
+  def where(frag: WhereFrag): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
 
-  def orWhere(frag: Frag): JoinedQuery[R] =
+  def orWhere(frag: WhereFrag): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, addOr(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
 
   def whereGroup(

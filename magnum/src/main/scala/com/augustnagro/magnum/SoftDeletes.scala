@@ -47,7 +47,7 @@ trait SoftDeletes[EC, E, ID]:
     def apply[C <: Selectable](
         qb: QueryBuilder[HasRoot, E, C]
     ): QueryBuilder[HasRoot, E, C] =
-      qb.where(Frag(s"$sdColSql IS NULL", Seq.empty, FragWriter.empty))
+      qb.where(WhereFrag(Frag(s"$sdColSql IS NULL", Seq.empty, FragWriter.empty)))
 
   override def finalScopes: Vector[Scope[E]] =
     self.injectedScopes :+ softDeleteScope
@@ -130,5 +130,5 @@ trait SoftDeletes[EC, E, ID]:
       def apply[C <: Selectable](
           qb: QueryBuilder[HasRoot, E, C]
       ): QueryBuilder[HasRoot, E, C] =
-        qb.where(Frag(s"$sdColSql IS NOT NULL", Seq.empty, FragWriter.empty))
+        qb.where(WhereFrag(Frag(s"$sdColSql IS NOT NULL", Seq.empty, FragWriter.empty)))
 end SoftDeletes

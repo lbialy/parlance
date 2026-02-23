@@ -46,23 +46,23 @@ open class ImmutableRepo[E, ID](
     val qb = QueryBuilder.build0[E, Columns[E]](tableMeta, eCodec, cols)
     applyScopes(qb)
 
-  /** Build a Frag for `pk = ?` */
-  private def pkEqualsFrag(id: ID): Frag =
-    Frag(
+  /** Build a WhereFrag for `pk = ?` */
+  private def pkEqualsFrag(id: ID): WhereFrag =
+    WhereFrag(Frag(
       s"${tableMeta.primaryKey.sqlName} = ?",
       Seq(id),
       FragWriter.fromKeys(Vector(id.asInstanceOf[Any]))
-    )
+    ))
 
-  /** Build a Frag for `pk IN (?, ?, ...)` */
-  private def pkInFrag(ids: Iterable[ID]): Frag =
+  /** Build a WhereFrag for `pk IN (?, ?, ...)` */
+  private def pkInFrag(ids: Iterable[ID]): WhereFrag =
     val keys = ids.toVector
     val placeholders = keys.map(_ => "?").mkString(", ")
-    Frag(
+    WhereFrag(Frag(
       s"${tableMeta.primaryKey.sqlName} IN ($placeholders)",
       keys,
       FragWriter.fromKeys(keys.asInstanceOf[Vector[Any]])
-    )
+    ))
 
   /** Count of all entities */
   def count(using DbCon): Long =

@@ -34,7 +34,7 @@ class LeftJoinTests extends QbTestBase:
       val results = QueryBuilder
         .from[LjBook]
         .leftJoin(bookAuthor)
-        .where(sql"title = ${"Anonymous Tales"}")
+        .where(sql"title = ${"Anonymous Tales"}".unsafeAsWhere)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "Anonymous Tales")
@@ -59,7 +59,7 @@ class LeftJoinTests extends QbTestBase:
     val t = xa()
     t.connect:
       val qb = QueryBuilder.from[LjBook].leftJoin(bookAuthor)
-      val result = qb.where(sql"title = ${"Foundation"}").first()
+      val result = qb.where(sql"title = ${"Foundation"}".unsafeAsWhere).first()
       assert(result.isDefined)
       assertEquals(result.get._2, Some(LjAuthor(2, "Asimov", Some(2L))))
 

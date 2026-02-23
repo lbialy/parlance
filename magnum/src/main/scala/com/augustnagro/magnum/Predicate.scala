@@ -2,25 +2,25 @@ package com.augustnagro.magnum
 
 /** ADT for SQL predicates with correct parenthesization. */
 enum Predicate:
-  case Leaf(frag: Frag)
+  case Leaf(frag: WhereFrag)
   case And(children: Vector[Predicate])
   case Or(children: Vector[Predicate])
 
-  /** Render this predicate tree to a Frag with correct parenthesization. */
-  def toFrag: Frag = this match
+  /** Render this predicate tree to a WhereFrag with correct parenthesization. */
+  def toFrag: WhereFrag = this match
     case Leaf(frag) => frag
 
     case And(children) =>
       val nonEmpty = children.map(_.toFrag).filter(_.sqlString.nonEmpty)
       nonEmpty.size match
-        case 0 => Frag("", Seq.empty, FragWriter.empty)
+        case 0 => WhereFrag.empty
         case 1 => nonEmpty.head
         case _ => Predicate.joinFrags(nonEmpty, " AND ")
 
     case Or(children) =>
       val nonEmpty = children.map(_.toFrag).filter(_.sqlString.nonEmpty)
       nonEmpty.size match
-        case 0 => Frag("", Seq.empty, FragWriter.empty)
+        case 0 => WhereFrag.empty
         case 1 => nonEmpty.head
         case _ => Predicate.joinFrags(nonEmpty, " OR ")
 end Predicate
@@ -28,7 +28,7 @@ end Predicate
 object Predicate:
   val empty: Predicate = And(Vector.empty)
 
-  private def joinFrags(frags: Vector[Frag], separator: String): Frag =
+  private def joinFrags(frags: Vector[WhereFrag], separator: String): WhereFrag =
     val sb = new StringBuilder("(")
     val allParams = Vector.newBuilder[Any]
     val writers = Vector.newBuilder[FragWriter]
@@ -48,6 +48,6 @@ object Predicate:
       for w <- writers.result() do currentPos = w.write(ps, currentPos)
       currentPos
 
-    Frag(sb.result(), allParams.result(), combinedWriter)
+    WhereFrag(Frag(sb.result(), allParams.result(), combinedWriter))
   end joinFrags
 end Predicate

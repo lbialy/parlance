@@ -90,7 +90,7 @@ class RepoQueryTests extends QbTestBase:
         def apply[C <: Selectable](
             qb: QueryBuilder[HasRoot, RepoItem, C]
         ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"status = 'active'")
+          qb.where(sql"status = 'active'".unsafeAsWhere)
 
       val scopedRepo =
         Repo[RepoItem, RepoItem, Long](Vector(activeScope))
@@ -106,7 +106,7 @@ class RepoQueryTests extends QbTestBase:
         def apply[C <: Selectable](
             qb: QueryBuilder[HasRoot, RepoItem, C]
         ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"status = 'active'")
+          qb.where(sql"status = 'active'".unsafeAsWhere)
 
       val scopedRepo =
         Repo[RepoItem, RepoItem, Long](Vector(activeScope))
@@ -121,7 +121,7 @@ class RepoQueryTests extends QbTestBase:
         def apply[C <: Selectable](
             qb: QueryBuilder[HasRoot, RepoItem, C]
         ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"status = 'active'")
+          qb.where(sql"status = 'active'".unsafeAsWhere)
 
       val scopedRepo =
         Repo[RepoItem, RepoItem, Long](Vector(activeScope))
@@ -141,7 +141,7 @@ class RepoQueryTests extends QbTestBase:
         def apply[C <: Selectable](
             qb: QueryBuilder[HasRoot, RepoItem, C]
         ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"amount >= 30")
+          qb.where(sql"amount >= 30".unsafeAsWhere)
 
       val customRepo = new Repo[RepoItem, RepoItem, Long]():
         override def finalScopes: Vector[Scope[RepoItem]] =

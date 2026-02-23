@@ -13,7 +13,8 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     private val rootPredicate: Option[Predicate],
     private val orderEntries: Vector[(ColRef[?], SortOrder, NullOrder)],
     private val limitOpt: Option[Int],
-    private val offsetOpt: Option[Long]
+    private val offsetOpt: Option[Long],
+    private val distinctFlag: Boolean = false
 ):
 
   private def addAnd(pred: Predicate): Option[Predicate] =
@@ -28,41 +29,44 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       case Some(Predicate.Or(children)) => Predicate.Or(children :+ pred)
       case Some(other)                  => Predicate.Or(Vector(other, pred)))
 
-  def where(frag: Frag): QueryBuilder[HasRoot, E, C] =
-    new QueryBuilder(meta, codec, cols, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
+  def where(frag: WhereFrag): QueryBuilder[HasRoot, E, C] =
+    new QueryBuilder(meta, codec, cols, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt, distinctFlag)
 
-  def where(f: C => Frag): QueryBuilder[HasRoot, E, C] =
-    new QueryBuilder(meta, codec, cols, addAnd(Predicate.Leaf(f(cols))), orderEntries, limitOpt, offsetOpt)
+  def where(f: C => WhereFrag): QueryBuilder[HasRoot, E, C] =
+    new QueryBuilder(meta, codec, cols, addAnd(Predicate.Leaf(f(cols))), orderEntries, limitOpt, offsetOpt, distinctFlag)
 
-  def orWhere(frag: Frag): QueryBuilder[HasRoot, E, C] =
-    new QueryBuilder(meta, codec, cols, addOr(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
+  def orWhere(frag: WhereFrag): QueryBuilder[HasRoot, E, C] =
+    new QueryBuilder(meta, codec, cols, addOr(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt, distinctFlag)
 
-  def orWhere(f: C => Frag): QueryBuilder[HasRoot, E, C] =
-    new QueryBuilder(meta, codec, cols, addOr(Predicate.Leaf(f(cols))), orderEntries, limitOpt, offsetOpt)
+  def orWhere(f: C => WhereFrag): QueryBuilder[HasRoot, E, C] =
+    new QueryBuilder(meta, codec, cols, addOr(Predicate.Leaf(f(cols))), orderEntries, limitOpt, offsetOpt, distinctFlag)
 
   def whereGroup(
       f: PredicateGroupBuilder[C] => PredicateGroupBuilder[C]
   ): QueryBuilder[HasRoot, E, C] =
-    new QueryBuilder(meta, codec, cols, addAnd(f(PredicateGroupBuilder.empty(cols)).build), orderEntries, limitOpt, offsetOpt)
+    new QueryBuilder(meta, codec, cols, addAnd(f(PredicateGroupBuilder.empty(cols)).build), orderEntries, limitOpt, offsetOpt, distinctFlag)
 
   def orWhereGroup(
       f: PredicateGroupBuilder[C] => PredicateGroupBuilder[C]
   ): QueryBuilder[HasRoot, E, C] =
-    new QueryBuilder(meta, codec, cols, addOr(f(PredicateGroupBuilder.empty(cols)).build), orderEntries, limitOpt, offsetOpt)
+    new QueryBuilder(meta, codec, cols, addOr(f(PredicateGroupBuilder.empty(cols)).build), orderEntries, limitOpt, offsetOpt, distinctFlag)
 
   def orderBy(f: C => ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): QueryBuilder[S, E, C] =
-    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), order, nullOrder), limitOpt, offsetOpt)
+    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), order, nullOrder), limitOpt, offsetOpt, distinctFlag)
 
   def orderBy(f: C => ColRef[?]): QueryBuilder[S, E, C] =
-    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), SortOrder.Asc, NullOrder.Default), limitOpt, offsetOpt)
+    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), SortOrder.Asc, NullOrder.Default), limitOpt, offsetOpt, distinctFlag)
 
   def limit(n: Int): QueryBuilder[S, E, C] =
     if n < 0 then throw QueryBuilderException("limit must not be negative")
-    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, Some(n), offsetOpt)
+    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, Some(n), offsetOpt, distinctFlag)
 
   def offset(n: Long): QueryBuilder[S, E, C] =
     if n < 0 then throw QueryBuilderException("offset must not be negative")
-    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, Some(n))
+    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, Some(n), distinctFlag)
+
+  def distinct: QueryBuilder[S, E, C] =
+    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, true)
 
   private def buildWhere: (String, Seq[Any], FragWriter) =
     rootPredicate match
@@ -74,7 +78,8 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 
   def build: Frag =
     val selectCols = meta.columns.map(_.sqlName).mkString(", ")
-    val baseSql = s"SELECT $selectCols FROM ${meta.tableName}"
+    val keyword = if distinctFlag then "SELECT DISTINCT" else "SELECT"
+    val baseSql = s"$keyword $selectCols FROM ${meta.tableName}"
 
     val (whereSql, params, writer) = buildWhere
 
@@ -196,7 +201,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 
   // --- Constrained withRelated ---
 
-  def withRelated[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => Frag)(using
+  def withRelated[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => WhereFrag)(using
       childMeta: TableMeta[T],
       childCodec: DbCodec[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
@@ -204,7 +209,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val d = DirectEagerDef(meta, rel, childMeta, childCodec, Some(f(relCols)))
     EagerQuery(build, codec, meta, Vector(d))
 
-  def withRelated[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => Frag)(using
+  def withRelated[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => WhereFrag)(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
@@ -212,7 +217,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, Some(f(relCols)))
     EagerQuery(build, codec, meta, Vector(d))
 
-  def withRelated[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(f: CT => Frag)(using
+  def withRelated[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(f: CT => WhereFrag)(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
@@ -231,7 +236,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     )
     EagerQuery(build, codec, meta, Vector(d))
 
-  def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: CT => Frag)(using
+  def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: CT => WhereFrag)(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
@@ -261,7 +266,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val d = ComposedEagerDef(meta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, None)
     EagerQuery(build, codec, meta, Vector(d))
 
-  def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: CT => Frag)(using
+  def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: CT => WhereFrag)(using
       intermediateMeta: TableMeta[I],
       intermediateCodec: DbCodec[I],
       targetMeta: TableMeta[T],
@@ -279,7 +284,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val subSql = buildRelCountSql(rel, relMeta)
     new CountQuery(meta, codec, subSql, None, rootPredicate, orderEntries, limitOpt, offsetOpt)
 
-  def withCount[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => Frag)(using
+  def withCount[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => WhereFrag)(using
       relMeta: TableMeta[T]
   ): CountQuery[E] =
     val subSql = buildRelCountSql(rel, relMeta)
@@ -292,7 +297,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val subSql = buildPivotCountSql(rel, None)
     new CountQuery(meta, codec, subSql, None, rootPredicate, orderEntries, limitOpt, offsetOpt)
 
-  def withCount[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => Frag)(using
+  def withCount[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => WhereFrag)(using
       relMeta: TableMeta[T]
   ): CountQuery[E] =
     val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
@@ -350,7 +355,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   ): QueryBuilder[HasRoot, E, C] =
     where(buildRelExistsFrag(rel, relMeta, None, negate = false))
 
-  def whereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => Frag)(using
+  def whereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => WhereFrag)(using
       relMeta: TableMeta[T]
   ): QueryBuilder[HasRoot, E, C] =
     val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
@@ -371,7 +376,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def whereHas[T](rel: BelongsToMany[E, T, ?]): QueryBuilder[HasRoot, E, C] =
     where(buildPivotExistsFrag(rel, None, negate = false))
 
-  def whereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => Frag)(using
+  def whereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => WhereFrag)(using
       relMeta: TableMeta[T]
   ): QueryBuilder[HasRoot, E, C] =
     val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
@@ -383,14 +388,14 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   // --- has with count threshold ---
 
   // HasMany — unconstrained
-  def has[T](rel: HasMany[E, T, ?])(f: CountExpr => Frag)(using
+  def has[T](rel: HasMany[E, T, ?])(f: CountExpr => WhereFrag)(using
       relMeta: TableMeta[T]
   ): QueryBuilder[HasRoot, E, C] =
     val countSql = buildRelCountSql(rel, relMeta)
     where(f(CountExpr(countSql)))
 
   // HasMany — constrained
-  def has[T, CT <: Selectable](rel: HasMany[E, T, CT], cond: CT => Frag)(f: CountExpr => Frag)(using
+  def has[T, CT <: Selectable](rel: HasMany[E, T, CT], cond: CT => WhereFrag)(f: CountExpr => WhereFrag)(using
       relMeta: TableMeta[T]
   ): QueryBuilder[HasRoot, E, C] =
     val countSql = buildRelCountSql(rel, relMeta)
@@ -399,12 +404,12 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     where(f(CountExpr(s"$countSql AND ${condFrag.sqlString}", condFrag.params, condFrag.writer)))
 
   // BelongsToMany — unconstrained
-  def has[T](rel: BelongsToMany[E, T, ?])(f: CountExpr => Frag): QueryBuilder[HasRoot, E, C] =
+  def has[T](rel: BelongsToMany[E, T, ?])(f: CountExpr => WhereFrag): QueryBuilder[HasRoot, E, C] =
     val countSql = buildPivotCountSql(rel, None)
     where(f(CountExpr(countSql)))
 
   // BelongsToMany — constrained
-  def has[T, CT <: Selectable](rel: BelongsToMany[E, T, CT], cond: CT => Frag)(f: CountExpr => Frag)(using
+  def has[T, CT <: Selectable](rel: BelongsToMany[E, T, CT], cond: CT => WhereFrag)(f: CountExpr => WhereFrag)(using
       relMeta: TableMeta[T]
   ): QueryBuilder[HasRoot, E, C] =
     val countSql = buildPivotCountSql(rel, Some(relMeta))
@@ -417,15 +422,15 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   private def buildExistsFrag(
       fromClause: String,
       correlation: String,
-      condition: Option[Frag],
+      condition: Option[WhereFrag],
       negate: Boolean
-  ): Frag =
+  ): WhereFrag =
     val prefix = if negate then "NOT EXISTS" else "EXISTS"
     condition match
       case None =>
-        Frag(s"$prefix (SELECT 1 FROM $fromClause WHERE $correlation)", Seq.empty, FragWriter.empty)
+        WhereFrag(Frag(s"$prefix (SELECT 1 FROM $fromClause WHERE $correlation)", Seq.empty, FragWriter.empty))
       case Some(cond) =>
-        Frag(s"$prefix (SELECT 1 FROM $fromClause WHERE $correlation AND ${cond.sqlString})", cond.params, cond.writer)
+        WhereFrag(Frag(s"$prefix (SELECT 1 FROM $fromClause WHERE $correlation AND ${cond.sqlString})", cond.params, cond.writer))
 
   private def buildCountSql(fromClause: String, correlation: String): String =
     s"SELECT COUNT(*) FROM $fromClause WHERE $correlation"
@@ -433,17 +438,17 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   private def buildRelExistsFrag[T](
       rel: Relationship[E, T],
       relMeta: TableMeta[T],
-      condition: Option[Frag],
+      condition: Option[WhereFrag],
       negate: Boolean
-  ): Frag =
+  ): WhereFrag =
     val correlation = s"${relMeta.tableName}.${rel.pk.sqlName} = ${meta.tableName}.${rel.fk.sqlName}"
     buildExistsFrag(relMeta.tableName, correlation, condition, negate)
 
   private def buildPivotExistsFrag[T](
       rel: BelongsToMany[E, T, ?],
-      conditionWithMeta: Option[(Frag, TableMeta[T])],
+      conditionWithMeta: Option[(WhereFrag, TableMeta[T])],
       negate: Boolean
-  ): Frag =
+  ): WhereFrag =
     val correlation = s"${rel.pivotTable}.${rel.sourceFk} = ${meta.tableName}.${rel.sourcePk.sqlName}"
     val fromClause = conditionWithMeta match
       case None => rel.pivotTable

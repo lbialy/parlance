@@ -3,9 +3,12 @@ import com.augustnagro.magnum.*
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 case class QbUser(@Id id: Long, firstName: Option[String], age: Int) derives DbCodec, TableMeta
 
+@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+case class QbProduct(@Id id: Long, name: String, price: Int) derives DbCodec, TableMeta
+
 class QueryBuilderBasicTests extends QbTestBase:
 
-  val h2Ddls = Seq("/h2/qb-user.sql")
+  val h2Ddls = Seq("/h2/qb-user.sql", "/h2/qb-product.sql")
 
   // val u = Columns.of[QbUser]
 
@@ -80,6 +83,100 @@ class QueryBuilderBasicTests extends QbTestBase:
         .run()
       assertEquals(results.length, 0)
 
+  // --- notIn tests ---
+
+  test("where age.notIn(List(25, 30)) returns rows NOT matching"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.age.notIn(List(25, 30)))
+        .run()
+      assertEquals(results.length, 2)
+      val ids = results.map(_.id).sorted
+      assertEquals(ids, Vector(3L, 4L))
+
+  test("empty notIn() returns all rows"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.age.notIn(List.empty[Int]))
+        .run()
+      assertEquals(results.length, 4)
+
+  // --- between tests ---
+
+  test("where age.between(20, 26) returns rows in range"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.age.between(20, 26))
+        .run()
+      assertEquals(results.length, 2)
+      val ids = results.map(_.id).sorted
+      assertEquals(ids, Vector(1L, 4L))
+
+  // --- notLike tests ---
+
+  test("where name.notLike(A%) returns rows not matching pattern"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbProduct]
+        .where(_.name.notLike("A%"))
+        .run()
+      assertEquals(results.length, 3)
+      val ids = results.map(_.id).sorted
+      assertEquals(ids, Vector(2L, 3L, 4L))
+
+  // --- ilike tests ---
+
+  test("where name.ilike(a%) matches case-insensitively"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbProduct]
+        .where(_.name.ilike("a%"))
+        .run()
+      assertEquals(results.length, 2)
+      val ids = results.map(_.id).sorted
+      assertEquals(ids, Vector(1L, 3L))
+
+  // --- Option[String] column tests (like/notLike/ilike on nullable) ---
+
+  test("like on Option[String] column works"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.firstName.like("A%"))
+        .run()
+      assertEquals(results.length, 1)
+      assertEquals(results.head.id, 1L)
+
+  test("notLike on Option[String] column works"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.firstName.notLike("A%"))
+        .run()
+      assertEquals(results.length, 2)
+      val ids = results.map(_.id).sorted
+      assertEquals(ids, Vector(2L, 3L))
+
+  test("ilike on Option[String] column works"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .where(_.firstName.ilike("alice"))
+        .run()
+      assertEquals(results.length, 1)
+      assertEquals(results.head.id, 1L)
+
   // --- Lambda syntax tests ---
 
   test("lambda where: _.age > 18"):
@@ -136,5 +233,38 @@ class QueryBuilderBasicTests extends QbTestBase:
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE age > ?"
     )
+
+  // --- distinct tests ---
+
+  test("distinct.build produces SELECT DISTINCT"):
+    val frag = QueryBuilder
+      .from[QbUser]
+      .distinct
+      .build
+    assertEquals(
+      frag.sqlString,
+      "SELECT DISTINCT id, first_name, age FROM qb_user"
+    )
+
+  test("distinct with where produces correct SQL"):
+    val frag = QueryBuilder
+      .from[QbUser]
+      .distinct
+      .where(_.age > 18)
+      .build
+    assertEquals(
+      frag.sqlString,
+      "SELECT DISTINCT id, first_name, age FROM qb_user WHERE age > ?"
+    )
+
+  test("distinct.run() returns correct rows"):
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[QbUser]
+        .distinct
+        .run()
+      assertEquals(results.length, 4)
+      assertEquals(results.map(_.id).sorted, Vector(1L, 2L, 3L, 4L))
 
 end QueryBuilderBasicTests

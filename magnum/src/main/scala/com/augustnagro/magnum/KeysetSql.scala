@@ -7,7 +7,7 @@ object KeysetSql:
   def buildKeysetFrag(
       entries: Vector[KeysetColumnEntry],
       keyValues: Vector[Any]
-  ): Frag =
+  ): WhereFrag =
     val n = entries.size
     val sb = new StringBuilder("(")
     val allParams = Vector.newBuilder[Any]
@@ -44,5 +44,5 @@ object KeysetSql:
         currentPos += codec.cols.length
       currentPos
 
-    Frag(sb.result(), allParams.result(), writer)
+    WhereFrag(Frag(sb.result(), allParams.result(), writer))
   end buildKeysetFrag

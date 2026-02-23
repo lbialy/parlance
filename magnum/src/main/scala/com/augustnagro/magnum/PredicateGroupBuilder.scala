@@ -5,28 +5,28 @@ class PredicateGroupBuilder[C] private[magnum] (
     private val predicates: Vector[Predicate],
     private val mode: PredicateGroupBuilder.Mode
 ):
-  def and(frag: Frag): PredicateGroupBuilder[C] =
+  def and(frag: WhereFrag): PredicateGroupBuilder[C] =
     new PredicateGroupBuilder(
       cols,
       predicates :+ Predicate.Leaf(frag),
       PredicateGroupBuilder.Mode.And
     )
 
-  def and(f: C => Frag): PredicateGroupBuilder[C] =
+  def and(f: C => WhereFrag): PredicateGroupBuilder[C] =
     new PredicateGroupBuilder(
       cols,
       predicates :+ Predicate.Leaf(f(cols)),
       PredicateGroupBuilder.Mode.And
     )
 
-  def or(frag: Frag): PredicateGroupBuilder[C] =
+  def or(frag: WhereFrag): PredicateGroupBuilder[C] =
     new PredicateGroupBuilder(
       cols,
       predicates :+ Predicate.Leaf(frag),
       PredicateGroupBuilder.Mode.Or
     )
 
-  def or(f: C => Frag): PredicateGroupBuilder[C] =
+  def or(f: C => WhereFrag): PredicateGroupBuilder[C] =
     new PredicateGroupBuilder(
       cols,
       predicates :+ Predicate.Leaf(f(cols)),
