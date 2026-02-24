@@ -385,6 +385,36 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def doesntHave[T](rel: BelongsToMany[E, T, ?]): QueryBuilder[HasRoot, E, C] =
     where(buildPivotExistsFrag(rel, None, negate = true))
 
+  // --- orWhereHas / orDoesntHave for Relationship ---
+
+  def orWhereHas[T](rel: Relationship[E, T])(using relMeta: TableMeta[T]): QueryBuilder[HasRoot, E, C] =
+    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = false))
+
+  def orWhereHas[T](rel: HasMany[E, T, ?])(using relMeta: TableMeta[T]): QueryBuilder[HasRoot, E, C] =
+    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = false))
+
+  def orWhereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => WhereFrag)(using relMeta: TableMeta[T]): QueryBuilder[HasRoot, E, C] =
+    val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
+    orWhere(buildRelExistsFrag(rel, relMeta, Some(f(cols)), negate = false))
+
+  def orDoesntHave[T](rel: HasMany[E, T, ?])(using relMeta: TableMeta[T]): QueryBuilder[HasRoot, E, C] =
+    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = true))
+
+  def orDoesntHave[T](rel: Relationship[E, T])(using relMeta: TableMeta[T]): QueryBuilder[HasRoot, E, C] =
+    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = true))
+
+  // --- orWhereHas / orDoesntHave for BelongsToMany ---
+
+  def orWhereHas[T](rel: BelongsToMany[E, T, ?]): QueryBuilder[HasRoot, E, C] =
+    orWhere(buildPivotExistsFrag(rel, None, negate = false))
+
+  def orWhereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => WhereFrag)(using relMeta: TableMeta[T]): QueryBuilder[HasRoot, E, C] =
+    val cols = new Columns[T](relMeta.columns).asInstanceOf[CT]
+    orWhere(buildPivotExistsFrag(rel, Some((f(cols), relMeta)), negate = false))
+
+  def orDoesntHave[T](rel: BelongsToMany[E, T, ?]): QueryBuilder[HasRoot, E, C] =
+    orWhere(buildPivotExistsFrag(rel, None, negate = true))
+
   // --- has with count threshold ---
 
   // HasMany — unconstrained
