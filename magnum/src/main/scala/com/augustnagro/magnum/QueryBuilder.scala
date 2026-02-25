@@ -18,16 +18,10 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 ):
 
   private def addAnd(pred: Predicate): Option[Predicate] =
-    Some(rootPredicate match
-      case None                          => pred
-      case Some(Predicate.And(children)) => Predicate.And(children :+ pred)
-      case Some(other)                   => Predicate.And(Vector(other, pred)))
+    QuerySqlBuilder.addAnd(rootPredicate, pred)
 
   private def addOr(pred: Predicate): Option[Predicate] =
-    Some(rootPredicate match
-      case None                         => pred
-      case Some(Predicate.Or(children)) => Predicate.Or(children :+ pred)
-      case Some(other)                  => Predicate.Or(Vector(other, pred)))
+    QuerySqlBuilder.addOr(rootPredicate, pred)
 
   def where(frag: WhereFrag): QueryBuilder[HasRoot, E, C] =
     new QueryBuilder(meta, codec, cols, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt, distinctFlag)
@@ -69,12 +63,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, true)
 
   private def buildWhere: (String, Seq[Any], FragWriter) =
-    rootPredicate match
-      case None => ("", Seq.empty, FragWriter.empty)
-      case Some(pred) =>
-        val frag = pred.toFrag
-        if frag.sqlString.isEmpty then ("", Seq.empty, FragWriter.empty)
-        else (" WHERE " + frag.sqlString, frag.params, frag.writer)
+    QuerySqlBuilder.buildWhere(rootPredicate)
 
   def build: Frag =
     val selectCols = meta.columns.map(_.sqlName).mkString(", ")
@@ -82,20 +71,10 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val baseSql = s"$keyword $selectCols FROM ${meta.tableName}"
 
     val (whereSql, params, writer) = buildWhere
+    val orderBySql = QuerySqlBuilder.buildOrderBy(orderEntries)
+    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
 
-    val orderBySql =
-      if orderEntries.isEmpty then ""
-      else
-        val entries = orderEntries.map((col, ord, nullOrd) =>
-          val base = s"${col.queryRepr} ${ord.queryRepr}"
-          if nullOrd.queryRepr.isEmpty then base else s"$base ${nullOrd.queryRepr}"
-        )
-        " ORDER BY " + entries.mkString(", ")
-
-    val limitSql = limitOpt.fold("")(n => s" LIMIT $n")
-    val offsetSql = offsetOpt.fold("")(n => s" OFFSET $n")
-
-    Frag(baseSql + whereSql + orderBySql + limitSql + offsetSql, params, writer)
+    Frag(baseSql + whereSql + orderBySql + limitOffsetSql, params, writer)
 
   def run()(using DbCon): Vector[E] =
     build.query[E](using codec).run()

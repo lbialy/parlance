@@ -20,16 +20,10 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
   def joinedCol[A](c: Col[A]): BoundCol[A] = col(1, c)
 
   private def addAnd(pred: Predicate): Option[Predicate] =
-    Some(predicate match
-      case None                          => pred
-      case Some(Predicate.And(children)) => Predicate.And(children :+ pred)
-      case Some(other)                   => Predicate.And(Vector(other, pred)))
+    QuerySqlBuilder.addAnd(predicate, pred)
 
   private def addOr(pred: Predicate): Option[Predicate] =
-    Some(predicate match
-      case None                         => pred
-      case Some(Predicate.Or(children)) => Predicate.Or(children :+ pred)
-      case Some(other)                  => Predicate.Or(Vector(other, pred)))
+    QuerySqlBuilder.addOr(predicate, pred)
 
   def where(frag: WhereFrag): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
@@ -149,12 +143,8 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
 
     val fromJoinSql = fromSql + joinsSql
 
-    predicate match
-      case None => (fromJoinSql, Seq.empty, FragWriter.empty)
-      case Some(pred) =>
-        val frag = pred.toFrag
-        if frag.sqlString.isEmpty then (fromJoinSql, Seq.empty, FragWriter.empty)
-        else (fromJoinSql + " WHERE " + frag.sqlString, frag.params, frag.writer)
+    val (whereSql, whereParams, whereWriter) = QuerySqlBuilder.buildWhere(predicate)
+    (fromJoinSql + whereSql, whereParams, whereWriter)
   end buildFromJoinWhere
 
   def build: Frag =
@@ -165,19 +155,10 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
 
     val (fromJoinWhereSql, params, writer) = buildFromJoinWhere
 
-    val orderBySql =
-      if orderEntries.isEmpty then ""
-      else
-        val entries = orderEntries.map((col, ord, nullOrd) =>
-          val base = s"${col.queryRepr} ${ord.queryRepr}"
-          if nullOrd.queryRepr.isEmpty then base else s"$base ${nullOrd.queryRepr}"
-        )
-        " ORDER BY " + entries.mkString(", ")
+    val orderBySql = QuerySqlBuilder.buildOrderBy(orderEntries)
+    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
 
-    val limitSql = limitOpt.fold("")(n => s" LIMIT $n")
-    val offsetSql = offsetOpt.fold("")(n => s" OFFSET $n")
-
-    Frag(selectSql + fromJoinWhereSql + orderBySql + limitSql + offsetSql, params, writer)
+    Frag(selectSql + fromJoinWhereSql + orderBySql + limitOffsetSql, params, writer)
 
   def run()(using DbCon): Vector[R] =
     given codec: DbCodec[R] = resultCodec

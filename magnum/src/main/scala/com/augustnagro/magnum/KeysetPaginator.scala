@@ -33,12 +33,9 @@ class KeysetPaginator[E, K] private[magnum] (
         (" WHERE " + combined.sqlString, combined.params, combined.writer)
 
     // Build ORDER BY
-    val orderBySql =
-      val orderEntries = entries.map(e =>
-        val base = s"${e.colRef.queryRepr} ${e.sortOrder.queryRepr}"
-        if e.nullOrder.queryRepr.isEmpty then base else s"$base ${e.nullOrder.queryRepr}"
-      )
-      " ORDER BY " + orderEntries.mkString(", ")
+    val orderBySql = QuerySqlBuilder.buildOrderBy(
+      entries.map(e => (e.colRef, e.sortOrder, e.nullOrder))
+    )
 
     val limitSql = s" LIMIT ${perPage + 1}"
 
