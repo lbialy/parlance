@@ -1,7 +1,7 @@
 ThisBuild / organization := "com.augustnagro"
 ThisBuild / version := "2.0.0-M2"
 ThisBuild / versionScheme := Some("early-semver")
-ThisBuild / scalaVersion := "3.3.4"
+ThisBuild / scalaVersion := "3.8.2"
 ThisBuild / scalacOptions ++= Seq("-deprecation")
 ThisBuild / homepage := Some(url("https://github.com/AugustNagro/magnum"))
 ThisBuild / licenses += (

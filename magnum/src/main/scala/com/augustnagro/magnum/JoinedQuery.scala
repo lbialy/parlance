@@ -1,6 +1,7 @@
 package com.augustnagro.magnum
 
 import java.sql.{PreparedStatement, ResultSet}
+import scala.NamedTuple
 import scala.deriving.Mirror
 import scala.quoted.*
 
@@ -8,7 +9,7 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     private[magnum] val metas: Vector[TableMeta[?]],
     private val codecs: Vector[DbCodec[?]],
     private val joinClauses: Vector[JoinEntry],
-    private val predicate: Option[Predicate],
+    private[magnum] val predicate: Option[Predicate],
     private val orderEntries: Vector[(ColRef[?], SortOrder, NullOrder)],
     private val limitOpt: Option[Int],
     private val offsetOpt: Option[Long]
@@ -127,10 +128,8 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
           codecs(i).asInstanceOf[DbCodec[Any]].writeSingle(entity.productElement(i), ps, p)
           p += codecs(i).cols.length
 
-  private def buildFromJoinWhere: (String, Seq[Any], FragWriter) =
-    val fromSql = s"FROM ${metas(0).tableName} t0"
-
-    val joinsSql = joinClauses
+  private def buildJoinsSql: String =
+    joinClauses
       .map { entry =>
         val kw = entry.joinType match
           case JoinType.Inner => "INNER JOIN"
@@ -141,10 +140,28 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
       }
       .mkString(" ", " ", "")
 
-    val fromJoinSql = fromSql + joinsSql
+  private[magnum] def buildFromJoin: String =
+    s"FROM ${metas(0).tableName} t0" + buildJoinsSql
+
+  private[magnum] def joinOnParams: Seq[Any] =
+    joinClauses.flatMap(_.onCondition.params)
+
+  private[magnum] def joinOnWriter: FragWriter =
+    joinClauses.foldLeft(FragWriter.empty) { (acc, entry) =>
+      (ps, pos) =>
+        val afterAcc = acc.write(ps, pos)
+        entry.onCondition.writer.write(ps, afterAcc)
+    }
+
+  private def buildFromJoinWhere: (String, Seq[Any], FragWriter) =
+    val fromJoinSql = buildFromJoin
 
     val (whereSql, whereParams, whereWriter) = QuerySqlBuilder.buildWhere(predicate)
-    (fromJoinSql + whereSql, whereParams, whereWriter)
+    val allParams = joinOnParams ++ whereParams
+    val combinedWriter: FragWriter = (ps, pos) =>
+      val afterJoin = joinOnWriter.write(ps, pos)
+      whereWriter.write(ps, afterJoin)
+    (fromJoinSql + whereSql, allParams, combinedWriter)
   end buildFromJoinWhere
 
   def build: Frag =
@@ -188,6 +205,9 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
       .run()
       .head
 
+  def select: JoinedQuery.JoinedSelectPhase[R] =
+    JoinedQuery.JoinedSelectPhase(this)
+
   def debugPrintSql(using DbCon): this.type =
     DebugSql.printDebug(Vector(build))
     this
@@ -195,6 +215,10 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
 end JoinedQuery
 
 object JoinedQuery:
+
+  class JoinedSelectPhase[R <: NonEmptyTuple](val jq: JoinedQuery[R]):
+    transparent inline def apply[P](inline f: JoinedQuery[R] => P): Any =
+      ${ joinedSelectImpl[R, P]('this, 'f) }
 
   extension [R <: NonEmptyTuple](jq: JoinedQuery[R])
     transparent inline def of[T]: Any = ${ ofImpl[R, T] }
@@ -310,5 +334,113 @@ object JoinedQuery:
           case (arg, idx) if arg =:= TypeRepr.of[T] => offset + idx
         }
       case _ => Nil
+
+  // --- joinedSelectImpl macro ---
+
+  private def joinedSelectImpl[R <: NonEmptyTuple : Type, P: Type](
+      phaseExpr: Expr[JoinedSelectPhase[R]],
+      f: Expr[JoinedQuery[R] => P]
+  )(using Quotes): Expr[Any] =
+    import quotes.reflect.*
+
+    // 1. Decompose P as NamedTuple[N, V]
+    val ntSym = Symbol.requiredModule("scala.NamedTuple").typeMember("NamedTuple")
+    val pRepr = TypeRepr.of[P].dealias
+
+    val (namesRepr, valuesRepr) = pRepr match
+      case AppliedType(tycon, List(n, v)) if tycon.typeSymbol == ntSym =>
+        (n, v)
+      case _ =>
+        report.errorAndAbort(
+          s"select() requires a named tuple return type, got: ${pRepr.show}"
+        )
+
+    // 2. Extract field names
+    val fieldNames: List[String] = namesRepr.asType match
+      case '[nmes] => QueryBuilder.selectFieldNames[nmes]()
+
+    // 3. Analyze element types
+    val elemInfos: List[(String, Type[?], Boolean)] = valuesRepr.asType match
+      case '[vals] => QueryBuilder.selectAnalyzeElements[vals](fieldNames)
+
+    // 4. Build result named tuple type
+    val resultTypes: List[Type[?]] = elemInfos.map(_._2)
+    val resultNtType = QueryBuilder.selectPackNamedTuple(fieldNames, resultTypes)
+
+    // 5. Build PC named tuple type
+    val pcTypes: List[Type[?]] = elemInfos.map { case (_, innerTpe, _) =>
+      innerTpe match { case '[a] => Type.of[SelectExpr[a]] }
+    }
+    val pcNtType = QueryBuilder.selectPackNamedTuple(fieldNames, pcTypes)
+
+    // 6. Generate codec expressions
+    val codecExprs: List[Expr[DbCodec[?]]] = elemInfos.map { case (name, innerTpe, isSE) =>
+      innerTpe match
+        case '[a] =>
+          if isSE then
+            '{ null.asInstanceOf[DbCodec[?]] }
+          else
+            Expr.summon[DbCodec[a]] match
+              case Some(c) => '{ $c.asInstanceOf[DbCodec[?]] }
+              case None =>
+                report.errorAndAbort(
+                  s"No DbCodec found for type ${TypeRepr.of[a].show} (field '$name')"
+                )
+    }
+
+    val fieldNameExprs: Expr[Seq[String]] = Expr.ofSeq(fieldNames.map(Expr.apply))
+    val codecsSeqExpr: Expr[Seq[DbCodec[?]]] = Expr.ofSeq(codecExprs)
+    val nExpr = Expr(elemInfos.length)
+
+    // 7. Generate the final expression
+    (resultNtType, pcNtType) match
+      case ('[resultT], '[pcT]) =>
+        '{
+          val phase = $phaseExpr
+          val jq = phase.jq
+          val rawTuple = $f(jq).asInstanceOf[Product]
+          val names = $fieldNameExprs
+          val fallbackCodecs = $codecsSeqExpr
+          val n = $nExpr
+
+          val selectExprsArr = new Array[SelectExpr[?]](n)
+          var i = 0
+          while i < n do
+            val elem = rawTuple.productElement(i)
+            val alias = names(i)
+            elem match
+              case se: SelectExpr[?] =>
+                selectExprsArr(i) = new SelectExpr(se.queryRepr, alias, se.codec)
+              case col: ColRef[?] =>
+                selectExprsArr(i) = new SelectExpr(col.queryRepr, alias, fallbackCodecs(i))
+            i += 1
+
+          val codecArr = IArray.from(selectExprsArr.map(_.codec))
+          val resultCodec = ProjectedQuery.positionalCodec[resultT](codecArr)
+
+          val pcArray = selectExprsArr.map(_.asInstanceOf[Object])
+          val pc = Tuple.fromArray(pcArray).asInstanceOf[pcT]
+
+          val fromClause = jq.buildFromJoin
+          val fromParams = jq.joinOnParams
+          val fromWriter = jq.joinOnWriter
+
+          // Merge frozen WHERE predicate from JoinedQuery
+          new ProjectedQuery[resultT, pcT](
+            fromClause,
+            fromParams,
+            fromWriter,
+            selectExprsArr.toVector,
+            resultCodec,
+            pc,
+            jq.predicate,
+            Vector.empty,
+            None,
+            Vector.empty,
+            None,
+            None
+          )
+        }
+  end joinedSelectImpl
 
 end JoinedQuery

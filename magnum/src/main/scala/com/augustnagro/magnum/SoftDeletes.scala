@@ -1,5 +1,7 @@
 package com.augustnagro.magnum
 
+import scala.reflect.{ClassTag, classTag}
+
 /** Mixin trait for soft-delete behavior on a [[Repo]].
   *
   * Adds a scope that filters rows where the deleted-at column is NULL (i.e. not deleted), and overrides write methods to SET the timestamp
@@ -48,6 +50,7 @@ trait SoftDeletes[EC, E, ID]:
         qb: QueryBuilder[HasRoot, E, C]
     ): QueryBuilder[HasRoot, E, C] =
       qb.where(WhereFrag(Frag(s"$sdColSql IS NULL", Seq.empty, FragWriter.empty)))
+    override def key: ClassTag[?] = classTag[SoftDeletes[?, ?, ?]]
 
   override def finalScopes: Vector[Scope[E]] =
     self.injectedScopes :+ softDeleteScope

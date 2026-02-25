@@ -36,4 +36,16 @@ private[magnum] object QuerySqlBuilder:
     val offsetSql = offsetOpt.fold("")(n => s" OFFSET $n")
     limitSql + offsetSql
 
+  def buildGroupBy(entries: Vector[ColRef[?]]): String =
+    if entries.isEmpty then ""
+    else " GROUP BY " + entries.map(_.queryRepr).mkString(", ")
+
+  def buildHaving(pred: Option[Predicate]): (String, Seq[Any], FragWriter) =
+    pred match
+      case None => ("", Seq.empty, FragWriter.empty)
+      case Some(p) =>
+        val frag = p.toFrag
+        if frag.sqlString.isEmpty then ("", Seq.empty, FragWriter.empty)
+        else (" HAVING " + frag.sqlString, frag.params, frag.writer)
+
 end QuerySqlBuilder

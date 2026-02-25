@@ -1,5 +1,7 @@
 import com.augustnagro.magnum.*
 
+import scala.reflect.{ClassTag, classTag}
+
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 case class RepoItem(
     @Id id: Long,
@@ -10,7 +12,7 @@ case class RepoItem(
 
 class RepoQueryTests extends QbTestBase:
 
-  val h2Ddls = Seq("/h2/repo-query.sql")
+  val h2Ddls = Seq("/h2/repo-query.sql", "/h2/soft-delete.sql")
 
   val itemRepo = Repo[RepoItem, RepoItem, Long]()
 
@@ -179,5 +181,76 @@ class RepoQueryTests extends QbTestBase:
 
       // Restore
       sql"INSERT INTO repo_item VALUES (1, 'Alpha', 'active', 10)".update.run()
+
+  // --- queryWithout[S] selective scope removal ---
+
+  test("queryWithout[SoftDeletes] returns all rows including deleted"):
+    val t = xa()
+    t.connect:
+      val sdRepo =
+        new Repo[SdUser, SdUser, Long] with SoftDeletes[SdUser, SdUser, Long]
+
+      // query (with scope) excludes soft-deleted
+      val scoped = sdRepo.query.run()
+      assertEquals(scoped.length, 2)
+
+      // queryWithout removes only SoftDeletes scope
+      val unscoped = sdRepo.queryWithout[SoftDeletes[?, ?, ?]].run()
+      assertEquals(unscoped.length, 4)
+
+  test("queryWithout removes only the targeted scope, keeps others"):
+    val t = xa()
+    t.connect:
+      class ActiveScope extends Scope[RepoItem]:
+        def apply[C <: Selectable](
+            qb: QueryBuilder[HasRoot, RepoItem, C]
+        ): QueryBuilder[HasRoot, RepoItem, C] =
+          qb.where(sql"status = 'active'".unsafeAsWhere)
+
+      class HighAmountScope extends Scope[RepoItem]:
+        def apply[C <: Selectable](
+            qb: QueryBuilder[HasRoot, RepoItem, C]
+        ): QueryBuilder[HasRoot, RepoItem, C] =
+          qb.where(sql"amount >= 20".unsafeAsWhere)
+
+      val scopedRepo = Repo[RepoItem, RepoItem, Long](
+        Vector(new ActiveScope, new HighAmountScope)
+      )
+
+      // Both scopes: active AND amount >= 20 → ids 2, 4
+      val both = scopedRepo.query.run()
+      assertEquals(both.map(_.id).sorted, Vector(2L, 4L))
+
+      // Remove ActiveScope only → amount >= 20 → ids 2, 3, 4, 5
+      val withoutActive =
+        scopedRepo.queryWithout[ActiveScope].run()
+      assertEquals(withoutActive.map(_.id).sorted, Vector(2L, 3L, 4L, 5L))
+
+      // Remove HighAmountScope only → active → ids 1, 2, 4
+      val withoutHighAmount =
+        scopedRepo.queryWithout[HighAmountScope].run()
+      assertEquals(withoutHighAmount.map(_.id).sorted, Vector(1L, 2L, 4L))
+
+  test("queryWithout for a scope that isn't present is a no-op"):
+    val t = xa()
+    t.connect:
+      class UnusedScope extends Scope[RepoItem]:
+        def apply[C <: Selectable](
+            qb: QueryBuilder[HasRoot, RepoItem, C]
+        ): QueryBuilder[HasRoot, RepoItem, C] = qb
+
+      val activeScope = new Scope[RepoItem]:
+        def apply[C <: Selectable](
+            qb: QueryBuilder[HasRoot, RepoItem, C]
+        ): QueryBuilder[HasRoot, RepoItem, C] =
+          qb.where(sql"status = 'active'".unsafeAsWhere)
+
+      val scopedRepo =
+        Repo[RepoItem, RepoItem, Long](Vector(activeScope))
+
+      // Removing UnusedScope should not affect anything
+      val results = scopedRepo.queryWithout[UnusedScope].run()
+      assertEquals(results.length, 3)
+      assertEquals(results.map(_.id).sorted, Vector(1L, 2L, 4L))
 
 end RepoQueryTests

@@ -2,6 +2,7 @@ package com.augustnagro.magnum
 
 import java.sql.ResultSet
 import javax.sql.DataSource
+import scala.reflect.ClassTag
 import scala.util.{Try, Using}
 
 /** Repository supporting read-only queries. When entity `E` does not have an id, use `Null` for the `Id` type.
@@ -119,6 +120,12 @@ open class ImmutableRepo[E, ID](
   /** Create a QueryBuilder without any scopes applied. */
   transparent inline def queryUnscoped: Any =
     QueryBuilder.from[E]
+
+  /** Create a QueryBuilder with a specific scope type removed. Other scopes are preserved. */
+  transparent inline def queryWithout[S: ClassTag]: Any =
+    QueryBuilder.fromWithScopes[E](
+      finalScopes.filterNot(_.key.runtimeClass == implicitly[ClassTag[S]].runtimeClass)
+    )
 
   /** Alias for findById */
   def find(id: ID)(using DbCon): Option[E] = findById(id)

@@ -1,5 +1,6 @@
 package com.augustnagro.magnum
 
+import scala.NamedTuple
 import scala.deriving.Mirror
 import scala.quoted.*
 
@@ -7,10 +8,10 @@ sealed trait QBState
 sealed trait HasRoot extends QBState
 
 class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
-    private val meta: TableMeta[E],
+    private[magnum] val meta: TableMeta[E],
     private val codec: DbCodec[E],
-    private val cols: C,
-    private val rootPredicate: Option[Predicate],
+    private[magnum] val cols: C,
+    private[magnum] val rootPredicate: Option[Predicate],
     private val orderEntries: Vector[(ColRef[?], SortOrder, NullOrder)],
     private val limitOpt: Option[Int],
     private val offsetOpt: Option[Long],
@@ -127,6 +128,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       Frag(baseSql + whereSql, params, writer).query[R].run(),
       s"Aggregate query on ${meta.tableName}"
     )
+
+  def select: QueryBuilder.SelectPhase[C] =
+    QueryBuilder.SelectPhase(meta.tableName, cols, rootPredicate)
 
   def withRelated[T](rel: HasMany[E, T, ?])(using
       childMeta: TableMeta[T],
@@ -562,6 +566,14 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 end QueryBuilder
 
 object QueryBuilder:
+  /** Intermediate object for the select() → ProjectedQuery transition.
+    * Created by QueryBuilder.select, holds the frozen WHERE + column proxy.
+    * The transparent inline apply method triggers the macro.
+    */
+  class SelectPhase[C](val tableName: String, val cols: C, val predicate: Option[Predicate]):
+    transparent inline def apply[P](inline f: C => P): Any =
+      ${ selectImpl[C, P]('this, 'f) }
+
   private[magnum] def build0[E, C <: Selectable](
       meta: TableMeta[E],
       codec: DbCodec[E],
@@ -656,5 +668,161 @@ object QueryBuilder:
         )
     end match
   end fromWithScopesImpl
+
+  // --- select() macro implementation ---
+
+  private def selectImpl[C: Type, P: Type](
+      phaseExpr: Expr[SelectPhase[C]],
+      f: Expr[C => P]
+  )(using Quotes): Expr[Any] =
+    import quotes.reflect.*
+
+    // 1. Decompose P as NamedTuple[N, V]
+    val ntSym = Symbol.requiredModule("scala.NamedTuple").typeMember("NamedTuple")
+    val pRepr = TypeRepr.of[P].dealias
+
+    val (namesRepr, valuesRepr) = pRepr match
+      case AppliedType(tycon, List(n, v)) if tycon.typeSymbol == ntSym =>
+        (n, v)
+      case _ =>
+        report.errorAndAbort(
+          s"select() requires a named tuple return type, got: ${pRepr.show}"
+        )
+
+    // 2. Extract field names from the names tuple type
+    val fieldNames: List[String] = namesRepr.asType match
+      case '[nmes] => selectFieldNames[nmes]()
+
+    // 3. Extract and analyze element types
+    val elemInfos: List[(String, Type[?], Boolean)] = valuesRepr.asType match
+      case '[vals] => selectAnalyzeElements[vals](fieldNames)
+
+    // 4. Build result named tuple type (unwrapped inner types)
+    val resultTypes: List[Type[?]] = elemInfos.map(_._2)
+    val resultNtType = selectPackNamedTuple(fieldNames, resultTypes)
+
+    // 5. Build PC named tuple type (all SelectExpr[A])
+    val pcTypes: List[Type[?]] = elemInfos.map { case (_, innerTpe, _) =>
+      innerTpe match { case '[a] => Type.of[SelectExpr[a]] }
+    }
+    val pcNtType = selectPackNamedTuple(fieldNames, pcTypes)
+
+    // 6. Generate codec expressions for Col elements (summon DbCodec[A])
+    val codecExprs: List[Expr[DbCodec[?]]] = elemInfos.map { case (name, innerTpe, isSE) =>
+      innerTpe match
+        case '[a] =>
+          if isSE then
+            '{ null.asInstanceOf[DbCodec[?]] } // placeholder; runtime uses SelectExpr.codec
+          else
+            Expr.summon[DbCodec[a]] match
+              case Some(c) => '{ $c.asInstanceOf[DbCodec[?]] }
+              case None =>
+                report.errorAndAbort(
+                  s"No DbCodec found for type ${TypeRepr.of[a].show} (field '$name')"
+                )
+    }
+
+    val fieldNameExprs: Expr[Seq[String]] = Expr.ofSeq(fieldNames.map(Expr.apply))
+    val codecsSeqExpr: Expr[Seq[DbCodec[?]]] = Expr.ofSeq(codecExprs)
+    val nExpr = Expr(elemInfos.length)
+
+    // 7. Generate the final expression
+    (resultNtType, pcNtType) match
+      case ('[resultT], '[pcT]) =>
+        '{
+          val phase = $phaseExpr
+          val rawTuple = $f(phase.cols).asInstanceOf[Product]
+          val names = $fieldNameExprs
+          val fallbackCodecs = $codecsSeqExpr
+          val n = $nExpr
+
+          val selectExprsArr = new Array[SelectExpr[?]](n)
+          var i = 0
+          while i < n do
+            val elem = rawTuple.productElement(i)
+            val alias = names(i)
+            elem match
+              case se: SelectExpr[?] =>
+                selectExprsArr(i) = new SelectExpr(se.queryRepr, alias, se.codec)
+              case col: ColRef[?] =>
+                selectExprsArr(i) = new SelectExpr(col.queryRepr, alias, fallbackCodecs(i))
+            i += 1
+
+          val codecArr = IArray.from(selectExprsArr.map(_.codec))
+          val resultCodec = ProjectedQuery.positionalCodec[resultT](codecArr)
+
+          val pcArray = selectExprsArr.map(_.asInstanceOf[Object])
+          val pc = Tuple.fromArray(pcArray).asInstanceOf[pcT]
+
+          new ProjectedQuery[resultT, pcT](
+            s"FROM ${phase.tableName}",
+            Seq.empty,
+            FragWriter.empty,
+            selectExprsArr.toVector,
+            resultCodec,
+            pc,
+            phase.predicate,
+            Vector.empty,
+            None,
+            Vector.empty,
+            None,
+            None
+          )
+        }
+  end selectImpl
+
+  // --- select() macro helper: extract field names from a tuple of string literal types ---
+  private[magnum] def selectFieldNames[N: Type](res: List[String] = Nil)(using Quotes): List[String] =
+    import quotes.reflect.*
+    Type.of[N] match
+      case '[n *: ns] =>
+        val name = TypeRepr.of[n] match
+          case ConstantType(StringConstant(s)) => s
+          case other =>
+            report.errorAndAbort(s"Expected string literal type in named tuple, got ${other.show}")
+        selectFieldNames[ns](name :: res)
+      case '[EmptyTuple] => res.reverse
+
+  // --- select() macro helper: analyze element types ---
+  // Returns (fieldName, innerType, isSelectExpr)
+  private[magnum] def selectAnalyzeElements[V: Type](names: List[String])(using Quotes): List[(String, Type[?], Boolean)] =
+    import quotes.reflect.*
+    def loop[T: Type](remainingNames: List[String]): List[(String, Type[?], Boolean)] =
+      Type.of[T] match
+        case '[v *: vs] =>
+          val name = remainingNames.head
+          val (innerType, isSE) = Type.of[v] match
+            case '[SelectExpr[a]] => (Type.of[a], true)
+            case '[Col[a]]       => (Type.of[a], false)
+            case '[ColRef[a]]    => (Type.of[a], false)
+            case _ =>
+              report.errorAndAbort(
+                s"select() element '$name' must be Col[A] or SelectExpr[A], got ${TypeRepr.of[v].show}"
+              )
+          (name, innerType, isSE) :: loop[vs](remainingNames.tail)
+        case '[EmptyTuple] => Nil
+    loop[V](names)
+
+  // --- select() macro helper: build a tuple type from a list of types ---
+  private[magnum] def selectListToTupleType(ts: List[Type[?]])(using Quotes): Type[?] =
+    ts.foldRight(Type.of[EmptyTuple]: Type[?]) { (t, acc) =>
+      (t, acc) match
+        case ('[ft], '[type acc <: Tuple; `acc`]) =>
+          Type.of[ft *: acc]
+    }
+
+  // --- select() macro helper: build a names-tuple type from string literals ---
+  private[magnum] def selectStringsToTupleType(names: List[String])(using Quotes): Type[?] =
+    import quotes.reflect.*
+    selectListToTupleType(names.map(n => ConstantType(StringConstant(n)).asType))
+
+  // --- select() macro helper: assemble a NamedTuple type ---
+  private[magnum] def selectPackNamedTuple(names: List[String], types: List[Type[?]])(using Quotes): Type[?] =
+    import quotes.reflect.*
+    val nmesTpe = selectStringsToTupleType(names)
+    val valsTpe = selectListToTupleType(types)
+    (nmesTpe, valsTpe) match
+      case ('[type nmes <: Tuple; `nmes`], '[type tps <: Tuple; `tps`]) =>
+        Type.of[NamedTuple.NamedTuple[nmes, tps]]
 
 end QueryBuilder
