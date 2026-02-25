@@ -63,6 +63,12 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def distinct: QueryBuilder[S, E, C] =
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, true)
 
+  def lockForUpdate: LockedQueryBuilder[S, E, C] =
+    LockedQueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, distinctFlag, LockMode.ForUpdate)
+
+  def forShare: LockedQueryBuilder[S, E, C] =
+    LockedQueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, distinctFlag, LockMode.ForShare)
+
   private def buildWhere: (String, Seq[Any], FragWriter) =
     QuerySqlBuilder.buildWhere(rootPredicate)
 
