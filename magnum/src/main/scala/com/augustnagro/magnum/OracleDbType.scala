@@ -238,6 +238,18 @@ object OracleDbType extends DbType:
               ps.addBatch()
 
             timed(batchUpdateResult(ps.executeBatch()))
+      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon): Unit =
+        throw UnsupportedOperationException("insertOnConflict is not supported for Oracle")
+
+      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon): Unit =
+        throw UnsupportedOperationException("insertOnConflictUpdateAll is not supported for Oracle")
+
+      def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon): Int =
+        throw UnsupportedOperationException("insertAllIgnoring is not supported for Oracle")
+
+      def upsertByPk(entity: E)(using DbCon): Unit =
+        throw UnsupportedOperationException("upsertByPk is not supported for Oracle")
+
     end new
   end buildRepoDefaults
 end OracleDbType

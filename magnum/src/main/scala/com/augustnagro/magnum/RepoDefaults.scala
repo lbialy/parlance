@@ -24,6 +24,10 @@ trait RepoDefaults[EC, E, ID]:
   def update(entity: E)(using DbCon): Unit
   def updateAll(entities: Iterable[E])(using DbCon): BatchUpdateResult
   def updatePartial(original: E, current: E)(using DbCon): Unit
+  def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon): Unit
+  def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon): Unit
+  def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon): Int
+  def upsertByPk(entity: E)(using DbCon): Unit
 
 object RepoDefaults:
 

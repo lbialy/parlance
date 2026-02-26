@@ -597,6 +597,14 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       pos + codec.cols.length
     updateUnsafe(Frag(s"${col.queryRepr} = ${col.queryRepr} + ?", Seq(actual), writer))
 
+  def touch()(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon): Int =
+    val (whereSql, params, writer) = buildWhere
+    Frag(
+      s"UPDATE ${meta.tableName} SET ${hasUpdatedAt.column.sqlName} = CURRENT_TIMESTAMP$whereSql",
+      params,
+      writer
+    ).update.run()
+
   def decrement[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon): Int =
     val actual: A = amount match
       case None    => num.one

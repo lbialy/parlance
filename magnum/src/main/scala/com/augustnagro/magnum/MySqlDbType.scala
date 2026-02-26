@@ -85,6 +85,20 @@ object MySqlDbType extends DbType:
       s"UPDATE $tableNameSql SET $updateKeys WHERE $idName = ${idCodec.queryRepr}"
     val insertAndFindByIdSql = insertSql + "\n" + findByIdSql
 
+    // upsert pre-computed SQL
+    val eInsertKeys = eElemNamesSql.mkString("(", ", ", ")")
+    val upsertSetClause = eElemNamesSql
+      .patch(idIndex, Seq.empty, 1)
+      .map(col => s"$col = VALUES($col)")
+      .mkString(", ")
+    val upsertByPkSql =
+      s"INSERT INTO $tableNameSql $eInsertKeys VALUES (${eCodec.queryRepr}) ON DUPLICATE KEY UPDATE $upsertSetClause"
+    val ecUpdateAllSetClause = ecElemNamesSql
+      .map(col => s"$col = VALUES($col)")
+      .mkString(", ")
+    val insertIgnoringSql =
+      s"INSERT IGNORE INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr})"
+
     def idWriter(id: ID): FragWriter = (ps, pos) =>
       idCodec.writeSingle(id, ps, pos)
       pos + idCodec.cols.length
@@ -244,6 +258,50 @@ object MySqlDbType extends DbType:
               ps.addBatch()
 
             timed(batchUpdateResult(ps.executeBatch()))
+      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon): Unit =
+        target match
+          case ConflictTarget.Constraint(_) =>
+            throw UnsupportedOperationException("MySQL does not support ON CONFLICT ON CONSTRAINT")
+          case _ => ()
+        val sql = action match
+          case ConflictAction.DoNothing =>
+            s"INSERT IGNORE INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr})"
+          case ConflictAction.DoUpdate(frag) =>
+            s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) ON DUPLICATE KEY UPDATE ${frag.sqlString}"
+        val fragWriter: FragWriter = action match
+          case ConflictAction.DoNothing => FragWriter.empty
+          case ConflictAction.DoUpdate(frag) => frag.writer
+        handleQuery(sql, entityCreator):
+          Using(con.connection.prepareStatement(sql)): ps =>
+            ecCodec.writeSingle(entityCreator, ps)
+            fragWriter.write(ps, 1 + ecCodec.cols.length)
+            timed(ps.executeUpdate())
+
+      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using con: DbCon): Unit =
+        target match
+          case ConflictTarget.Constraint(_) =>
+            throw UnsupportedOperationException("MySQL does not support ON CONFLICT ON CONSTRAINT")
+          case _ => ()
+        val sql = s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) ON DUPLICATE KEY UPDATE $ecUpdateAllSetClause"
+        handleQuery(sql, entityCreator):
+          Using(con.connection.prepareStatement(sql)): ps =>
+            ecCodec.writeSingle(entityCreator, ps)
+            timed(ps.executeUpdate())
+
+      def insertAllIgnoring(entityCreators: Iterable[EC])(using con: DbCon): Int =
+        handleQuery(insertIgnoringSql, entityCreators):
+          Using(con.connection.prepareStatement(insertIgnoringSql)): ps =>
+            ecCodec.write(entityCreators, ps)
+            timed:
+              val results = ps.executeBatch()
+              results.count(_ > 0)
+
+      def upsertByPk(entity: E)(using con: DbCon): Unit =
+        handleQuery(upsertByPkSql, entity):
+          Using(con.connection.prepareStatement(upsertByPkSql)): ps =>
+            eCodec.writeSingle(entity, ps)
+            timed(ps.executeUpdate())
+
     end new
   end buildRepoDefaults
 end MySqlDbType

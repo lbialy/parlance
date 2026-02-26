@@ -145,6 +145,18 @@ object ClickhouseDbType extends DbType:
       ): BatchUpdateResult =
         throw UnsupportedOperationException()
 
+      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon): Unit =
+        throw UnsupportedOperationException("insertOnConflict is not supported for ClickHouse")
+
+      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon): Unit =
+        throw UnsupportedOperationException("insertOnConflictUpdateAll is not supported for ClickHouse")
+
+      def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon): Int =
+        throw UnsupportedOperationException("insertAllIgnoring is not supported for ClickHouse")
+
+      def upsertByPk(entity: E)(using DbCon): Unit =
+        throw UnsupportedOperationException("upsertByPk is not supported for ClickHouse")
+
     end new
   end buildRepoDefaults
 end ClickhouseDbType

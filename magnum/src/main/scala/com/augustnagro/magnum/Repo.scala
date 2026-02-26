@@ -66,14 +66,60 @@ open class Repo[EC, E, ID](
   def updatePartial(original: E, current: E)(using DbCon): Unit =
     defaults.updatePartial(original, current)
 
-  /** Save entity: partial update if tracked, full update otherwise. */
+  /** Save entity: partial update if tracked, upsert otherwise. */
   def save(entity: E)(using con: DbCon): Unit =
     val pkValue = extractPk(entity)
     con.getOriginal(meta.tableName, pkValue) match
       case Some(original) =>
         updatePartial(original.asInstanceOf[E], entity)
       case None =>
-        update(entity)
+        defaults.upsertByPk(entity)
+
+  /** Insert with conflict handling. */
+  def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon): Unit =
+    defaults.insertOnConflict(entityCreator, target, action)
+
+  /** Insert with conflict handling, updating all EC columns on conflict. */
+  def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon): Unit =
+    defaults.insertOnConflictUpdateAll(entityCreator, target)
+
+  /** Bulk insert, skipping rows that conflict. Returns the number of rows actually inserted. */
+  def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon): Int =
+    defaults.insertAllIgnoring(entityCreators)
+
+  /** Find an existing entity matching the predicate, or insert a new one. */
+  def firstOrCreate(predicate: WhereFrag, creator: => EC)(using con: DbTx): E =
+    val found = applyScopes(
+      QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
+    ).where(predicate).first()
+    found.getOrElse:
+      val result = defaults.insertReturning(creator)
+      con.trackLoaded(meta.tableName, extractPk(result), result)
+      result
+
+  /** Find and update an existing entity, or insert a new one. */
+  def updateOrCreate(predicate: WhereFrag, creator: => EC, updater: E => E)(using con: DbTx): E =
+    val found = applyScopes(
+      QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
+    ).where(predicate).first()
+    found match
+      case Some(existing) =>
+        val updated = updater(existing)
+        update(updated)
+        updated
+      case None =>
+        val result = defaults.insertReturning(creator)
+        con.trackLoaded(meta.tableName, extractPk(result), result)
+        result
+
+  /** Touch an entity, setting its @updatedAt column to CURRENT_TIMESTAMP. */
+  def touch(entity: E)(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon): Unit =
+    val id = extractPk(entity)
+    Frag(
+      s"UPDATE ${entityMeta.tableName} SET ${hasUpdatedAt.column.sqlName} = CURRENT_TIMESTAMP WHERE ${entityMeta.primaryKey.sqlName} = ?",
+      Seq(id),
+      FragWriter.fromKeys(Vector(id))
+    ).update.run()
 
   /** Re-fetch the entity from the database using its primary key. */
   def refresh(entity: E)(using DbCon): E =

@@ -61,6 +61,11 @@ object H2DbType extends DbType:
     val updateSql =
       s"UPDATE $tableNameSql SET $updateKeys WHERE $idName = ${idCodec.queryRepr}"
 
+    // upsert pre-computed SQL (H2 uses MERGE INTO syntax)
+    val eInsertKeys = eElemNamesSql.mkString("(", ", ", ")")
+    val upsertByPkSql =
+      s"MERGE INTO $tableNameSql $eInsertKeys KEY ($idName) VALUES (${eCodec.queryRepr})"
+
     val compositeId = idCodec.cols.distinct.size != 1
     val idFirstTypeName = JDBCType.valueOf(idCodec.cols.head).getName
 
@@ -253,6 +258,77 @@ object H2DbType extends DbType:
               ps.addBatch()
 
             timed(batchUpdateResult(ps.executeBatch()))
+
+      private def h2KeyColumns(target: ConflictTarget): String =
+        target match
+          case ConflictTarget.Columns(cols*) =>
+            if cols.isEmpty then idName
+            else cols.map(_.sqlName).mkString(", ")
+          case ConflictTarget.Constraint(_) =>
+            throw UnsupportedOperationException("H2 does not support ON CONFLICT ON CONSTRAINT")
+          case ConflictTarget.AnyConflict => idName
+
+      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon): Unit =
+        action match
+          case ConflictAction.DoNothing =>
+            // Conditional INSERT: skip if a matching row exists
+            val keyColNames = target match
+              case ConflictTarget.Columns(cols*) if cols.nonEmpty => cols.map(_.sqlName).toSeq
+              case _ => Seq(eElemNamesSql(idIndex))
+            val whereClause = keyColNames.map(c => s"$c = ?").mkString(" AND ")
+            val ecCols = ecElemNamesSql.mkString(", ")
+            val sql = s"INSERT INTO $tableNameSql ($ecCols) SELECT ${ecCodec.queryRepr} WHERE NOT EXISTS (SELECT 1 FROM $tableNameSql WHERE $whereClause)"
+            handleQuery(sql, entityCreator):
+              Using(con.connection.prepareStatement(sql)): ps =>
+                ecCodec.writeSingle(entityCreator, ps)
+                // Write the key values for the NOT EXISTS subquery
+                val product = entityCreator.asInstanceOf[Product]
+                var pos = 1 + ecCodec.cols.length
+                for keyCol <- keyColNames do
+                  val idx = ecElemNamesSql.indexOf(keyCol)
+                  if idx >= 0 then
+                    val codec = eElemCodecs(idx).asInstanceOf[DbCodec[Any]]
+                    codec.writeSingle(product.productElement(idx), ps, pos)
+                    pos += codec.cols.length
+                timed(ps.executeUpdate())
+          case ConflictAction.DoUpdate(_) =>
+            // H2 MERGE INTO KEY does an upsert (updates all columns on conflict)
+            val keyColumns = h2KeyColumns(target)
+            val sql = s"MERGE INTO $tableNameSql $ecInsertKeys KEY ($keyColumns) VALUES (${ecCodec.queryRepr})"
+            handleQuery(sql, entityCreator):
+              Using(con.connection.prepareStatement(sql)): ps =>
+                ecCodec.writeSingle(entityCreator, ps)
+                timed(ps.executeUpdate())
+
+      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using con: DbCon): Unit =
+        val keyColumns = h2KeyColumns(target)
+        val sql = s"MERGE INTO $tableNameSql $ecInsertKeys KEY ($keyColumns) VALUES (${ecCodec.queryRepr})"
+        handleQuery(sql, entityCreator):
+          Using(con.connection.prepareStatement(sql)): ps =>
+            ecCodec.writeSingle(entityCreator, ps)
+            timed(ps.executeUpdate())
+
+      def insertAllIgnoring(entityCreators: Iterable[EC])(using con: DbCon): Int =
+        // Conditional INSERT: skip rows where PK already exists
+        val ecCols = ecElemNamesSql.mkString(", ")
+        val sql = s"INSERT INTO $tableNameSql ($ecCols) SELECT ${ecCodec.queryRepr} WHERE NOT EXISTS (SELECT 1 FROM $tableNameSql WHERE $idName = ?)"
+        handleQuery(sql, entityCreators):
+          Using(con.connection.prepareStatement(sql)): ps =>
+            timed:
+              var count = 0
+              for ec <- entityCreators do
+                ecCodec.writeSingle(ec, ps)
+                val product = ec.asInstanceOf[Product]
+                val pkCodec = eElemCodecs(idIndex).asInstanceOf[DbCodec[Any]]
+                pkCodec.writeSingle(product.productElement(idIndex), ps, 1 + ecCodec.cols.length)
+                count += ps.executeUpdate()
+              count
+
+      def upsertByPk(entity: E)(using con: DbCon): Unit =
+        handleQuery(upsertByPkSql, entity):
+          Using(con.connection.prepareStatement(upsertByPkSql)): ps =>
+            eCodec.writeSingle(entity, ps)
+            timed(ps.executeUpdate())
 
     end new
   end buildRepoDefaults
