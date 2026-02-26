@@ -7,8 +7,8 @@ import java.time.OffsetDateTime
 case class SdExtUser(
     @Id id: Long,
     name: String,
-    deletedAt: Option[OffsetDateTime]
-) derives EntityMeta
+    @deletedAt deletedAt: Option[OffsetDateTime]
+) derives EntityMeta, HasDeletedAt
 
 class EntityExtensionSoftDeleteTests extends QbTestBase:
 

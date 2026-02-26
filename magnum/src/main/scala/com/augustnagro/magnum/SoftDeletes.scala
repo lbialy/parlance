@@ -9,31 +9,21 @@ import scala.reflect.{ClassTag, classTag}
   *
   * Usage:
   * {{{
+  *   @Table(PostgresDbType, SqlNameMapper.CamelToSnakeCase)
+  *   case class SdUser(@Id id: Long, name: String, @deletedAt deletedAt: Option[OffsetDateTime])
+  *     derives EntityMeta, HasDeletedAt
+  *
   *   val repo = new Repo[SdUser, SdUser, Long] with SoftDeletes[SdUser, SdUser, Long]
   * }}}
   *
-  * The entity must have an `Option` -typed deleted-at field (e.g. `deletedAt: Option[OffsetDateTime]`). Override [[deletedAtFieldName]] if
-  * the Scala field is not called `deletedAt`.
+  * The entity must have an `Option`-typed field annotated with `@deletedAt` and must derive `HasDeletedAt`.
   */
-trait SoftDeletes[EC, E, ID]:
+trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
   self: Repo[EC, E, ID] =>
-
-  /** Scala field name for the deleted-at column. Override if not "deletedAt". */
-  def deletedAtFieldName: String = "deletedAt"
 
   // --- internals ---
 
-  private lazy val sdCol: Col[?] =
-    self.entityMeta
-      .columnByName(deletedAtFieldName)
-      .getOrElse(
-        throw new IllegalStateException(
-          s"SoftDeletes: column '$deletedAtFieldName' not found in ${self.entityMeta.tableName}. " +
-            "Override deletedAtFieldName if the field has a different name."
-        )
-      )
-
-  private lazy val sdColSql: String = sdCol.sqlName
+  private lazy val sdColSql: String = hasDeletedAt.column.sqlName
   private lazy val tbl: String = self.entityMeta.tableName
   private lazy val pkSql: String = self.entityMeta.primaryKey.sqlName
 
@@ -109,8 +99,7 @@ trait SoftDeletes[EC, E, ID]:
 
   /** Check whether an entity is soft-deleted (deletedAt is not None). */
   def isTrashed(entity: E): Boolean =
-    val idx = self.entityMeta.columns.indexWhere(_.scalaName == deletedAtFieldName)
-    entity.asInstanceOf[Product].productElement(idx) != None
+    entity.asInstanceOf[Product].productElement(hasDeletedAt.index) != None
 
   // --- query helpers ---
 
