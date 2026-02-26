@@ -1,3 +1,4 @@
+drop table if exists pv_user_role_ext;
 drop table if exists pv_user_role;
 drop table if exists pv_role;
 drop table if exists pv_user;
@@ -37,3 +38,24 @@ insert into student values (1, 'Alice'), (2, 'Bob');
 insert into course values (1, 'Math'), (2, 'Physics'), (3, 'History');
 insert into student_course values (1, 1), (1, 2);
 insert into student_course values (2, 2), (2, 3);
+
+-- Pivot table with composite PK and metadata columns
+create table pv_user_role_ext (
+    user_id bigint not null,
+    role_id bigint not null,
+    assigned_by varchar(100) not null,
+    assigned_at timestamp default current_timestamp,
+    primary key (user_id, role_id),
+    foreign key (user_id) references pv_user(id),
+    foreign key (role_id) references pv_role(id)
+);
+
+-- Seed: Alice assigned admin by 'system', editor by 'admin1'
+-- Bob assigned editor by 'system'
+-- Dave assigned all 3 by 'admin1'
+insert into pv_user_role_ext values (1, 1, 'system', timestamp '2024-01-01 00:00:00');
+insert into pv_user_role_ext values (1, 2, 'admin1', timestamp '2024-01-02 00:00:00');
+insert into pv_user_role_ext values (2, 2, 'system', timestamp '2024-01-03 00:00:00');
+insert into pv_user_role_ext values (4, 1, 'admin1', timestamp '2024-02-01 00:00:00');
+insert into pv_user_role_ext values (4, 2, 'admin1', timestamp '2024-02-01 00:00:00');
+insert into pv_user_role_ext values (4, 3, 'admin1', timestamp '2024-02-01 00:00:00');

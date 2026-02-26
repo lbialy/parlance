@@ -245,6 +245,40 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     )
     EagerQuery(build, codec, meta, Vector(d))
 
+  // --- withRelated for PivotRelation (delegates to underlying BelongsToMany) ---
+
+  def withRelated[T, P, CT <: Selectable, PCT <: Selectable](rel: PivotRelation[E, T, P, CT, PCT])(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+    val d = PivotEagerDef(meta, rel.underlying, targetMeta, targetCodec, None)
+    EagerQuery(build, codec, meta, Vector(d))
+
+  // --- withRelatedAndPivot ---
+
+  def withRelatedAndPivot[T, P, CT <: Selectable, PCT <: Selectable](
+      rel: PivotRelation[E, T, P, CT, PCT]
+  )(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T],
+      pivotMeta: TableMeta[P],
+      pivotCodec: DbCodec[P]
+  ): EagerQuery[E, Vector[(T, P)] *: EmptyTuple] =
+    val d = PivotWithDataEagerDef(meta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, None)
+    EagerQuery(build, codec, meta, Vector(d))
+
+  def withRelatedAndPivot[T, P, CT <: Selectable, PCT <: Selectable](
+      rel: PivotRelation[E, T, P, CT, PCT],
+      pivotFilter: Frag
+  )(using
+      targetMeta: TableMeta[T],
+      targetCodec: DbCodec[T],
+      pivotMeta: TableMeta[P],
+      pivotCodec: DbCodec[P]
+  ): EagerQuery[E, Vector[(T, P)] *: EmptyTuple] =
+    val d = PivotWithDataEagerDef(meta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, Some(pivotFilter))
+    EagerQuery(build, codec, meta, Vector(d))
+
   // --- Composed (via) withRelated ---
 
   def withRelated[I, T](rel: ComposedRelationship[E, I, T, ?])(using

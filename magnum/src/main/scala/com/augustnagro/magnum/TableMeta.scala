@@ -9,5 +9,7 @@ trait TableMeta[E]:
   def tableName: String
   def columns: IArray[Col[?]]
   def primaryKey: Col[?]
+  def primaryKeys: IArray[Col[?]]
+  def isCompositeKey: Boolean = primaryKeys.length > 1
   def columnByName(scalaName: String): Option[Col[?]] =
     columns.find(_.scalaName == scalaName)

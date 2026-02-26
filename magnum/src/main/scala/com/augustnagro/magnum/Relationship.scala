@@ -369,4 +369,7 @@ object Relationship:
     infix def via[Z, ICT <: Selectable](inner: HasMany[Z, A, ICT]): ComposedRelationship[Z, A, B, CT] =
       ComposedRelationship(inner, outer)
 
+  private[magnum] def computeColumnsRefinementFor[T: Type]()(using Quotes): quotes.reflect.TypeRepr =
+    computeColumnsRefinement[T]()
+
 end Relationship

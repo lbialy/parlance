@@ -312,3 +312,75 @@ class ComposedEagerDef[Root, Intermediate, Target](
     )
 
 end ComposedEagerDef
+
+class PivotWithDataEagerDef[E, T, P](
+    private val rootMeta: TableMeta[E],
+    private val rel: BelongsToMany[E, T, ?],
+    private val targetMeta: TableMeta[T],
+    private val targetCodec: DbCodec[T],
+    private val pivotMeta: TableMeta[P],
+    private val pivotCodec: DbCodec[P],
+    private val pivotFilter: Option[Frag]
+) extends EagerQueryDef:
+
+  import EagerQueryDef.*
+
+  def parentKeyScalaName: String = rel.sourcePk.scalaName
+
+  private def sourceFkPivotIndex: Int =
+    pivotMeta.columns.indexWhere(_.sqlName == rel.sourceFk)
+
+  private def targetFkPivotIndex: Int =
+    pivotMeta.columns.indexWhere(_.sqlName == rel.targetFk)
+
+  private def targetPkIndex: Int =
+    resolveColumnIndex(targetMeta, rel.targetPk.scalaName)
+
+  private def pivotQuerySql(placeholders: String): String =
+    val pivotCols = pivotMeta.columns.map(_.sqlName).mkString(", ")
+    s"SELECT $pivotCols FROM ${pivotMeta.tableName} WHERE ${rel.sourceFk} IN ($placeholders)"
+
+  private def targetQuerySql(placeholders: String): String =
+    val targetCols = targetMeta.columns.map(_.sqlName).mkString(", ")
+    s"SELECT $targetCols FROM ${targetMeta.tableName} WHERE ${rel.targetPk.sqlName} IN ($placeholders)"
+
+  def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]] =
+    // 1. Fetch all pivot rows for these source keys
+    val pivots = fetchByKeys(pivotQuerySql, parentKeys, pivotCodec, pivotFilter)
+    if pivots.isEmpty then return mutable.LinkedHashMap.empty
+
+    // 2. Extract source/target FKs from pivot rows
+    val srcFkIdx = sourceFkPivotIndex
+    val tgtFkIdx = targetFkPivotIndex
+    val pivotsBySourceAndTarget = pivots.map: p =>
+      val prod = p.asInstanceOf[Product]
+      val srcKey = prod.productElement(srcFkIdx)
+      val tgtKey = prod.productElement(tgtFkIdx)
+      (srcKey, tgtKey, p)
+
+    // 3. Fetch all target entities
+    val uniqueTargetKeys = pivotsBySourceAndTarget.map(_._2).distinct
+    val targets = fetchByKeys(targetQuerySql, uniqueTargetKeys, targetCodec, None)
+    val tPkIdx = targetPkIndex
+    val targetByKey = mutable.LinkedHashMap.empty[Any, T]
+    targets.foreach: t =>
+      val key = extractKey(t, targetMeta, tPkIdx)
+      targetByKey(key) = t
+
+    // 4. Build result: sourceKey → Vector[(T, P)] stored as Any tuples
+    val result = mutable.LinkedHashMap.empty[Any, Vector[Any]]
+    pivotsBySourceAndTarget.foreach: (srcKey, tgtKey, pivot) =>
+      targetByKey.get(tgtKey).foreach: target =>
+        val pair: (T, P) = (target, pivot)
+        result.updateWith(srcKey):
+          case Some(existing) => Some(existing :+ pair)
+          case None           => Some(Vector(pair))
+    result
+
+  def representativeQueries: Vector[Frag] =
+    Vector(
+      Frag(pivotQuerySql("?"), Seq.empty, FragWriter.empty),
+      Frag(targetQuerySql("?"), Seq.empty, FragWriter.empty)
+    )
+
+end PivotWithDataEagerDef

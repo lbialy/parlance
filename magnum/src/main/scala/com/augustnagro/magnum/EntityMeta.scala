@@ -55,7 +55,7 @@ object EntityMeta:
               '{ $nameMapper.toColumnName(${ Expr(elemName) }) }
         )
 
-        val idIndex: Int = metaIdAnnotIndex[E]
+        val idIndices: List[Int] = metaIdAnnotIndices[E]
 
         val colExprs: List[Expr[Col[?]]] =
           eElemNames.lazyZip(eElemNamesSql).map { (scalaName, sqlNameExpr) =>
@@ -68,7 +68,7 @@ object EntityMeta:
           }
 
         val metaColsExpr = Expr.ofSeq(colExprs)
-        val idIndexExpr = Expr(idIndex)
+        val idIndicesExpr = Expr.ofSeq(idIndices.map(Expr(_)))
 
         // --- DbCodec part (reuse DbCodec macro helpers) ---
         val jdbcColsExpr = DbCodec.buildColsExpr[mets]()
@@ -76,12 +76,15 @@ object EntityMeta:
 
         '{
           val metaCols = IArray.from($metaColsExpr)
-          val pk = metaCols($idIndexExpr)
+          val pkIndices = $idIndicesExpr
+          val pks = IArray.from(pkIndices.map(metaCols(_)))
+          val pk = pks(0)
           new EntityMeta[E]:
             // TableMeta
             def tableName: String = $tableNameSql
             def columns: IArray[Col[?]] = metaCols
             def primaryKey: Col[?] = pk
+            def primaryKeys: IArray[Col[?]] = pks
             // DbCodec
             val cols: IArray[Int] = $jdbcColsExpr
             def readSingle(rs: ResultSet, pos: Int): E =
@@ -121,17 +124,17 @@ object EntityMeta:
       .flatMap(sym => sym.getAnnotation(annot))
       .map(term => term.asExprOf[SqlName])
 
-  private def metaIdAnnotIndex[E: Type](using q: Quotes): Int =
+  private def metaIdAnnotIndices[E: Type](using q: Quotes): List[Int] =
     import q.reflect.*
     val idAnnot = TypeRepr.of[Id].typeSymbol
-    TypeRepr
+    val params = TypeRepr
       .of[E]
       .typeSymbol
       .primaryConstructor
       .paramSymss
       .head
-      .indexWhere(sym => sym.hasAnnotation(idAnnot)) match
-      case -1 => 0
-      case x  => x
+    val indices = params.zipWithIndex.collect:
+      case (sym, idx) if sym.hasAnnotation(idAnnot) => idx
+    if indices.isEmpty then List(0) else indices
 
 end EntityMeta
