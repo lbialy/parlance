@@ -3,6 +3,7 @@ package com.augustnagro.magnum
 import scala.NamedTuple
 import scala.deriving.Mirror
 import scala.quoted.*
+import scala.reflect.TypeTest
 
 sealed trait QBState
 sealed trait HasRoot extends QBState
@@ -565,6 +566,47 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     end new
   end chunk
 
+  // --- Mutation operations (§5.1, §5.2, §5.3) ---
+
+  def update: QueryBuilder.UpdatePhase[E] =
+    QueryBuilder.UpdatePhase(this)
+
+  def delete()(using DbCon): Int =
+    val (whereSql, params, writer) = buildWhere
+    Frag(s"DELETE FROM ${meta.tableName}$whereSql", params, writer).update.run()
+
+  def updateUnsafe(assignments: Frag)(using DbCon): Int =
+    val (whereSql, whereParams, whereWriter) = buildWhere
+    val sql = s"UPDATE ${meta.tableName} SET ${assignments.sqlString}$whereSql"
+    val allParams = assignments.params ++ whereParams
+    val combinedWriter: FragWriter = (ps, pos) =>
+      val next = assignments.writer.write(ps, pos)
+      whereWriter.write(ps, next)
+    Frag(sql, allParams, combinedWriter).update.run()
+
+  def updateUnsafe(f: C => Frag)(using DbCon): Int =
+    updateUnsafe(f(cols))
+
+  def increment[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon): Int =
+    val actual: A = amount match
+      case None    => num.one
+      case a: A    => a
+    val col = f(cols)
+    val writer: FragWriter = (ps, pos) =>
+      codec.writeSingle(actual, ps, pos)
+      pos + codec.cols.length
+    updateUnsafe(Frag(s"${col.queryRepr} = ${col.queryRepr} + ?", Seq(actual), writer))
+
+  def decrement[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon): Int =
+    val actual: A = amount match
+      case None    => num.one
+      case a: A    => a
+    val col = f(cols)
+    val writer: FragWriter = (ps, pos) =>
+      codec.writeSingle(actual, ps, pos)
+      pos + codec.cols.length
+    updateUnsafe(Frag(s"${col.queryRepr} = ${col.queryRepr} - ?", Seq(amount), writer))
+
   def debugPrintSql(using DbCon): this.type =
     val frag = build
     DebugSql.printDebug(Vector(frag))
@@ -830,5 +872,123 @@ object QueryBuilder:
     (nmesTpe, valsTpe) match
       case ('[type nmes <: Tuple; `nmes`], '[type tps <: Tuple; `tps`]) =>
         Type.of[NamedTuple.NamedTuple[nmes, tps]]
+
+  class UpdatePhase[E] private[magnum] (
+      private[magnum] val qb: QueryBuilder[?, E, ?]
+  ):
+    inline def apply[P](inline assignments: P)(using inline con: DbCon): Int =
+      ${ updateImpl[E, P]('this, 'assignments, 'con) }
+
+  // --- update() macro implementation ---
+
+  private def updateImpl[E: Type, P: Type](
+      phaseExpr: Expr[UpdatePhase[E]],
+      assignments: Expr[P],
+      conExpr: Expr[DbCon]
+  )(using Quotes): Expr[Int] =
+    import quotes.reflect.*
+
+    // 1. Decompose P as NamedTuple[N, V]
+    val ntSym = Symbol.requiredModule("scala.NamedTuple").typeMember("NamedTuple")
+    val pRepr = TypeRepr.of[P].dealias
+
+    val (namesRepr, valuesRepr) = pRepr match
+      case AppliedType(tycon, List(n, v)) if tycon.typeSymbol == ntSym =>
+        (n, v)
+      case _ =>
+        report.errorAndAbort(
+          s"update() requires a named tuple, got: ${pRepr.show}"
+        )
+
+    // 2. Extract field names from the names tuple type
+    val fieldNames: List[String] = namesRepr.asType match
+      case '[nmes] => selectFieldNames[nmes]()
+
+    // 3. Extract value types from the values tuple type
+    val valueTypes: List[Type[?]] = valuesRepr.asType match
+      case '[vals] => elemTypes[vals]()
+
+    // 4. Get entity field names and types from Mirror
+    val entityFields: Map[String, TypeRepr] =
+      Expr.summon[Mirror.ProductOf[E]] match
+        case Some('{
+              $mirror: Mirror.ProductOf[E] {
+                type MirroredElemLabels = eMels
+                type MirroredElemTypes = eMets
+              }
+            }) =>
+          val names = elemNames[eMels]()
+          val types = elemTypes[eMets]()
+          names.zip(types.map { case '[t] => TypeRepr.of[t] }).toMap
+        case _ =>
+          report.errorAndAbort(
+            s"A Mirror.ProductOf is required for update() on ${TypeRepr.of[E].show}"
+          )
+
+    // 5. Validate each field name exists on E and type-check values
+    fieldNames.zip(valueTypes).foreach { case (fieldName, valType) =>
+      entityFields.get(fieldName) match
+        case None =>
+          val available = entityFields.keys.toList.sorted.mkString(", ")
+          report.errorAndAbort(
+            s"Field '$fieldName' does not exist on entity. Available columns: $available"
+          )
+        case Some(entityFieldType) =>
+          valType match
+            case '[v] =>
+              if !(TypeRepr.of[v] <:< entityFieldType) then
+                report.errorAndAbort(
+                  s"Type mismatch for field '$fieldName': expected ${entityFieldType.show}, got ${TypeRepr.of[v].show}"
+                )
+    }
+
+    // 6. Summon DbCodec for each value type
+    val codecExprs: List[Expr[DbCodec[?]]] = fieldNames.zip(valueTypes).map { case (name, valType) =>
+      valType match
+        case '[a] =>
+          Expr.summon[DbCodec[a]] match
+            case Some(c) => '{ $c.asInstanceOf[DbCodec[?]] }
+            case None =>
+              report.errorAndAbort(
+                s"No DbCodec found for type ${TypeRepr.of[a].show} (field '$name')"
+              )
+    }
+
+    // 7. Generate runtime code
+    val fieldNameExprs: Expr[Seq[String]] = Expr.ofSeq(fieldNames.map(Expr.apply))
+    val codecsSeqExpr: Expr[Seq[DbCodec[?]]] = Expr.ofSeq(codecExprs)
+    val nExpr = Expr(fieldNames.length)
+
+    '{
+      val phase = $phaseExpr
+      val qb = phase.qb
+      val rawTuple = $assignments.asInstanceOf[Product]
+      val fieldNamesRT = $fieldNameExprs
+      val codecs = $codecsSeqExpr
+      val n = $nExpr
+
+      val sb = new StringBuilder()
+      val params = new scala.collection.mutable.ArrayBuffer[Any](n)
+      var i = 0
+      while i < n do
+        if i > 0 then sb.append(", ")
+        val col = qb.meta.columnByName(fieldNamesRT(i)).get
+        sb.append(col.sqlName)
+        sb.append(" = ?")
+        params += rawTuple.productElement(i)
+        i += 1
+
+      val writer: FragWriter = (ps, pos) =>
+        var p = pos
+        var j = 0
+        while j < n do
+          codecs(j).asInstanceOf[DbCodec[Any]].writeSingle(rawTuple.productElement(j), ps, p)
+          p += codecs(j).cols.length
+          j += 1
+        p
+
+      qb.updateUnsafe(Frag(sb.toString, params.toSeq, writer))(using $conExpr)
+    }
+  end updateImpl
 
 end QueryBuilder
