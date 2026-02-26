@@ -45,7 +45,7 @@ val postgresDriverVersion = "42.7.4"
 
 lazy val root = project
   .in(file("."))
-  .aggregate(magnum, magnumPg)
+  .aggregate(magnum, magnumPg, magnumMigrate)
 
 lazy val magnum = project
   .in(file("magnum"))
@@ -65,6 +65,18 @@ lazy val magnum = project
       "com.dimafeng" %% "testcontainers-scala-clickhouse" % testcontainersVersion % Test,
       "com.clickhouse" % "clickhouse-jdbc" % "0.6.0" % Test classifier "http",
       "org.xerial" % "sqlite-jdbc" % "3.46.1.3" % Test
+    )
+  )
+
+lazy val magnumMigrate = project
+  .in(file("magnum-migrate"))
+  .dependsOn(magnum)
+  .settings(
+    name := "magnum-migrate",
+    Test / fork := true,
+    libraryDependencies ++= Seq(
+      "org.scalameta" %% "munit" % munitVersion % Test,
+      "com.h2database" % "h2" % "2.3.232" % Test
     )
   )
 
