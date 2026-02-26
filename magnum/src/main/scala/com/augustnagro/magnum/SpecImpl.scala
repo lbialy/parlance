@@ -12,7 +12,7 @@ private trait SpecImpl:
       case NullOrder.Default => ""
       case NullOrder.First   => " NULLS FIRST"
       case NullOrder.Last    => " NULLS LAST"
-      case _                 => throw UnsupportedOperationException()
+      case null              => throw UnsupportedOperationException()
     sort.column + dir + nullOrder
 
   def offsetLimitSql(offset: Option[Long], limit: Option[Int]): Option[String] =

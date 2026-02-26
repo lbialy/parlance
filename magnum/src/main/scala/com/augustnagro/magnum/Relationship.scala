@@ -362,11 +362,11 @@ object Relationship:
           s"Expected a field selector like _.fieldName, got: ${term.show}"
         )
   extension [A, B, CT <: Selectable](outer: HasMany[A, B, CT])
-    def via[Z](inner: BelongsTo[Z, A]): ComposedRelationship[Z, A, B, CT] =
+    infix def via[Z](inner: BelongsTo[Z, A]): ComposedRelationship[Z, A, B, CT] =
       ComposedRelationship(inner, outer)
-    def via[Z](inner: HasOne[Z, A]): ComposedRelationship[Z, A, B, CT] =
+    infix def via[Z](inner: HasOne[Z, A]): ComposedRelationship[Z, A, B, CT] =
       ComposedRelationship(inner, outer)
-    def via[Z, ICT <: Selectable](inner: HasMany[Z, A, ICT]): ComposedRelationship[Z, A, B, CT] =
+    infix def via[Z, ICT <: Selectable](inner: HasMany[Z, A, ICT]): ComposedRelationship[Z, A, B, CT] =
       ComposedRelationship(inner, outer)
 
 end Relationship

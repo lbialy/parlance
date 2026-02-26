@@ -27,7 +27,7 @@ class MySqlTests extends FunSuite, TestContainersFixtures:
       .createContainer()
   )
 
-  override def munitFixtures: Seq[AnyFixture[_]] =
+  override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ mySqlContainer
 
   def xa(): Transactor =

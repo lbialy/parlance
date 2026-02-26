@@ -33,7 +33,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
       .createContainer()
   )
 
-  override def munitFixtures: Seq[AnyFixture[_]] =
+  override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ clickHouseContainer
 
   def xa(): Transactor =

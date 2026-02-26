@@ -441,6 +441,8 @@ object JoinedQuery:
             None
           )
         }
+      case _ =>
+        report.errorAndAbort("select() failed to construct result types. This is a bug in magnum.")
   end joinedSelectImpl
 
 end JoinedQuery

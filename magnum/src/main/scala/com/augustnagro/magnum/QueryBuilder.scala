@@ -817,6 +817,8 @@ object QueryBuilder:
             None
           )
         }
+      case _ =>
+        report.errorAndAbort("select() failed to construct result types. This is a bug in magnum.")
   end selectImpl
 
   // --- select() macro helper: extract field names from a tuple of string literal types ---
@@ -857,6 +859,8 @@ object QueryBuilder:
       (t, acc) match
         case ('[ft], '[type acc <: Tuple; `acc`]) =>
           Type.of[ft *: acc]
+        case _ =>
+          quotes.reflect.report.errorAndAbort("Failed to build tuple type from select() elements. This is a bug in magnum.")
     }
 
   // --- select() macro helper: build a names-tuple type from string literals ---
@@ -872,6 +876,8 @@ object QueryBuilder:
     (nmesTpe, valsTpe) match
       case ('[type nmes <: Tuple; `nmes`], '[type tps <: Tuple; `tps`]) =>
         Type.of[NamedTuple.NamedTuple[nmes, tps]]
+      case _ =>
+        report.errorAndAbort("Failed to construct NamedTuple type for select(). This is a bug in magnum.")
 
   class UpdatePhase[E] private[magnum] (
       private[magnum] val qb: QueryBuilder[?, E, ?]

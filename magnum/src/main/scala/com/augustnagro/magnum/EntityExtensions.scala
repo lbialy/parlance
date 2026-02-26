@@ -54,7 +54,7 @@ end extension
 
 // --- Group 4: SoftDeletes extensions ---
 extension [EC, E, ID](entity: E)(using
-    repo: Repo[EC, E, ID] with SoftDeletes[EC, E, ID],
+    repo: Repo[EC, E, ID] & SoftDeletes[EC, E, ID],
     con: DbCon
 )
   def forceDelete(): Unit = repo.forceDelete(entity)

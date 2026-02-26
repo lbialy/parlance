@@ -128,24 +128,24 @@ private def likeImpl(col: ColRef[?], op: String, pattern: String)(
   WhereFrag(Frag(s"${col.queryRepr} $op ?", Seq(pattern), writer))
 
 extension (col: ColRef[String])
-  def like(pattern: String)(using DbCodec[String]): WhereFrag =
+  infix def like(pattern: String)(using DbCodec[String]): WhereFrag =
     likeImpl(col, "LIKE", pattern)
 
-  def notLike(pattern: String)(using DbCodec[String]): WhereFrag =
+  infix def notLike(pattern: String)(using DbCodec[String]): WhereFrag =
     likeImpl(col, "NOT LIKE", pattern)
 
-  def ilike(pattern: String)(using DbCodec[String]): WhereFrag =
+  infix def ilike(pattern: String)(using DbCodec[String]): WhereFrag =
     likeImpl(col, "ILIKE", pattern)
 
 extension (col: ColRef[Option[String]])
   @targetName("likeOpt")
-  def like(pattern: String)(using DbCodec[String]): WhereFrag =
+  infix def like(pattern: String)(using DbCodec[String]): WhereFrag =
     likeImpl(col, "LIKE", pattern)
 
   @targetName("notLikeOpt")
-  def notLike(pattern: String)(using DbCodec[String]): WhereFrag =
+  infix def notLike(pattern: String)(using DbCodec[String]): WhereFrag =
     likeImpl(col, "NOT LIKE", pattern)
 
   @targetName("ilikeOpt")
-  def ilike(pattern: String)(using DbCodec[String]): WhereFrag =
+  infix def ilike(pattern: String)(using DbCodec[String]): WhereFrag =
     likeImpl(col, "ILIKE", pattern)

@@ -16,7 +16,7 @@ object MySqlDbType extends DbType:
         case NullOrder.Default => ""
         case NullOrder.First   => s"$column IS NOT NULL, "
         case NullOrder.Last    => s"$column IS NULL, "
-        case _                 => throw UnsupportedOperationException()
+        case null              => throw UnsupportedOperationException()
       val dir = sort.direction match
         case SortOrder.Default => ""
         case SortOrder.Asc     => " ASC"

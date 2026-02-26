@@ -14,7 +14,7 @@ class EntityExtensionSoftDeleteTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/soft-delete.sql")
 
-  given sdRepo: (Repo[SdExtUser, SdExtUser, Long] with SoftDeletes[SdExtUser, SdExtUser, Long]) =
+  given sdRepo: (Repo[SdExtUser, SdExtUser, Long] & SoftDeletes[SdExtUser, SdExtUser, Long]) =
     new Repo[SdExtUser, SdExtUser, Long] with SoftDeletes[SdExtUser, SdExtUser, Long]
 
   test("entity.trashed returns true for soft-deleted entity"):
