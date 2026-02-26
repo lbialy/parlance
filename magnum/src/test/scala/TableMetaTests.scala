@@ -10,18 +10,18 @@ class TableMetaTests extends FunSuite:
     )
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class User(@Id id: Long, firstName: String, age: Int) derives DbCodec, TableMeta
+  case class User(@Id id: Long, firstName: String, age: Int) derives EntityMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
   case class Product(
       name: String,
       @SqlName("custom_col") description: String,
       @Id productId: Long
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   @SqlName("custom_table")
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class CustomNamed(@Id id: Long, value: String) derives DbCodec, TableMeta
+  case class CustomNamed(@Id id: Long, value: String) derives EntityMeta
 
   test("tableName is derived via nameMapper"):
     val meta = summon[TableMeta[User]]

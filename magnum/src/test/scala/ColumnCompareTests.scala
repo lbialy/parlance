@@ -1,7 +1,7 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class QbScore(@Id id: Long, scoreA: Int, scoreB: Int) derives DbCodec, TableMeta
+case class QbScore(@Id id: Long, scoreA: Int, scoreB: Int) derives EntityMeta
 
 class ColumnCompareTests extends QbTestBase:
 

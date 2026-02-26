@@ -1,7 +1,7 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class QbItem(@Id id: Long, amount: Int) derives DbCodec, TableMeta
+case class QbItem(@Id id: Long, amount: Int) derives EntityMeta
 
 class ChunkTests extends QbTestBase:
 

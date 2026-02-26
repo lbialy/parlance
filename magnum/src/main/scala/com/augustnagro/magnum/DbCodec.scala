@@ -666,7 +666,7 @@ object DbCodec:
     end match
   end dbCodecImpl
 
-  private def productQueryRepr[Mets: Type](
+  private[magnum] def productQueryRepr[Mets: Type](
       elemReprs: Vector[Expr[String]] = Vector.empty
   )(using Quotes): Expr[String] =
     import quotes.reflect.*
@@ -681,7 +681,7 @@ object DbCodec:
         val seqExpr = Expr.ofSeq(elemReprs)
         '{ $seqExpr.mkString(", ") }
 
-  private def buildColsExpr[Mets: Type](
+  private[magnum] def buildColsExpr[Mets: Type](
       res: Vector[Expr[IArray[Int]]] = Vector.empty
   )(using Quotes): Expr[IArray[Int]] =
     import quotes.reflect.*
@@ -701,7 +701,7 @@ object DbCodec:
           IArray.concat(iArrays*)
         }
 
-  private def productReadSingle[E: Type, Mets: Type](
+  private[magnum] def productReadSingle[E: Type, Mets: Type](
       rs: Expr[ResultSet],
       m: Expr[Mirror.ProductOf[E]],
       res: Vector[Expr[Any]],
@@ -760,7 +760,7 @@ object DbCodec:
     end match
   end productReadSingle
 
-  private def productReadOption[E: Type, Mets: Type](
+  private[magnum] def productReadOption[E: Type, Mets: Type](
       rs: Expr[ResultSet],
       m: Expr[Mirror.ProductOf[E]],
       res: Vector[Expr[Any]],
@@ -823,7 +823,7 @@ object DbCodec:
     end match
   end productReadOption
 
-  private def productWriteSingle[E: Type, Mets: Type](
+  private[magnum] def productWriteSingle[E: Type, Mets: Type](
       e: Expr[E],
       ps: Expr[PreparedStatement],
       pos: Expr[Int],

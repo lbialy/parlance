@@ -2,7 +2,7 @@ import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 case class QbCounter(@Id id: Long, name: String, status: String, viewCount: Long, score: Int)
-  derives DbCodec, TableMeta
+  derives EntityMeta
 
 class QueryBuilderMutationTests extends QbTestBase:
 
@@ -197,7 +197,7 @@ class QueryBuilderMutationTests extends QbTestBase:
       import com.augustnagro.magnum.*
       import java.time.Instant
       @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-      case class Timestamped(@Id id: Long, createdAt: Instant) derives DbCodec, TableMeta
+      case class Timestamped(@Id id: Long, createdAt: Instant) derives EntityMeta
       def test(using DbCon): Unit =
         QueryBuilder.from[Timestamped].increment(_.createdAt, Instant.now())
     """)

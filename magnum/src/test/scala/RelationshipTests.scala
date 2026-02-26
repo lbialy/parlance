@@ -11,13 +11,13 @@ class RelationshipTests extends FunSuite:
     )
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class RAuthor(@Id id: Long, name: String) derives DbCodec, TableMeta
+  case class RAuthor(@Id id: Long, name: String) derives EntityMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class RBook(@Id id: Long, authorId: Long, title: String) derives DbCodec, TableMeta
+  case class RBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class RBookDetail(@Id id: Long, bookId: Long, isbn: String) derives DbCodec, TableMeta
+  case class RBookDetail(@Id id: Long, bookId: Long, isbn: String) derives EntityMeta
 
   test("belongsTo compiles and stores correct metadata"):
     val rel = Relationship.belongsTo[RBook, RAuthor](_.authorId, _.id)
@@ -39,9 +39,9 @@ class RelationshipTests extends FunSuite:
     val errors = typeCheckErrors("""
       import com.augustnagro.magnum.*
       @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-      case class NBook(@Id id: Long, authorId: Long, title: String) derives DbCodec, TableMeta
+      case class NBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
       @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-      case class NAuthor(@Id id: Long, name: String) derives DbCodec, TableMeta
+      case class NAuthor(@Id id: Long, name: String) derives EntityMeta
       Relationship.belongsTo[NBook, NAuthor](_.nonExistent, _.id)
     """)
     assert(errors.nonEmpty, "expected compile error for non-existent source field")
@@ -50,9 +50,9 @@ class RelationshipTests extends FunSuite:
     val errors = typeCheckErrors("""
       import com.augustnagro.magnum.*
       @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-      case class NBook2(@Id id: Long, authorId: Long, title: String) derives DbCodec, TableMeta
+      case class NBook2(@Id id: Long, authorId: Long, title: String) derives EntityMeta
       @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-      case class NAuthor2(@Id id: Long, name: String) derives DbCodec, TableMeta
+      case class NAuthor2(@Id id: Long, name: String) derives EntityMeta
       Relationship.belongsTo[NBook2, NAuthor2](_.authorId, _.nonExistent)
     """)
     assert(errors.nonEmpty, "expected compile error for non-existent target field")

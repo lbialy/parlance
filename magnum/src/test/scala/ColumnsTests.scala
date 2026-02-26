@@ -11,16 +11,16 @@ class ColumnsTests extends FunSuite:
     )
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class User(@Id id: Long, firstName: String, age: Int) derives DbCodec, TableMeta
+  case class User(@Id id: Long, firstName: String, age: Int) derives EntityMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-  case class WithOptional(@Id id: Long, nickname: Option[String]) derives DbCodec, TableMeta
+  case class WithOptional(@Id id: Long, nickname: Option[String]) derives EntityMeta
 
   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
   case class WithSqlName(
       @Id id: Long,
       @SqlName("custom_col") description: String
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   val userCols = Columns.of[User]
   val optCols = Columns.of[WithOptional]
@@ -45,7 +45,7 @@ class ColumnsTests extends FunSuite:
     val errors = typeCheckErrors("""
       import com.augustnagro.magnum.*
       @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-      case class NegTest(@Id id: Long, name: String) derives DbCodec, TableMeta
+      case class NegTest(@Id id: Long, name: String) derives EntityMeta
       val cols = Columns.of[NegTest]
       cols.nonExistent
     """)

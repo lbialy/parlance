@@ -21,7 +21,7 @@ def immutableRepoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(us
       @SqlName("vin") vinNumber: Option[Int],
       color: Color,
       created: OffsetDateTime
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   val carRepo = ImmutableRepo[Car, Long]()
   val car = TableInfo[Car, Car, Long]

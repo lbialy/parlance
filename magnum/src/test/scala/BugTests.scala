@@ -1,19 +1,19 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class BgUser(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class BgUser(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class BgRole(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class BgRole(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class BgCountry(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class BgCountry(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class BgPerson(@Id id: Long, countryId: Long, name: String) derives DbCodec, TableMeta
+case class BgPerson(@Id id: Long, countryId: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class BgArticle(@Id id: Long, personId: Long, title: String) derives DbCodec, TableMeta
+case class BgArticle(@Id id: Long, personId: Long, title: String) derives EntityMeta
 
 class BugTests extends QbTestBase:
 

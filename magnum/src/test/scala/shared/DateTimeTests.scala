@@ -21,7 +21,7 @@ def dateTimeTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
       b: LocalDate,
       c: LocalTime,
       d: LocalDateTime
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   val myTimeRepo = Repo[MyTime, MyTime, Null]()
 

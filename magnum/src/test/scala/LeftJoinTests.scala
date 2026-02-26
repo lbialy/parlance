@@ -1,13 +1,13 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class LjCountry(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class LjCountry(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class LjAuthor(@Id id: Long, name: String, countryId: Option[Long]) derives DbCodec, TableMeta
+case class LjAuthor(@Id id: Long, name: String, countryId: Option[Long]) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class LjBook(@Id id: Long, authorId: Option[Long], title: String) derives DbCodec, TableMeta
+case class LjBook(@Id id: Long, authorId: Option[Long], title: String) derives EntityMeta
 
 class LeftJoinTests extends QbTestBase:
 

@@ -24,7 +24,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
     intercept[IllegalArgumentException]:
       case class UserCreator(name: String) derives DbCodec
       @Table(ClickhouseDbType)
-      case class User(id: UUID, name: String) derives DbCodec, TableMeta
+      case class User(id: UUID, name: String) derives EntityMeta
       val repo = Repo[UserCreator, User, UUID]()
 
   val clickHouseContainer = ForAllContainerFixture(

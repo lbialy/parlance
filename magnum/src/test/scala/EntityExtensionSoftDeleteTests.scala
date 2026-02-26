@@ -8,7 +8,7 @@ case class SdExtUser(
     @Id id: Long,
     name: String,
     deletedAt: Option[OffsetDateTime]
-) derives DbCodec, TableMeta
+) derives EntityMeta
 
 class EntityExtensionSoftDeleteTests extends QbTestBase:
 

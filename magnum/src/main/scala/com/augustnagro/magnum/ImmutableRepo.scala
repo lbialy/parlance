@@ -15,42 +15,41 @@ open class ImmutableRepo[E, ID](
     val injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]]
 )(using
     defaults: RepoDefaults[?, E, ID],
-    tableMeta: TableMeta[E],
-    eCodec: DbCodec[E]
+    meta: EntityMeta[E]
 ):
 
   /** Expose table metadata for traits with self-type. */
-  protected def entityMeta: TableMeta[E] = tableMeta
+  protected def entityMeta: TableMeta[E] = meta
 
   /** Expose entity codec for traits with self-type. */
-  protected def entityCodec: DbCodec[E] = eCodec
+  protected def entityCodec: DbCodec[E] = meta
 
   /** Index of the primary key column in the entity's product elements. */
   protected val pkIndex: Int =
-    tableMeta.columns.indexWhere(_.scalaName == tableMeta.primaryKey.scalaName)
+    meta.columns.indexWhere(_.scalaName == meta.primaryKey.scalaName)
 
   /** Extract the primary key value from an entity. */
   protected def extractPk(entity: E): Any =
     entity.asInstanceOf[Product].productElement(pkIndex)
 
   private def track(entity: E)(using con: DbCon): E =
-    con.trackLoaded(tableMeta.tableName, extractPk(entity), entity)
+    con.trackLoaded(meta.tableName, extractPk(entity), entity)
     entity
 
   private def trackAll(entities: Vector[E])(using con: DbCon): Vector[E] =
-    entities.foreach(e => con.trackLoaded(tableMeta.tableName, extractPk(e), e))
+    entities.foreach(e => con.trackLoaded(meta.tableName, extractPk(e), e))
     entities
 
   /** Internal scoped query builder using build0 (no structural typing needed). */
   private def scopedQb: QueryBuilder[HasRoot, E, Columns[E]] =
-    val cols = new Columns[E](tableMeta.columns)
-    val qb = QueryBuilder.build0[E, Columns[E]](tableMeta, eCodec, cols)
+    val cols = new Columns[E](meta.columns)
+    val qb = QueryBuilder.build0[E, Columns[E]](meta, meta, cols)
     applyScopes(qb)
 
   /** Build a WhereFrag for `pk = ?` */
   private def pkEqualsFrag(id: ID): WhereFrag =
     WhereFrag(Frag(
-      s"${tableMeta.primaryKey.sqlName} = ?",
+      s"${meta.primaryKey.sqlName} = ?",
       Seq(id),
       FragWriter.fromKeys(Vector(id.asInstanceOf[Any]))
     ))
@@ -60,7 +59,7 @@ open class ImmutableRepo[E, ID](
     val keys = ids.toVector
     val placeholders = keys.map(_ => "?").mkString(", ")
     WhereFrag(Frag(
-      s"${tableMeta.primaryKey.sqlName} IN ($placeholders)",
+      s"${meta.primaryKey.sqlName} IN ($placeholders)",
       keys,
       FragWriter.fromKeys(keys.asInstanceOf[Vector[Any]])
     ))

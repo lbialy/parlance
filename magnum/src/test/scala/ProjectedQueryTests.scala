@@ -1,7 +1,7 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class QbOrder(@Id id: Long, customer: String, status: String, amount: Int) derives DbCodec, TableMeta
+case class QbOrder(@Id id: Long, customer: String, status: String, amount: Int) derives EntityMeta
 
 class ProjectedQueryTests extends QbTestBase:
 

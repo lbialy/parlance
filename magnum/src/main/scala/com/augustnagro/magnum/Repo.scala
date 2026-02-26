@@ -15,8 +15,7 @@ open class Repo[EC, E, ID](
     injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]]
 )(using
     defaults: RepoDefaults[EC, E, ID],
-    tableMeta: TableMeta[E],
-    eCodec: DbCodec[E]
+    meta: EntityMeta[E]
 ) extends ImmutableRepo[E, ID](injectedScopes):
 
   /** Deletes an entity using its id */
@@ -46,14 +45,14 @@ open class Repo[EC, E, ID](
 
   def insertReturning(entityCreator: EC)(using con: DbCon): E =
     val result = defaults.insertReturning(entityCreator)
-    con.trackLoaded(tableMeta.tableName, extractPk(result), result)
+    con.trackLoaded(meta.tableName, extractPk(result), result)
     result
 
   def insertAllReturning(
       entityCreators: Iterable[EC]
   )(using con: DbCon): Vector[E] =
     val results = defaults.insertAllReturning(entityCreators)
-    results.foreach(e => con.trackLoaded(tableMeta.tableName, extractPk(e), e))
+    results.foreach(e => con.trackLoaded(meta.tableName, extractPk(e), e))
     results
 
   /** Update the entity */
@@ -70,7 +69,7 @@ open class Repo[EC, E, ID](
   /** Save entity: partial update if tracked, full update otherwise. */
   def save(entity: E)(using con: DbCon): Unit =
     val pkValue = extractPk(entity)
-    con.getOriginal(tableMeta.tableName, pkValue) match
+    con.getOriginal(meta.tableName, pkValue) match
       case Some(original) =>
         updatePartial(original.asInstanceOf[E], entity)
       case None =>

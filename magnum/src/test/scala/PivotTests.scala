@@ -1,16 +1,16 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class PvUser(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class PvUser(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class PvRole(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class PvRole(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class Student(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class Student(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class Course(@Id id: Long, title: String) derives DbCodec, TableMeta
+case class Course(@Id id: Long, title: String) derives EntityMeta
 
 class PivotTests extends QbTestBase:
 

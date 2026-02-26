@@ -19,7 +19,7 @@ def sqlNameTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
       @SqlName("vin") vinNumber: Option[Int],
       color: Color,
       created: OffsetDateTime
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   val customCarRepo = Repo[CustomCar, CustomCar, Long]()
 

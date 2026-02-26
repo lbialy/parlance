@@ -20,7 +20,7 @@ def tupleTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
       @SqlName("vin") vinNumber: Option[Int],
       color: Color,
       created: OffsetDateTime
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   val car = TableInfo[Car, Car, Long]
 

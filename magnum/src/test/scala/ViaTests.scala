@@ -1,16 +1,16 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ViaAuthor(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class ViaAuthor(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ViaPost(@Id id: Long, authorId: Long, title: String) derives DbCodec, TableMeta
+case class ViaPost(@Id id: Long, authorId: Long, title: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ViaBook(@Id id: Long, authorId: Long, title: String) derives DbCodec, TableMeta
+case class ViaBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ViaContact(@Id id: Long, authorId: Long, email: String, active: Boolean) derives DbCodec, TableMeta
+case class ViaContact(@Id id: Long, authorId: Long, email: String, active: Boolean) derives EntityMeta
 
 class ViaTests extends QbTestBase:
 

@@ -10,7 +10,7 @@ def bigDecTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
   import suite.*
 
   @Table(dbType, SqlNameMapper.CamelToSnakeCase)
-  case class BigDec(id: Int, myBigDec: Option[BigDecimal]) derives DbCodec, TableMeta
+  case class BigDec(id: Int, myBigDec: Option[BigDecimal]) derives EntityMeta
 
   val bigDecRepo = Repo[BigDec, BigDec, Int]()
 

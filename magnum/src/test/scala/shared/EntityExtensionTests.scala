@@ -26,7 +26,7 @@ def entityExtensionTests(
       isAdmin: Boolean,
       created: OffsetDateTime,
       socialId: Option[UUID]
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   given personRepo: Repo[Person, Person, Long] = Repo[Person, Person, Long]()
 

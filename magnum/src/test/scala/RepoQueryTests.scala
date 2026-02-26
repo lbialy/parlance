@@ -8,7 +8,7 @@ case class RepoItem(
     name: String,
     status: String,
     amount: Int
-) derives DbCodec, TableMeta
+) derives EntityMeta
 
 class RepoQueryTests extends QbTestBase:
 

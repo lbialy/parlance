@@ -23,7 +23,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
       isAdmin: Boolean,
       created: OffsetDateTime,
       socialId: Option[UUID]
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   val personRepo = Repo[Person, Person, Long]()
   val person = TableInfo[Person, Person, Long]

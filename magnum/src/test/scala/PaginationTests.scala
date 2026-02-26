@@ -4,8 +4,7 @@ import java.time.LocalDateTime
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 case class QbPaginated(@Id id: Long, name: String, score: Int, createdAt: LocalDateTime)
-    derives DbCodec,
-      TableMeta
+    derives EntityMeta
 
 class PaginationTests extends QbTestBase:
 

@@ -26,7 +26,7 @@ def partialUpdateTests(
       isAdmin: Boolean,
       created: OffsetDateTime,
       socialId: Option[UUID]
-  ) derives DbCodec, TableMeta
+  ) derives EntityMeta
 
   val personRepo = Repo[Person, Person, Long]()
 

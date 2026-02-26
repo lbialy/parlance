@@ -1,22 +1,22 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ThCountry(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class ThCountry(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ThUser(@Id id: Long, countryId: Long, name: String) derives DbCodec, TableMeta
+case class ThUser(@Id id: Long, countryId: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ThPost(@Id id: Long, userId: Long, title: String) derives DbCodec, TableMeta
+case class ThPost(@Id id: Long, userId: Long, title: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ThMechanic(@Id id: Long, name: String) derives DbCodec, TableMeta
+case class ThMechanic(@Id id: Long, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ThCar(@Id id: Long, mechanicId: Long, model: String) derives DbCodec, TableMeta
+case class ThCar(@Id id: Long, mechanicId: Long, model: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class ThOwner(@Id id: Long, carId: Long, name: String) derives DbCodec, TableMeta
+case class ThOwner(@Id id: Long, carId: Long, name: String) derives EntityMeta
 
 class ThroughTests extends QbTestBase:
 

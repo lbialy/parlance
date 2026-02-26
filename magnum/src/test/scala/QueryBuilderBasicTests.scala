@@ -1,10 +1,10 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class QbUser(@Id id: Long, firstName: Option[String], age: Int) derives DbCodec, TableMeta
+case class QbUser(@Id id: Long, firstName: Option[String], age: Int) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class QbProduct(@Id id: Long, name: String, price: Int) derives DbCodec, TableMeta
+case class QbProduct(@Id id: Long, name: String, price: Int) derives EntityMeta
 
 class QueryBuilderBasicTests extends QbTestBase:
 
