@@ -35,6 +35,8 @@ ThisBuild / publishTo := {
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 ThisBuild / publish / skip := true
+ThisBuild / coverageExcludedPackages := ""
+ThisBuild / coverageFailOnMinimum := false
 
 addCommandAlias("fmt", "scalafmtAll")
 
