@@ -27,47 +27,45 @@ class PredicateGroupTests extends QbTestBase:
       val names = results.flatMap(_.firstName).sorted
       assertEquals(names, Vector("Alice", "Bob"))
 
-  test("whereGroup + orWhereGroup SQL generation"):
+  test("&& combinator SQL generation"):
     val frag = QueryBuilder
       .from[QbUser]
-      .whereGroup(g => g.and(_.age > 20).and(_.age < 26))
-      .orWhereGroup(g => g.and(_.firstName === Some("Bob")))
+      .where(sq => (sq.age > 20) && (sq.age < 26))
+      .orWhere(_.firstName === Some("Bob"))
       .build
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE ((age > ? AND age < ?) OR first_name = ?)"
     )
 
-  test("whereGroup + orWhereGroup returns correct rows"):
+  test("&& combinator returns correct rows"):
     val t = xa()
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
-        .whereGroup(g => g.and(_.age > 20).and(_.age < 26))
-        .orWhereGroup(g => g.and(_.firstName === Some("Bob")))
+        .where(sq => (sq.age > 20) && (sq.age < 26))
+        .orWhere(_.firstName === Some("Bob"))
         .run()
       assertEquals(results.length, 3)
       val ids = results.map(_.id).sorted
       assertEquals(ids, Vector(1L, 2L, 4L))
 
-  test("whereGroup with or() builds OR group"):
+  test("|| combinator builds OR group"):
     val t = xa()
     t.connect:
       val results = QueryBuilder
         .from[QbUser]
         .where(_.age > 10)
-        .whereGroup(g =>
-          g.or(_.firstName === Some("Alice"))
-            .or(_.firstName === Some("Bob"))
+        .where(sq =>
+          (sq.firstName === Some("Alice")) || (sq.firstName === Some("Bob"))
         )
         .run()
       assertEquals(results.length, 2)
       val frag = QueryBuilder
         .from[QbUser]
         .where(_.age > 10)
-        .whereGroup(g =>
-          g.or(_.firstName === Some("Alice"))
-            .or(_.firstName === Some("Bob"))
+        .where(sq =>
+          (sq.firstName === Some("Alice")) || (sq.firstName === Some("Bob"))
         )
         .build
       assertEquals(
@@ -96,5 +94,19 @@ class PredicateGroupTests extends QbTestBase:
         .orWhere(_.firstName === Some("Charlie"))
         .count()
       assertEquals(c, 4L)
+
+  test("&& with empty WhereFrag returns the non-empty side"):
+    val nonEmpty: WhereFrag = Frag("age > ?", Seq(18), FragWriter.empty).unsafeAsWhere
+    val result = nonEmpty && WhereFrag.empty
+    assertEquals(result.sqlString, "age > ?")
+    val result2 = WhereFrag.empty && nonEmpty
+    assertEquals(result2.sqlString, "age > ?")
+
+  test("|| with empty WhereFrag returns the non-empty side"):
+    val nonEmpty: WhereFrag = Frag("age > ?", Seq(18), FragWriter.empty).unsafeAsWhere
+    val result = nonEmpty || WhereFrag.empty
+    assertEquals(result.sqlString, "age > ?")
+    val result2 = WhereFrag.empty || nonEmpty
+    assertEquals(result2.sqlString, "age > ?")
 
 end PredicateGroupTests

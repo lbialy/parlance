@@ -32,16 +32,6 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
   def orWhere(frag: WhereFrag): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, addOr(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
 
-  def whereGroup(
-      f: PredicateGroupBuilder[Any] => PredicateGroupBuilder[Any]
-  ): JoinedQuery[R] =
-    new JoinedQuery(metas, codecs, joinClauses, addAnd(f(PredicateGroupBuilder.empty(null)).build), orderEntries, limitOpt, offsetOpt)
-
-  def orWhereGroup(
-      f: PredicateGroupBuilder[Any] => PredicateGroupBuilder[Any]
-  ): JoinedQuery[R] =
-    new JoinedQuery(metas, codecs, joinClauses, addOr(f(PredicateGroupBuilder.empty(null)).build), orderEntries, limitOpt, offsetOpt)
-
   def orderBy(col: ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): JoinedQuery[R] =
     new JoinedQuery(metas, codecs, joinClauses, predicate, orderEntries :+ (col, order, nullOrder), limitOpt, offsetOpt)
 
