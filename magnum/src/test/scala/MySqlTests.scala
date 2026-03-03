@@ -30,7 +30,7 @@ class MySqlTests extends FunSuite, TestContainersFixtures:
   override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ mySqlContainer
 
-  def xa(): Transactor =
+  def xa(): Transactor[MySQL.type] =
     val mySql = mySqlContainer()
     val ds = MysqlDataSource()
     ds.setURL(mySql.jdbcUrl)
@@ -51,6 +51,6 @@ class MySqlTests extends FunSuite, TestContainersFixtures:
       val stmt = use(con.createStatement())
       for ddl <- tableDDLs do stmt.execute(ddl)
     ).get
-    Transactor(ds)
+    Transactor(MySQL, ds)
   end xa
 end MySqlTests

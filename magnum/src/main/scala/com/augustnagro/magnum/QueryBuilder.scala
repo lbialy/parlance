@@ -60,23 +60,26 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def distinct: QueryBuilder[S, E, C] =
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, true, rawOrderFrags)
 
-  def lockForUpdate: LockedQueryBuilder[S, E, C] =
+  def lockForUpdate(using DbTx[? <: SupportsRowLocks]): LockedQueryBuilder[S, E, C] =
     LockedQueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, distinctFlag, LockMode.ForUpdate, rawOrderFrags)
 
-  def forShare: LockedQueryBuilder[S, E, C] =
+  def forShare(using DbTx[? <: SupportsForShare]): LockedQueryBuilder[S, E, C] =
     LockedQueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, distinctFlag, LockMode.ForShare, rawOrderFrags)
 
   private def buildWhere: (String, Seq[Any], FragWriter) =
     QuerySqlBuilder.buildWhere(rootPredicate)
 
-  def build: Frag =
+  def build(using con: DbCon[?]): Frag =
+    buildWith(con.databaseType)
+
+  def buildWith(dt: DatabaseType): Frag =
     val selectCols = meta.columns.map(_.sqlName).mkString(", ")
     val keyword = if distinctFlag then "SELECT DISTINCT" else "SELECT"
     val baseSql = s"$keyword $selectCols FROM ${meta.tableName}"
 
     val (whereSql, whereParams, whereWriter) = buildWhere
     val (orderBySql, orderParams, orderWriter) = QuerySqlBuilder.buildOrderBy(orderEntries, rawOrderFrags)
-    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
+    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt, dt)
 
     val allParams = whereParams ++ orderParams
     val combinedWriter: FragWriter =
@@ -87,20 +90,20 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 
     Frag(baseSql + whereSql + orderBySql + limitOffsetSql, allParams, combinedWriter)
 
-  def run()(using DbCon): Vector[E] =
+  def run()(using DbCon[?]): Vector[E] =
     build.query[E](using codec).run()
 
-  def first()(using DbCon): Option[E] =
+  def first()(using DbCon[?]): Option[E] =
     limit(1).run().headOption
 
-  def firstOrFail()(using DbCon): E =
+  def firstOrFail()(using DbCon[?]): E =
     first().getOrElse(
       throw QueryBuilderException(
         s"No ${meta.tableName} found matching query"
       )
     )
 
-  def count()(using DbCon): Long =
+  def count()(using DbCon[?]): Long =
     val baseSql = s"SELECT COUNT(*) FROM ${meta.tableName}"
     val (whereSql, params, writer) = buildWhere
     QueryBuilderException.requireNonEmpty(
@@ -108,7 +111,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       s"Aggregate query on ${meta.tableName}"
     )
 
-  def exists()(using DbCon): Boolean =
+  def exists()(using DbCon[?]): Boolean =
     val innerSql = s"SELECT 1 FROM ${meta.tableName}"
     val (whereSql, params, writer) = buildWhere
     QueryBuilderException.requireNonEmpty(
@@ -116,22 +119,22 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       s"Aggregate query on ${meta.tableName}"
     )
 
-  def sum[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
+  def sum[A](f: C => ColRef[A])(using DbCodec[A], DbCon[?]): Option[A] =
     runAgg[Option[A]]("SUM", f(cols).queryRepr)
 
-  def avg(f: C => ColRef[?])(using DbCon): Option[Double] =
+  def avg(f: C => ColRef[?])(using DbCon[?]): Option[Double] =
     runAgg[Option[Double]]("AVG", f(cols).queryRepr)
 
-  def min[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
+  def min[A](f: C => ColRef[A])(using DbCodec[A], DbCon[?]): Option[A] =
     runAgg[Option[A]]("MIN", f(cols).queryRepr)
 
-  def max[A](f: C => ColRef[A])(using DbCodec[A], DbCon): Option[A] =
+  def max[A](f: C => ColRef[A])(using DbCodec[A], DbCon[?]): Option[A] =
     runAgg[Option[A]]("MAX", f(cols).queryRepr)
 
-  def count(f: C => ColRef[?])(using DbCon): Long =
+  def count(f: C => ColRef[?])(using DbCon[?]): Long =
     runAgg[Long]("COUNT", f(cols).queryRepr)(using DbCodec.LongCodec)
 
-  private def runAgg[R](fn: String, colRepr: String)(using DbCodec[R], DbCon): R =
+  private def runAgg[R](fn: String, colRepr: String)(using DbCodec[R], DbCon[?]): R =
     val baseSql = s"SELECT $fn($colRepr) FROM ${meta.tableName}"
     val (whereSql, params, writer) = buildWhere
     QueryBuilderException.requireNonEmpty(
@@ -163,7 +166,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
     val d = DirectEagerDef(meta, rel, childMeta, childCodec, mergeEagerFilter(None, childMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T](rel: BelongsToMany[E, T, ?])(using
       targetMeta: TableMeta[T],
@@ -171,7 +174,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
     val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, mergeEagerFilter(None, targetMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T](rel: HasManyThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
@@ -190,7 +193,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       targetCodec,
       mergeEagerFilter(None, targetMeta, scoped)
     )
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T](rel: HasOneThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
@@ -209,7 +212,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       targetCodec,
       mergeEagerFilter(None, targetMeta, scoped)
     )
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   // --- Constrained withRelated ---
 
@@ -221,7 +224,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val relCols = new Columns[T](childMeta.columns).asInstanceOf[CT]
     val sq = new SubQuery[T, CT](childMeta, relCols)
     val d = DirectEagerDef(meta, rel, childMeta, childCodec, mergeEagerFilter(Some(f(sq)), childMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
       targetMeta: TableMeta[T],
@@ -231,7 +234,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
     val sq = new SubQuery[T, CT](targetMeta, relCols)
     val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, mergeEagerFilter(Some(f(sq)), targetMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
       targetMeta: TableMeta[T],
@@ -252,7 +255,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       targetCodec,
       mergeEagerFilter(Some(f(sq)), targetMeta, scoped)
     )
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
       targetMeta: TableMeta[T],
@@ -273,7 +276,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       targetCodec,
       mergeEagerFilter(Some(f(sq)), targetMeta, scoped)
     )
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   // --- withRelated for PivotRelation (delegates to underlying BelongsToMany) ---
 
@@ -283,7 +286,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
     val d = PivotEagerDef(meta, rel.underlying, targetMeta, targetCodec, mergeEagerFilter(None, targetMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   // --- withRelatedAndPivot ---
 
@@ -297,7 +300,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[(T, P)] *: EmptyTuple] =
     val d = PivotWithDataEagerDef(meta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, mergeEagerFilter(None, targetMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelatedAndPivot[T, P, CT <: Selectable, PCT <: Selectable](
       rel: PivotRelation[E, T, P, CT, PCT],
@@ -310,7 +313,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[(T, P)] *: EmptyTuple] =
     val d = PivotWithDataEagerDef(meta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, mergeEagerFilter(Some(pivotFilter), targetMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   // --- Composed (via) withRelated ---
 
@@ -323,7 +326,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
     val d = ComposedEagerDef(meta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, mergeEagerFilter(None, intermediateMeta, intermediateScoped), mergeEagerFilter(None, targetMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
       intermediateMeta: TableMeta[I],
@@ -336,7 +339,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
     val sq = new SubQuery[T, CT](targetMeta, relCols)
     val d = ComposedEagerDef(meta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, mergeEagerFilter(None, intermediateMeta, intermediateScoped), mergeEagerFilter(Some(f(sq)), targetMeta, scoped))
-    EagerQuery(build, codec, meta, Vector(d))
+    EagerQuery(buildWith, codec, meta, Vector(d))
 
   // --- withCount for HasMany ---
 
@@ -620,7 +623,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   ): String =
     ExistsBuilder.buildPivotCountSql(meta, rel, targetMeta)
 
-  def paginate(page: Int, perPage: Int)(using DbCon): OffsetPage[E] =
+  def paginate(page: Int, perPage: Int)(using DbCon[?]): OffsetPage[E] =
     if page < 1 then throw QueryBuilderException("page must be >= 1")
     if perPage < 1 then throw QueryBuilderException("perPage must be >= 1")
     val total = count()
@@ -655,7 +658,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     new KeysetPaginator(meta, codec, rootPredicate, perPage, entries, keyExtractor, keyToValues, None)
   end keysetPaginate
 
-  def chunk(batchSize: Int)(using DbCon): Iterator[Vector[E]] =
+  def chunk(batchSize: Int)(using DbCon[?]): Iterator[Vector[E]] =
     require(batchSize > 0, "batchSize must be positive")
     val startOffset = offsetOpt.getOrElse(0L)
     val maxRows = limitOpt.map(_.toLong).getOrElse(Long.MaxValue)
@@ -697,11 +700,11 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def update: QueryBuilder.UpdatePhase[E] =
     QueryBuilder.UpdatePhase(this)
 
-  def delete()(using DbCon): Int =
+  def delete()(using DbCon[?]): Int =
     val (whereSql, params, writer) = buildWhere
     Frag(s"DELETE FROM ${meta.tableName}$whereSql", params, writer).update.run()
 
-  def updateUnsafe(assignments: Frag)(using DbCon): Int =
+  def updateUnsafe(assignments: Frag)(using DbCon[?]): Int =
     val (whereSql, whereParams, whereWriter) = buildWhere
     val sql = s"UPDATE ${meta.tableName} SET ${assignments.sqlString}$whereSql"
     val allParams = assignments.params ++ whereParams
@@ -710,10 +713,10 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       whereWriter.write(ps, next)
     Frag(sql, allParams, combinedWriter).update.run()
 
-  def updateUnsafe(f: C => Frag)(using DbCon): Int =
+  def updateUnsafe(f: C => Frag)(using DbCon[?]): Int =
     updateUnsafe(f(cols))
 
-  def increment[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon): Int =
+  def increment[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon[?]): Int =
     val actual: A = amount match
       case None    => num.one
       case a: A    => a
@@ -723,7 +726,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       pos + codec.cols.length
     updateUnsafe(Frag(s"${col.queryRepr} = ${col.queryRepr} + ?", Seq(actual), writer))
 
-  def touch()(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon): Int =
+  def touch()(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon[?]): Int =
     val (whereSql, params, writer) = buildWhere
     Frag(
       s"UPDATE ${meta.tableName} SET ${hasUpdatedAt.column.sqlName} = CURRENT_TIMESTAMP$whereSql",
@@ -731,7 +734,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       writer
     ).update.run()
 
-  def decrement[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon): Int =
+  def decrement[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon[?]): Int =
     val actual: A = amount match
       case None    => num.one
       case a: A    => a
@@ -741,7 +744,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       pos + codec.cols.length
     updateUnsafe(Frag(s"${col.queryRepr} = ${col.queryRepr} - ?", Seq(amount), writer))
 
-  def debugPrintSql(using DbCon): this.type =
+  def debugPrintSql(using DbCon[?]): this.type =
     val frag = build
     DebugSql.printDebug(Vector(frag))
     this
@@ -1020,7 +1023,7 @@ object QueryBuilder:
   class UpdatePhase[E] private[magnum] (
       private[magnum] val qb: QueryBuilder[?, E, ?]
   ):
-    inline def apply[P](inline assignments: P)(using inline con: DbCon): Int =
+    inline def apply[P](inline assignments: P)(using inline con: DbCon[?]): Int =
       ${ updateImpl[E, P]('this, 'assignments, 'con) }
 
   // --- update() macro implementation ---
@@ -1028,7 +1031,7 @@ object QueryBuilder:
   private def updateImpl[E: Type, P: Type](
       phaseExpr: Expr[UpdatePhase[E]],
       assignments: Expr[P],
-      conExpr: Expr[DbCon]
+      conExpr: Expr[DbCon[?]]
   )(using Quotes): Expr[Int] =
     import quotes.reflect.*
 

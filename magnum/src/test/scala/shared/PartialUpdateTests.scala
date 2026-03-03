@@ -9,7 +9,7 @@ import java.util.UUID
 def partialUpdateTests(
     suite: FunSuite,
     dbType: DbType,
-    xa: () => Transactor
+    xa: () => Transactor[?]
 )(using
     munit.Location,
     DbCodec[UUID],

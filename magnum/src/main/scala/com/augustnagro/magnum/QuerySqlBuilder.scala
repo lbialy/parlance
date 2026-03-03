@@ -42,10 +42,8 @@ private[magnum] object QuerySqlBuilder:
           rawParts.foldLeft(pos)((p, f) => f.writer.write(ps, p))
       (sql, params, writer)
 
-  def buildLimitOffset(limitOpt: Option[Int], offsetOpt: Option[Long]): String =
-    val limitSql = limitOpt.fold("")(n => s" LIMIT $n")
-    val offsetSql = offsetOpt.fold("")(n => s" OFFSET $n")
-    limitSql + offsetSql
+  def buildLimitOffset(limitOpt: Option[Int], offsetOpt: Option[Long], dt: DatabaseType): String =
+    dt.renderLimitOffset(limitOpt, offsetOpt)
 
   def buildGroupBy(entries: Vector[ColRef[?]]): String =
     if entries.isEmpty then ""

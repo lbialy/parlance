@@ -32,11 +32,11 @@ open class ImmutableRepo[E, ID](
   protected def extractPk(entity: E): Any =
     entity.asInstanceOf[Product].productElement(pkIndex)
 
-  private def track(entity: E)(using con: DbCon): E =
+  private def track(entity: E)(using con: DbCon[?]): E =
     con.trackLoaded(meta.tableName, extractPk(entity), entity)
     entity
 
-  private def trackAll(entities: Vector[E])(using con: DbCon): Vector[E] =
+  private def trackAll(entities: Vector[E])(using con: DbCon[?]): Vector[E] =
     entities.foreach(e => con.trackLoaded(meta.tableName, extractPk(e), e))
     entities
 
@@ -65,17 +65,17 @@ open class ImmutableRepo[E, ID](
     ))
 
   /** Count of all entities */
-  def count(using DbCon): Long =
+  def count(using DbCon[?]): Long =
     if finalScopes.isEmpty then defaults.count
     else scopedQb.count()
 
   /** Returns true if an E exists with the given id */
-  def existsById(id: ID)(using DbCon): Boolean =
+  def existsById(id: ID)(using DbCon[?]): Boolean =
     if finalScopes.isEmpty then defaults.existsById(id)
     else scopedQb.where(pkEqualsFrag(id)).exists()
 
   /** Returns all entity values */
-  def findAll(using con: DbCon): Vector[E] =
+  def findAll(using con: DbCon[?]): Vector[E] =
     val results =
       if finalScopes.isEmpty then defaults.findAll
       else scopedQb.run()
@@ -83,11 +83,11 @@ open class ImmutableRepo[E, ID](
 
   /** Find all entities matching the specification. See the scaladoc of [[Spec]] for more details
     */
-  def findAll(spec: Spec[E])(using con: DbCon): Vector[E] =
+  def findAll(spec: Spec[E])(using con: DbCon[?]): Vector[E] =
     trackAll(defaults.findAll(spec))
 
   /** Returns Some(entity) if a matching E is found */
-  def findById(id: ID)(using con: DbCon): Option[E] =
+  def findById(id: ID)(using con: DbCon[?]): Option[E] =
     val result =
       if finalScopes.isEmpty then defaults.findById(id)
       else scopedQb.where(pkEqualsFrag(id)).first()
@@ -95,7 +95,7 @@ open class ImmutableRepo[E, ID](
 
   /** Find all entities having ids in the Iterable. If an Id is not found, no error is thrown.
     */
-  def findAllById(ids: Iterable[ID])(using con: DbCon): Vector[E] =
+  def findAllById(ids: Iterable[ID])(using con: DbCon[?]): Vector[E] =
     val results =
       if finalScopes.isEmpty then defaults.findAllById(ids)
       else if ids.isEmpty then Vector.empty
@@ -134,10 +134,10 @@ open class ImmutableRepo[E, ID](
     )
 
   /** Alias for findById */
-  def find(id: ID)(using DbCon): Option[E] = findById(id)
+  def find(id: ID)(using DbCon[?]): Option[E] = findById(id)
 
   /** Find by id or throw QueryBuilderException */
-  def findOrFail(id: ID)(using DbCon): E =
+  def findOrFail(id: ID)(using DbCon[?]): E =
     findById(id).getOrElse(
       throw QueryBuilderException(s"Entity not found for id: $id")
     )

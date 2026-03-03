@@ -148,7 +148,7 @@ class WithCountTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .withCount(authorBooks)
-      .build
+      .buildWith(H2)
     assert(
       frag.sqlString.contains("(SELECT COUNT(*)"),
       s"SQL should contain COUNT subquery: ${frag.sqlString}"
@@ -162,7 +162,7 @@ class WithCountTests extends QbTestBase:
     val frag = QueryBuilder
       .from[PvUser]
       .withCount(userRoles)
-      .build
+      .buildWith(H2)
     assert(
       frag.sqlString.contains("(SELECT COUNT(*)"),
       s"SQL should contain COUNT subquery: ${frag.sqlString}"
@@ -176,7 +176,7 @@ class WithCountTests extends QbTestBase:
     val frag = QueryBuilder
       .from[PvUser]
       .withCount(userRoles)(_.name === "admin")
-      .build
+      .buildWith(H2)
     assert(
       frag.sqlString.contains("JOIN pv_role"),
       s"SQL should contain JOIN to target table: ${frag.sqlString}"

@@ -159,7 +159,7 @@ class ViaTests extends QbTestBase:
     val eq = QueryBuilder
       .from[ViaPost]
       .withRelated(contactsViaPostAuthor)
-    val queries = eq.buildQueries
+    val queries = eq.buildQueriesWith(H2)
     // root + intermediate query + target query = 3
     assertEquals(queries.size, 3)
 

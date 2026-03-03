@@ -5,4 +5,4 @@ import scala.util.Using
 
 /** Represents a transactional [[DbCon]]
   */
-class DbTx private[magnum] (connection: Connection, sqlLogger: SqlLogger) extends DbCon(connection, sqlLogger)
+class DbTx[D <: DatabaseType] private[magnum] (connection: Connection, sqlLogger: SqlLogger, databaseType: D) extends DbCon[D](connection, sqlLogger, databaseType)

@@ -1,4 +1,4 @@
-import com.augustnagro.magnum.Transactor
+import com.augustnagro.magnum.{H2, Transactor}
 import munit.{FunSuite, Tag}
 import org.h2.jdbcx.JdbcDataSource
 
@@ -17,7 +17,7 @@ trait QbTestBase extends FunSuite:
 
   def h2Ddls: Seq[String]
 
-  def xa(): Transactor =
+  def xa(): Transactor[H2.type] =
     val ds = JdbcDataSource()
     ds.setURL("jdbc:h2:" + h2DbPath)
     ds.setUser("sa")
@@ -31,6 +31,6 @@ trait QbTestBase extends FunSuite:
         )
         stmt.execute(ddl)
 
-    Transactor(ds)
+    Transactor(H2, ds)
 
 end QbTestBase

@@ -6,7 +6,7 @@ import munit.{FunSuite, Location}
 import java.sql.{PreparedStatement, ResultSet}
 import java.time.OffsetDateTime
 
-def tupleTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def tupleTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     Location,
     DbCodec[OffsetDateTime]
 ): Unit =

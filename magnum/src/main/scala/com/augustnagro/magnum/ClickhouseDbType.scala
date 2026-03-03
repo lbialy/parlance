@@ -54,29 +54,29 @@ object ClickhouseDbType extends DbType:
       pos + idCodec.cols.length
 
     new RepoDefaults[EC, E, ID]:
-      def count(using con: DbCon): Long = countQuery.run().head
+      def count(using con: DbCon[?]): Long = countQuery.run().head
 
-      def existsById(id: ID)(using DbCon): Boolean =
+      def existsById(id: ID)(using DbCon[?]): Boolean =
         Frag(existsByIdSql, IArray(id), idWriter(id))
           .query[Int]
           .run()
           .nonEmpty
 
-      def findAll(using DbCon): Vector[E] = findAllQuery.run()
+      def findAll(using DbCon[?]): Vector[E] = findAllQuery.run()
 
-      def findAll(spec: Spec[E])(using DbCon): Vector[E] =
+      def findAll(spec: Spec[E])(using DbCon[?]): Vector[E] =
         SpecImpl.Default.findAll(spec, tableNameSql)
 
-      def findById(id: ID)(using DbCon): Option[E] =
+      def findById(id: ID)(using DbCon[?]): Option[E] =
         Frag(findByIdSql, IArray(id), idWriter(id))
           .query[E]
           .run()
           .headOption
 
-      def findAllById(ids: Iterable[ID])(using DbCon): Vector[E] =
+      def findAllById(ids: Iterable[ID])(using DbCon[?]): Vector[E] =
         throw UnsupportedOperationException()
 
-      def delete(entity: E)(using DbCon): Unit =
+      def delete(entity: E)(using DbCon[?]): Unit =
         deleteById(
           entity
             .asInstanceOf[Product]
@@ -84,39 +84,39 @@ object ClickhouseDbType extends DbType:
             .asInstanceOf[ID]
         )
 
-      def deleteById(id: ID)(using DbCon): Unit =
+      def deleteById(id: ID)(using DbCon[?]): Unit =
         Frag(deleteByIdSql, IArray(id), idWriter(id)).update
           .run()
 
-      def truncate()(using DbCon): Unit =
+      def truncate()(using DbCon[?]): Unit =
         truncateUpdate.run()
 
-      def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
+      def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
         deleteAllById(
           entities.map(e => e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID])
         )
 
       def deleteAllById(ids: Iterable[ID])(using
-          con: DbCon
+          con: DbCon[?]
       ): BatchUpdateResult =
         handleQuery(deleteByIdSql, ids):
           Using(con.connection.prepareStatement(deleteByIdSql)): ps =>
             idCodec.write(ids, ps)
             timed(batchUpdateResult(ps.executeBatch()))
 
-      def insert(entityCreator: EC)(using con: DbCon): Unit =
+      def insert(entityCreator: EC)(using con: DbCon[?]): Unit =
         handleQuery(insertSql, entityCreator):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)
             timed(ps.executeUpdate())
 
-      def insertAll(entityCreators: Iterable[EC])(using con: DbCon): Unit =
+      def insertAll(entityCreators: Iterable[EC])(using con: DbCon[?]): Unit =
         handleQuery(insertSql, entityCreators):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.write(entityCreators, ps)
             timed(batchUpdateResult(ps.executeBatch()))
 
-      def insertReturning(entityCreator: EC)(using con: DbCon): E =
+      def insertReturning(entityCreator: EC)(using con: DbCon[?]): E =
         handleQuery(insertSql, entityCreator):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)
@@ -126,7 +126,7 @@ object ClickhouseDbType extends DbType:
 
       def insertAllReturning(
           entityCreators: Iterable[EC]
-      )(using con: DbCon): Vector[E] =
+      )(using con: DbCon[?]): Vector[E] =
         handleQuery(insertSql, entityCreators):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.write(entityCreators, ps)
@@ -134,27 +134,27 @@ object ClickhouseDbType extends DbType:
               batchUpdateResult(ps.executeBatch())
               entityCreators.toVector.asInstanceOf[Vector[E]]
 
-      def update(entity: E)(using DbCon): Unit =
+      def update(entity: E)(using DbCon[?]): Unit =
         throw UnsupportedOperationException()
 
-      def updatePartial(original: E, current: E)(using DbCon): Unit =
+      def updatePartial(original: E, current: E)(using DbCon[?]): Unit =
         throw UnsupportedOperationException()
 
       def updateAll(entities: Iterable[E])(using
-          con: DbCon
+          con: DbCon[?]
       ): BatchUpdateResult =
         throw UnsupportedOperationException()
 
-      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon): Unit =
+      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[?]): Unit =
         throw UnsupportedOperationException("insertOnConflict is not supported for ClickHouse")
 
-      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon): Unit =
+      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon[?]): Unit =
         throw UnsupportedOperationException("insertOnConflictUpdateAll is not supported for ClickHouse")
 
-      def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon): Int =
+      def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon[?]): Int =
         throw UnsupportedOperationException("insertAllIgnoring is not supported for ClickHouse")
 
-      def upsertByPk(entity: E)(using DbCon): Unit =
+      def upsertByPk(entity: E)(using DbCon[?]): Unit =
         throw UnsupportedOperationException("upsertByPk is not supported for ClickHouse")
 
     end new

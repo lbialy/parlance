@@ -83,26 +83,26 @@ object PostgresDbType extends DbType:
       pos + idCodec.cols.length
 
     new RepoDefaults[EC, E, ID]:
-      def count(using con: DbCon): Long = countQuery.run().head
+      def count(using con: DbCon[?]): Long = countQuery.run().head
 
-      def existsById(id: ID)(using DbCon): Boolean =
+      def existsById(id: ID)(using DbCon[?]): Boolean =
         Frag(existsByIdSql, IArray(id), idWriter(id))
           .query[Int]
           .run()
           .nonEmpty
 
-      def findAll(using DbCon): Vector[E] = findAllQuery.run()
+      def findAll(using DbCon[?]): Vector[E] = findAllQuery.run()
 
-      def findAll(spec: Spec[E])(using DbCon): Vector[E] =
+      def findAll(spec: Spec[E])(using DbCon[?]): Vector[E] =
         SpecImpl.Default.findAll(spec, tableNameSql)
 
-      def findById(id: ID)(using DbCon): Option[E] =
+      def findById(id: ID)(using DbCon[?]): Option[E] =
         Frag(findByIdSql, IArray(id), idWriter(id))
           .query[E]
           .run()
           .headOption
 
-      def findAllById(ids: Iterable[ID])(using DbCon): Vector[E] =
+      def findAllById(ids: Iterable[ID])(using DbCon[?]): Vector[E] =
         if compositeId then
           throw UnsupportedOperationException(
             "Composite ids unsupported for findAllById."
@@ -118,7 +118,7 @@ object PostgresDbType extends DbType:
             pos + 1
         ).query[E].run()
 
-      def delete(entity: E)(using DbCon): Unit =
+      def delete(entity: E)(using DbCon[?]): Unit =
         deleteById(
           entity
             .asInstanceOf[Product]
@@ -126,39 +126,39 @@ object PostgresDbType extends DbType:
             .asInstanceOf[ID]
         )
 
-      def deleteById(id: ID)(using DbCon): Unit =
+      def deleteById(id: ID)(using DbCon[?]): Unit =
         Frag(deleteByIdSql, IArray(id), idWriter(id)).update
           .run()
 
-      def truncate()(using DbCon): Unit =
+      def truncate()(using DbCon[?]): Unit =
         truncateUpdate.run()
 
-      def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
+      def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
         deleteAllById(
           entities.map(e => e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID])
         )
 
       def deleteAllById(ids: Iterable[ID])(using
-          con: DbCon
+          con: DbCon[?]
       ): BatchUpdateResult =
         handleQuery(deleteByIdSql, ids):
           Using(con.connection.prepareStatement(deleteByIdSql)): ps =>
             idCodec.write(ids, ps)
             timed(batchUpdateResult(ps.executeBatch()))
 
-      def insert(entityCreator: EC)(using con: DbCon): Unit =
+      def insert(entityCreator: EC)(using con: DbCon[?]): Unit =
         handleQuery(insertSql, entityCreator):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)
             timed(ps.executeUpdate())
 
-      def insertAll(entityCreators: Iterable[EC])(using con: DbCon): Unit =
+      def insertAll(entityCreators: Iterable[EC])(using con: DbCon[?]): Unit =
         handleQuery(insertSql, entityCreators):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.write(entityCreators, ps)
             timed(batchUpdateResult(ps.executeBatch()))
 
-      def insertReturning(entityCreator: EC)(using con: DbCon): E =
+      def insertReturning(entityCreator: EC)(using con: DbCon[?]): E =
         handleQuery(insertSql, entityCreator):
           Using.Manager: use =>
             val ps = use(
@@ -174,7 +174,7 @@ object PostgresDbType extends DbType:
 
       def insertAllReturning(
           entityCreators: Iterable[EC]
-      )(using con: DbCon): Vector[E] =
+      )(using con: DbCon[?]): Vector[E] =
         handleQuery(insertSql, entityCreators):
           Using.Manager: use =>
             val ps = use(
@@ -187,7 +187,7 @@ object PostgresDbType extends DbType:
               val rs = use(ps.getGeneratedKeys)
               eCodec.read(rs)
 
-      def update(entity: E)(using con: DbCon): Unit =
+      def update(entity: E)(using con: DbCon[?]): Unit =
         handleQuery(updateSql, entity):
           Using(con.connection.prepareStatement(updateSql)): ps =>
             val entityValues: Vector[Any] = entity
@@ -205,7 +205,7 @@ object PostgresDbType extends DbType:
               pos += codec.cols.length
             timed(ps.executeUpdate())
 
-      def updatePartial(original: E, current: E)(using con: DbCon): Unit =
+      def updatePartial(original: E, current: E)(using con: DbCon[?]): Unit =
         val origProduct = original.asInstanceOf[Product]
         val currProduct = current.asInstanceOf[Product]
 
@@ -246,7 +246,7 @@ object PostgresDbType extends DbType:
       end updatePartial
 
       def updateAll(entities: Iterable[E])(using
-          con: DbCon
+          con: DbCon[?]
       ): BatchUpdateResult =
         handleQuery(updateSql, entities):
           Using(con.connection.prepareStatement(updateSql)): ps =>
@@ -267,7 +267,7 @@ object PostgresDbType extends DbType:
               ps.addBatch()
 
             timed(batchUpdateResult(ps.executeBatch()))
-      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon): Unit =
+      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon[?]): Unit =
         val conflictClause = target match
           case ConflictTarget.Columns(cols*) =>
             if cols.isEmpty then "ON CONFLICT"
@@ -291,7 +291,7 @@ object PostgresDbType extends DbType:
             fragWriter.write(ps, 1 + ecCodec.cols.length)
             timed(ps.executeUpdate())
 
-      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using con: DbCon): Unit =
+      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using con: DbCon[?]): Unit =
         val conflictClause = target match
           case ConflictTarget.Columns(cols*) =>
             if cols.isEmpty then "ON CONFLICT"
@@ -305,7 +305,7 @@ object PostgresDbType extends DbType:
             ecCodec.writeSingle(entityCreator, ps)
             timed(ps.executeUpdate())
 
-      def insertAllIgnoring(entityCreators: Iterable[EC])(using con: DbCon): Int =
+      def insertAllIgnoring(entityCreators: Iterable[EC])(using con: DbCon[?]): Int =
         handleQuery(insertIgnoringSql, entityCreators):
           Using(con.connection.prepareStatement(insertIgnoringSql)): ps =>
             ecCodec.write(entityCreators, ps)
@@ -313,7 +313,7 @@ object PostgresDbType extends DbType:
               val results = ps.executeBatch()
               results.count(_ > 0)
 
-      def upsertByPk(entity: E)(using con: DbCon): Unit =
+      def upsertByPk(entity: E)(using con: DbCon[?]): Unit =
         handleQuery(upsertByPkSql, entity):
           Using(con.connection.prepareStatement(upsertByPkSql)): ps =>
             eCodec.writeSingle(entity, ps)

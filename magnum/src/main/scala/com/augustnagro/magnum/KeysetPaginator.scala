@@ -17,7 +17,7 @@ class KeysetPaginator[E, K] private[magnum] (
   def afterOpt(key: Option[K]): KeysetPaginator[E, K] =
     new KeysetPaginator(meta, entityCodec, rootPredicate, perPage, entries, keyExtractor, keyToValues, key)
 
-  def run()(using DbCon): KeysetPage[E, K] =
+  def run()(using con: DbCon[?]): KeysetPage[E, K] =
     val selectCols = meta.columns.map(_.sqlName).mkString(", ")
     val baseSql = s"SELECT $selectCols FROM ${meta.tableName}"
 
@@ -37,7 +37,7 @@ class KeysetPaginator[E, K] private[magnum] (
       entries.map(e => (e.colRef, e.sortOrder, e.nullOrder))
     )
 
-    val limitSql = s" LIMIT ${perPage + 1}"
+    val limitSql = QuerySqlBuilder.buildLimitOffset(Some(perPage + 1), None, con.databaseType)
 
     val fullSql = baseSql + whereSql + orderBySql + limitSql
     val frag = Frag(fullSql, whereParams, whereWriter)

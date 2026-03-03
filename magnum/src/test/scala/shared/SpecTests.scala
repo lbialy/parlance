@@ -12,7 +12,7 @@ object CarId:
   given DbCodec[CarId] =
     DbCodec.LongCodec.biMap(CarId.apply, _.value)
 
-def specTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def specTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     Location,
     DbCodec[OffsetDateTime]
 ): Unit =

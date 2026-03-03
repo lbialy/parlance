@@ -17,11 +17,11 @@ class PivotRelation[S, T, P, +CT <: Selectable, +PCT <: Selectable](
   def detach(source: S, targets: T*)(using
       sm: EntityMeta[S],
       tm: EntityMeta[T],
-      con: DbCon
+      con: DbCon[?]
   ): Int =
     BelongsToManyOps.detachImpl(underlying, source, targets, sm, tm, con)
 
-  def detachAll(source: S)(using sm: EntityMeta[S], con: DbCon): Int =
+  def detachAll(source: S)(using sm: EntityMeta[S], con: DbCon[?]): Int =
     BelongsToManyOps.detachAllImpl(underlying, source, sm, con)
 
 /** Writable pivot relation — supports attach with typed creator.
@@ -33,10 +33,10 @@ class WritablePivotRelation[S, T, P, PC, +CT <: Selectable, +PCT <: Selectable](
     val creatorCodec: DbCodec[PC]
 ) extends PivotRelation[S, T, P, CT, PCT](underlying, pivotMeta):
 
-  def attach(creator: PC)(using con: DbCon): Unit =
+  def attach(creator: PC)(using con: DbCon[?]): Unit =
     attachAll(List(creator))
 
-  def attachAll(creators: Iterable[PC])(using con: DbCon): Unit =
+  def attachAll(creators: Iterable[PC])(using con: DbCon[?]): Unit =
     if creators.isEmpty then return
     val allCols = pivotMeta.columns.map(_.sqlName).mkString(", ")
     val placeholders = pivotMeta.columns.map(_ => "?").mkString(", ")
@@ -50,7 +50,7 @@ class WritablePivotRelation[S, T, P, PC, +CT <: Selectable, +PCT <: Selectable](
   def sync(source: S, targets: Iterable[T], creator: T => PC)(using
       sm: EntityMeta[S],
       tm: EntityMeta[T],
-      con: DbCon
+      con: DbCon[?]
   ): SyncResult =
     val rel = underlying
     val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
@@ -97,24 +97,24 @@ extension [S, T, CT <: Selectable](rel: BelongsToMany[S, T, CT])
   def attach(source: S, targets: T*)(using
       sm: EntityMeta[S],
       tm: EntityMeta[T],
-      con: DbCon
+      con: DbCon[?]
   ): Int =
     BelongsToManyOps.attachImpl(rel, source, targets, sm, tm, con)
 
   def detach(source: S, targets: T*)(using
       sm: EntityMeta[S],
       tm: EntityMeta[T],
-      con: DbCon
+      con: DbCon[?]
   ): Int =
     BelongsToManyOps.detachImpl(rel, source, targets, sm, tm, con)
 
-  def detachAll(source: S)(using sm: EntityMeta[S], con: DbCon): Int =
+  def detachAll(source: S)(using sm: EntityMeta[S], con: DbCon[?]): Int =
     BelongsToManyOps.detachAllImpl(rel, source, sm, con)
 
   def sync(source: S, targets: Iterable[T])(using
       sm: EntityMeta[S],
       tm: EntityMeta[T],
-      con: DbCon
+      con: DbCon[?]
   ): SyncResult =
     BelongsToManyOps.syncImpl(rel, source, targets, sm, tm, con)
 
@@ -151,7 +151,7 @@ private[magnum] object BelongsToManyOps:
       targets: Seq[T],
       sm: EntityMeta[S],
       tm: EntityMeta[T],
-      con: DbCon
+      con: DbCon[?]
   ): Int =
     if targets.isEmpty then return 0
     val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
@@ -172,7 +172,7 @@ private[magnum] object BelongsToManyOps:
       targets: Seq[T],
       sm: EntityMeta[S],
       tm: EntityMeta[T],
-      con: DbCon
+      con: DbCon[?]
   ): Int =
     if targets.isEmpty then return 0
     val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
@@ -185,7 +185,7 @@ private[magnum] object BelongsToManyOps:
       rel: BelongsToMany[?, ?, ?],
       sourceKey: Any,
       targetKeys: Vector[Any],
-      con: DbCon
+      con: DbCon[?]
   ): Int =
     if targetKeys.isEmpty then return 0
     val placeholders = targetKeys.map(_ => "?").mkString(", ")
@@ -200,7 +200,7 @@ private[magnum] object BelongsToManyOps:
       rel: BelongsToMany[S, ?, ?],
       source: S,
       sm: EntityMeta[S],
-      con: DbCon
+      con: DbCon[?]
   ): Int =
     val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
     val sourceKey = source.asInstanceOf[Product].productElement(sourcePkIdx)
@@ -212,7 +212,7 @@ private[magnum] object BelongsToManyOps:
   def fetchTargetKeys(
       rel: BelongsToMany[?, ?, ?],
       sourceKey: Any,
-      con: DbCon
+      con: DbCon[?]
   ): Vector[Any] =
     val sql = s"SELECT ${rel.targetFk} FROM ${rel.pivotTable} WHERE ${rel.sourceFk} = ?"
     val keys = Vector.newBuilder[Any]
@@ -228,7 +228,7 @@ private[magnum] object BelongsToManyOps:
       targets: Iterable[T],
       sm: EntityMeta[S],
       tm: EntityMeta[T],
-      con: DbCon
+      con: DbCon[?]
   ): SyncResult =
     val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
     val targetPkIdx = tm.columns.indexWhere(_.scalaName == rel.targetPk.scalaName)

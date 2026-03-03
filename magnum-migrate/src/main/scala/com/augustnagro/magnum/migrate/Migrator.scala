@@ -1,6 +1,6 @@
 package com.augustnagro.magnum.migrate
 
-import com.augustnagro.magnum.{DbCon, DbTx, Transactor}
+import com.augustnagro.magnum.{DbCon, DbTx, Transactor, DatabaseType}
 
 import java.sql.{PreparedStatement, ResultSet, Statement, Timestamp}
 import java.time.Instant
@@ -8,7 +8,7 @@ import scala.util.Using
 
 class Migrator(
     migrations: List[MigrationDef],
-    xa: Transactor,
+    xa: Transactor[?],
     compiler: MigrationCompiler = PostgresCompiler,
     tableName: String = "_parabellum_migrations"
 ):
@@ -185,13 +185,13 @@ class Migrator(
   private def migrationKey(m: MigrationDef): String =
     s"${m.version}_${m.name}"
 
-  private def ensureTrackingTable()(using con: DbCon): Unit =
+  private def ensureTrackingTable()(using con: DbCon[?]): Unit =
     val sqls = compiler.compile(trackingTableDDL)
     val conn = con.connection
     Using.resource(conn.createStatement()): stmt =>
       sqls.foreach(stmt.execute(_))
 
-  private def trackingTableExists()(using con: DbCon): Boolean =
+  private def trackingTableExists()(using con: DbCon[?]): Boolean =
     val conn = con.connection
     Using.resource(
       conn.prepareStatement(
@@ -203,7 +203,7 @@ class Migrator(
         rs.next()
         rs.getInt(1) > 0
 
-  private def loadApplied()(using con: DbCon): List[AppliedMigration] =
+  private def loadApplied()(using con: DbCon[?]): List[AppliedMigration] =
     val conn = con.connection
     Using.resource(conn.createStatement()): stmt =>
       Using.resource(
@@ -222,7 +222,7 @@ class Migrator(
         buf.result()
 
   private def insertApplied(key: String, batch: Int)(using
-      con: DbCon
+      con: DbCon[?]
   ): AppliedMigration =
     val conn = con.connection
     val now = Instant.now()
@@ -245,7 +245,7 @@ class Migrator(
           appliedAt = now
         )
 
-  private def deleteApplied(id: Int)(using con: DbCon): Unit =
+  private def deleteApplied(id: Int)(using con: DbCon[?]): Unit =
     val conn = con.connection
     Using.resource(
       conn.prepareStatement(s"DELETE FROM $tableName WHERE id = ?")
@@ -253,7 +253,7 @@ class Migrator(
       ps.setInt(1, id)
       ps.executeUpdate()
 
-  private def executeMigration(m: Migration)(using con: DbCon): Unit =
+  private def executeMigration(m: Migration)(using con: DbCon[?]): Unit =
     val conn = con.connection
     m match
       case Migration.RawParameterized(sql, params) =>
@@ -269,13 +269,13 @@ class Migrator(
   private def rollbackBatchInternal(
       applied: List[AppliedMigration],
       batch: Int
-  )(using tx: DbTx): RollbackResult =
+  )(using tx: DbTx[?]): RollbackResult =
     val batchRecords =
       applied.filter(_.batch == batch).sortBy(_.id).reverse
     doRollback(batchRecords)
 
   private def doRollback(records: List[AppliedMigration])(using
-      tx: DbTx
+      tx: DbTx[?]
   ): RollbackResult =
     val migrationsByKey =
       sortedMigrations.map(m => migrationKey(m) -> m).toMap

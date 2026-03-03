@@ -10,17 +10,17 @@ class Returning[E] private[magnum] (
     reader: DbCodec[E],
     keyColumns: Iterable[String]
 ):
-  def run()(using con: DbCon): Vector[E] =
+  def run()(using con: DbCon[?]): Vector[E] =
     withResultSet(reader.read)
 
   /** Streaming [[Iterator]]. Set [[fetchSize]] to give the JDBC driver a hint as to how many rows to fetch per request
     */
   def iterator(
       fetchSize: Int = 0
-  )(using con: DbCon, use: Manager): Iterator[E] =
+  )(using con: DbCon[?], use: Manager): Iterator[E] =
     withResultSet(ResultSetIterator(_, frag, reader, con.sqlLogger))
 
-  private def withResultSet[A](f: ResultSet => A)(using con: DbCon): A =
+  private def withResultSet[A](f: ResultSet => A)(using con: DbCon[?]): A =
     handleQuery(frag.sqlString, frag.params):
       Manager: use =>
         if keyColumns.isEmpty then

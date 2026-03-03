@@ -53,7 +53,10 @@ class ProjectedQuery[P, PC](
   def distinct: ProjectedQuery[P, PC] =
     new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, havingPredicate, orderEntries, limitOpt, offsetOpt, true)
 
-  def build: Frag =
+  def build(using con: DbCon[?]): Frag =
+    buildWith(con.databaseType)
+
+  def buildWith(dt: DatabaseType): Frag =
     val selectClause = selectExprs.map(e => s"${e.queryRepr} AS ${e.alias}").mkString(", ")
     val keyword = if distinctFlag then "SELECT DISTINCT" else "SELECT"
     val baseSql = s"$keyword $selectClause $fromClause"
@@ -62,7 +65,7 @@ class ProjectedQuery[P, PC](
     val groupBySql = QuerySqlBuilder.buildGroupBy(groupByExprs)
     val (havingSql, havingParams, havingWriter) = QuerySqlBuilder.buildHaving(havingPredicate)
     val (orderBySql, orderByParams, orderByWriter) = QuerySqlBuilder.buildOrderBy(orderEntries)
-    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
+    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt, dt)
 
     val allParams = fromParams ++ whereParams ++ havingParams ++ orderByParams
     val combinedWriter: FragWriter = (ps, pos) =>
@@ -73,13 +76,13 @@ class ProjectedQuery[P, PC](
 
     Frag(baseSql + whereSql + groupBySql + havingSql + orderBySql + limitOffsetSql, allParams, combinedWriter)
 
-  def run()(using DbCon): Vector[P] =
+  def run()(using DbCon[?]): Vector[P] =
     build.query[P](using resultCodec).run()
 
-  def first()(using DbCon): Option[P] =
+  def first()(using DbCon[?]): Option[P] =
     limit(1).run().headOption
 
-  def firstOrFail()(using DbCon): P =
+  def firstOrFail()(using DbCon[?]): P =
     first().getOrElse(
       throw QueryBuilderException(
         s"No projection found matching query"

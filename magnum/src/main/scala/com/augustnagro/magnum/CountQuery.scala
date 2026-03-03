@@ -13,7 +13,10 @@ class CountQuery[E] private[magnum] (
     private val countBaseWriter: FragWriter = FragWriter.empty
 ):
 
-  def build: Frag =
+  def build(using con: DbCon[?]): Frag =
+    buildWith(con.databaseType)
+
+  def buildWith(dt: DatabaseType): Frag =
     val selectCols = meta.columns.map(_.sqlName).mkString(", ")
 
     val countSql = countCondition match
@@ -24,7 +27,7 @@ class CountQuery[E] private[magnum] (
 
     val (whereSql, whereParams, whereWriter) = QuerySqlBuilder.buildWhere(rootPredicate)
     val (orderBySql, _, _) = QuerySqlBuilder.buildOrderBy(orderEntries)
-    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
+    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt, dt)
 
     val fullSql = baseSql + whereSql + orderBySql + limitOffsetSql
 
@@ -40,20 +43,29 @@ class CountQuery[E] private[magnum] (
       whereWriter.write(ps, afterCount)
 
     Frag(fullSql, combinedParams, combinedWriter)
-  end build
+  end buildWith
 
-  def run()(using DbCon): Vector[(E, Long)] =
+  def run()(using DbCon[?]): Vector[(E, Long)] =
     given DbCodec[E] = rootCodec
     build.query[(E, Long)].run()
 
-  def first()(using DbCon): Option[(E, Long)] =
+  def first()(using DbCon[?]): Option[(E, Long)] =
     given DbCodec[E] = rootCodec
     val q = new CountQuery(meta, rootCodec, countSubquerySql, countCondition, rootPredicate, orderEntries, Some(1), offsetOpt, countBaseParams, countBaseWriter)
     q.build.query[(E, Long)].run().headOption
 
-  def buildQueries: Vector[Frag] = Vector(build)
+  def firstOrFail()(using DbCon[?]): (E, Long) =
+    first().getOrElse(
+      throw QueryBuilderException(
+        s"No ${meta.tableName} found matching query"
+      )
+    )
 
-  def debugPrintSql(using DbCon): this.type =
+  def buildQueries(using DbCon[?]): Vector[Frag] = Vector(build)
+
+  def buildQueriesWith(dt: DatabaseType): Vector[Frag] = Vector(buildWith(dt))
+
+  def debugPrintSql(using DbCon[?]): this.type =
     DebugSql.printDebug(buildQueries)
     this
 

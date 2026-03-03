@@ -7,7 +7,7 @@ private def extractPkValue(entity: Any, meta: TableMeta[?]): Any =
   entity.asInstanceOf[Product].productElement(pkIndex(meta))
 
 // --- Group 1: Core lifecycle ---
-extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon)
+extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[?])
   def save(): Unit = repo.save(entity)
   def delete(): Unit = repo.delete(entity)
   def refresh(): E = repo.refresh(entity)
@@ -20,7 +20,7 @@ extension [E](entity: E)(using meta: TableMeta[E])
     extractPkValue(entity, meta) != extractPkValue(other, meta)
 
 // --- Group 3: Change tracking ---
-extension [E](entity: E)(using meta: TableMeta[E], con: DbCon)
+extension [E](entity: E)(using meta: TableMeta[E], con: DbCon[?])
   def isDirty: Boolean =
     con.getOriginal(meta.tableName, extractPkValue(entity, meta)) match
       case Some(original) =>
@@ -55,7 +55,7 @@ end extension
 // --- Group 4: SoftDeletes extensions ---
 extension [EC, E, ID](entity: E)(using
     repo: Repo[EC, E, ID] & SoftDeletes[EC, E, ID],
-    con: DbCon
+    con: DbCon[?]
 )
   def forceDelete(): Unit = repo.forceDelete(entity)
   def restore(): Unit = repo.restore(entity)

@@ -182,7 +182,7 @@ class ThroughTests extends QbTestBase:
     val tq = QueryBuilder
       .from[ThCountry]
       .withRelated(countryPosts)
-    val queries = tq.buildQueries
+    val queries = tq.buildQueriesWith(H2)
     assertEquals(queries.size, 3)
     assert(queries(0).sqlString.contains("SELECT"), "Root should be a SELECT")
     assert(!queries(0).sqlString.contains("JOIN"), "Root should not contain JOIN")
@@ -195,7 +195,7 @@ class ThroughTests extends QbTestBase:
     val tq = QueryBuilder
       .from[ThMechanic]
       .withRelated(mechanicOwner)
-    val queries = tq.buildQueries
+    val queries = tq.buildQueriesWith(H2)
     assertEquals(queries.size, 3)
     assert(queries(0).sqlString.contains("SELECT"), "Root should be a SELECT")
     assert(queries(1).sqlString.contains("mechanic_id"), "Intermediate query should reference sourceFk")

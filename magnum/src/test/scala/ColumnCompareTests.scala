@@ -13,7 +13,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA === c.scoreB)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a = score_b"
@@ -24,7 +24,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA !== c.scoreB)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a <> score_b"
@@ -34,7 +34,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA > c.scoreB)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a > score_b"
@@ -44,7 +44,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA < c.scoreB)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a < score_b"
@@ -54,7 +54,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA >= c.scoreB)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a >= score_b"
@@ -64,7 +64,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA <= c.scoreB)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a <= score_b"

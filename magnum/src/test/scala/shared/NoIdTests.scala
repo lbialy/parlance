@@ -5,7 +5,7 @@ import munit.{FunSuite, Location}
 
 import java.time.OffsetDateTime
 
-def noIdTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def noIdTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     Location,
     DbCodec[OffsetDateTime]
 ): Unit =

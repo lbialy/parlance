@@ -19,55 +19,55 @@ open class Repo[EC, E, ID](
 ) extends ImmutableRepo[E, ID](injectedScopes):
 
   /** Deletes an entity using its id */
-  def delete(entity: E)(using DbCon): Unit = defaults.delete(entity)
+  def delete(entity: E)(using DbCon[?]): Unit = defaults.delete(entity)
 
   /** Deletes an entity using its id */
-  def deleteById(id: ID)(using DbCon): Unit = defaults.deleteById(id)
+  def deleteById(id: ID)(using DbCon[?]): Unit = defaults.deleteById(id)
 
   /** Deletes ALL entities */
-  def truncate()(using DbCon): Unit = defaults.truncate()
+  def truncate()(using DbCon[?]): Unit = defaults.truncate()
 
   /** Delete all provided entities */
-  def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
+  def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
     defaults.deleteAll(entities)
 
   /** Deletes all entities with an Iterable of ids */
-  def deleteAllById(ids: Iterable[ID])(using DbCon): BatchUpdateResult =
+  def deleteAllById(ids: Iterable[ID])(using DbCon[?]): BatchUpdateResult =
     defaults.deleteAllById(ids)
 
   /** Insert and return entity E */
-  def insert(entityCreator: EC)(using DbCon): Unit =
+  def insert(entityCreator: EC)(using DbCon[?]): Unit =
     defaults.insert(entityCreator)
 
   /** Insert and return all new entities */
-  def insertAll(entityCreators: Iterable[EC])(using DbCon): Unit =
+  def insertAll(entityCreators: Iterable[EC])(using DbCon[?]): Unit =
     defaults.insertAll(entityCreators)
 
-  def insertReturning(entityCreator: EC)(using con: DbCon): E =
+  def insertReturning(entityCreator: EC)(using con: DbCon[?]): E =
     val result = defaults.insertReturning(entityCreator)
     con.trackLoaded(meta.tableName, extractPk(result), result)
     result
 
   def insertAllReturning(
       entityCreators: Iterable[EC]
-  )(using con: DbCon): Vector[E] =
+  )(using con: DbCon[?]): Vector[E] =
     val results = defaults.insertAllReturning(entityCreators)
     results.foreach(e => con.trackLoaded(meta.tableName, extractPk(e), e))
     results
 
   /** Update the entity */
-  def update(entity: E)(using DbCon): Unit = defaults.update(entity)
+  def update(entity: E)(using DbCon[?]): Unit = defaults.update(entity)
 
   /** Update all entities */
-  def updateAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
+  def updateAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
     defaults.updateAll(entities)
 
   /** Update only the changed fields between original and current entity */
-  def updatePartial(original: E, current: E)(using DbCon): Unit =
+  def updatePartial(original: E, current: E)(using DbCon[?]): Unit =
     defaults.updatePartial(original, current)
 
   /** Save entity: partial update if tracked, upsert otherwise. */
-  def save(entity: E)(using con: DbCon): Unit =
+  def save(entity: E)(using con: DbCon[?]): Unit =
     val pkValue = extractPk(entity)
     con.getOriginal(meta.tableName, pkValue) match
       case Some(original) =>
@@ -76,19 +76,19 @@ open class Repo[EC, E, ID](
         defaults.upsertByPk(entity)
 
   /** Insert with conflict handling. */
-  def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon): Unit =
+  def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[?]): Unit =
     defaults.insertOnConflict(entityCreator, target, action)
 
   /** Insert with conflict handling, updating all EC columns on conflict. */
-  def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon): Unit =
+  def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon[?]): Unit =
     defaults.insertOnConflictUpdateAll(entityCreator, target)
 
   /** Bulk insert, skipping rows that conflict. Returns the number of rows actually inserted. */
-  def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon): Int =
+  def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon[?]): Int =
     defaults.insertAllIgnoring(entityCreators)
 
   /** Find an existing entity matching the predicate, or insert a new one. */
-  def firstOrCreate(predicate: WhereFrag, creator: => EC)(using con: DbTx): E =
+  def firstOrCreate(predicate: WhereFrag, creator: => EC)(using con: DbTx[?]): E =
     val found = applyScopes(
       QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
     ).where(predicate).first()
@@ -98,7 +98,7 @@ open class Repo[EC, E, ID](
       result
 
   /** Find and update an existing entity, or insert a new one. */
-  def updateOrCreate(predicate: WhereFrag, creator: => EC, updater: E => E)(using con: DbTx): E =
+  def updateOrCreate(predicate: WhereFrag, creator: => EC, updater: E => E)(using con: DbTx[?]): E =
     val found = applyScopes(
       QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
     ).where(predicate).first()
@@ -113,7 +113,7 @@ open class Repo[EC, E, ID](
         result
 
   /** Touch an entity, setting its @updatedAt column to CURRENT_TIMESTAMP. */
-  def touch(entity: E)(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon): Unit =
+  def touch(entity: E)(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon[?]): Unit =
     val id = extractPk(entity)
     Frag(
       s"UPDATE ${entityMeta.tableName} SET ${hasUpdatedAt.column.sqlName} = CURRENT_TIMESTAMP WHERE ${entityMeta.primaryKey.sqlName} = ?",
@@ -122,7 +122,7 @@ open class Repo[EC, E, ID](
     ).update.run()
 
   /** Re-fetch the entity from the database using its primary key. */
-  def refresh(entity: E)(using DbCon): E =
+  def refresh(entity: E)(using DbCon[?]): E =
     val id = extractPk(entity).asInstanceOf[ID]
     findById(id).getOrElse(
       throw QueryBuilderException(s"Entity not found for refresh")

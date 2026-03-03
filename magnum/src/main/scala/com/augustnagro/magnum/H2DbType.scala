@@ -74,26 +74,26 @@ object H2DbType extends DbType:
       pos + idCodec.cols.length
 
     new RepoDefaults[EC, E, ID]:
-      def count(using con: DbCon): Long = countQuery.run().head
+      def count(using con: DbCon[?]): Long = countQuery.run().head
 
-      def existsById(id: ID)(using DbCon): Boolean =
+      def existsById(id: ID)(using DbCon[?]): Boolean =
         Frag(existsByIdSql, IArray(id), idWriter(id))
           .query[Int]
           .run()
           .nonEmpty
 
-      def findAll(using DbCon): Vector[E] = findAllQuery.run()
+      def findAll(using DbCon[?]): Vector[E] = findAllQuery.run()
 
-      def findAll(spec: Spec[E])(using DbCon): Vector[E] =
+      def findAll(spec: Spec[E])(using DbCon[?]): Vector[E] =
         SpecImpl.Default.findAll(spec, tableNameSql)
 
-      def findById(id: ID)(using DbCon): Option[E] =
+      def findById(id: ID)(using DbCon[?]): Option[E] =
         Frag(findByIdSql, IArray(id), idWriter(id))
           .query[E]
           .run()
           .headOption
 
-      def findAllById(ids: Iterable[ID])(using DbCon): Vector[E] =
+      def findAllById(ids: Iterable[ID])(using DbCon[?]): Vector[E] =
         if compositeId then
           throw UnsupportedOperationException(
             "Composite ids unsupported for findAllById."
@@ -115,7 +115,7 @@ object H2DbType extends DbType:
 //        for id <- ids do builder += id.asInstanceOf[Object]
 //        Sql(findAllByIdSql, Vector(builder.result())).run
 
-      def delete(entity: E)(using DbCon): Unit =
+      def delete(entity: E)(using DbCon[?]): Unit =
         deleteById(
           entity
             .asInstanceOf[Product]
@@ -123,37 +123,37 @@ object H2DbType extends DbType:
             .asInstanceOf[ID]
         )
 
-      def deleteById(id: ID)(using DbCon): Unit =
+      def deleteById(id: ID)(using DbCon[?]): Unit =
         Frag(deleteByIdSql, IArray(id), idWriter(id)).update.run()
 
-      def truncate()(using DbCon): Unit = truncateUpdate.run()
+      def truncate()(using DbCon[?]): Unit = truncateUpdate.run()
 
-      def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
+      def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
         deleteAllById(
           entities.map(e => e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID])
         )
 
       def deleteAllById(ids: Iterable[ID])(using
-          con: DbCon
+          con: DbCon[?]
       ): BatchUpdateResult =
         handleQuery(deleteByIdSql, ids):
           Using(con.connection.prepareStatement(deleteByIdSql)): ps =>
             idCodec.write(ids, ps)
             timed(batchUpdateResult(ps.executeBatch()))
 
-      def insert(entityCreator: EC)(using con: DbCon): Unit =
+      def insert(entityCreator: EC)(using con: DbCon[?]): Unit =
         handleQuery(insertSql, entityCreator):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)
             timed(ps.executeUpdate())
 
-      def insertAll(entityCreators: Iterable[EC])(using con: DbCon): Unit =
+      def insertAll(entityCreators: Iterable[EC])(using con: DbCon[?]): Unit =
         handleQuery(insertSql, entityCreators):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.write(entityCreators, ps)
             timed(batchUpdateResult(ps.executeBatch()))
 
-      def insertReturning(entityCreator: EC)(using con: DbCon): E =
+      def insertReturning(entityCreator: EC)(using con: DbCon[?]): E =
         handleQuery(insertSql, entityCreator):
           Using.Manager: use =>
             val ps =
@@ -167,7 +167,7 @@ object H2DbType extends DbType:
 
       def insertAllReturning(
           entityCreators: Iterable[EC]
-      )(using con: DbCon): Vector[E] =
+      )(using con: DbCon[?]): Vector[E] =
         handleQuery(insertSql, entityCreators):
           Using.Manager: use =>
             val ps =
@@ -178,7 +178,7 @@ object H2DbType extends DbType:
               val rs = use(ps.getGeneratedKeys)
               eCodec.read(rs)
 
-      def update(entity: E)(using con: DbCon): Unit =
+      def update(entity: E)(using con: DbCon[?]): Unit =
         handleQuery(updateSql, entity):
           Using(con.connection.prepareStatement(updateSql)): ps =>
             val entityValues: Vector[Any] = entity
@@ -196,7 +196,7 @@ object H2DbType extends DbType:
               pos += codec.cols.length
             timed(ps.executeUpdate())
 
-      def updatePartial(original: E, current: E)(using con: DbCon): Unit =
+      def updatePartial(original: E, current: E)(using con: DbCon[?]): Unit =
         val origProduct = original.asInstanceOf[Product]
         val currProduct = current.asInstanceOf[Product]
 
@@ -237,7 +237,7 @@ object H2DbType extends DbType:
       end updatePartial
 
       def updateAll(entities: Iterable[E])(using
-          con: DbCon
+          con: DbCon[?]
       ): BatchUpdateResult =
         handleQuery(updateSql, entities):
           Using(con.connection.prepareStatement(updateSql)): ps =>
@@ -268,7 +268,7 @@ object H2DbType extends DbType:
             throw UnsupportedOperationException("H2 does not support ON CONFLICT ON CONSTRAINT")
           case ConflictTarget.AnyConflict => idName
 
-      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon): Unit =
+      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon[?]): Unit =
         action match
           case ConflictAction.DoNothing =>
             // Conditional INSERT: skip if a matching row exists
@@ -300,7 +300,7 @@ object H2DbType extends DbType:
                 ecCodec.writeSingle(entityCreator, ps)
                 timed(ps.executeUpdate())
 
-      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using con: DbCon): Unit =
+      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using con: DbCon[?]): Unit =
         val keyColumns = h2KeyColumns(target)
         val sql = s"MERGE INTO $tableNameSql $ecInsertKeys KEY ($keyColumns) VALUES (${ecCodec.queryRepr})"
         handleQuery(sql, entityCreator):
@@ -308,7 +308,7 @@ object H2DbType extends DbType:
             ecCodec.writeSingle(entityCreator, ps)
             timed(ps.executeUpdate())
 
-      def insertAllIgnoring(entityCreators: Iterable[EC])(using con: DbCon): Int =
+      def insertAllIgnoring(entityCreators: Iterable[EC])(using con: DbCon[?]): Int =
         // Conditional INSERT: skip rows where PK already exists
         val ecCols = ecElemNamesSql.mkString(", ")
         val sql = s"INSERT INTO $tableNameSql ($ecCols) SELECT ${ecCodec.queryRepr} WHERE NOT EXISTS (SELECT 1 FROM $tableNameSql WHERE $idName = ?)"
@@ -324,7 +324,7 @@ object H2DbType extends DbType:
                 count += ps.executeUpdate()
               count
 
-      def upsertByPk(entity: E)(using con: DbCon): Unit =
+      def upsertByPk(entity: E)(using con: DbCon[?]): Unit =
         handleQuery(upsertByPkSql, entity):
           Using(con.connection.prepareStatement(upsertByPkSql)): ps =>
             eCodec.writeSingle(entity, ps)

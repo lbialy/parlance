@@ -88,7 +88,7 @@ class WhereHasTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .whereHas(authorBooks)
-      .build
+      .buildWith(H2)
     assert(
       frag.sqlString.contains("EXISTS (SELECT 1 FROM"),
       s"SQL should contain EXISTS subquery: ${frag.sqlString}"
@@ -222,7 +222,7 @@ class WhereHasTests extends QbTestBase:
       .from[ElAuthor]
       .where(_.name === "Rowling")
       .orWhereHas(authorBooks)
-      .build
+      .buildWith(H2)
     assert(
       frag.sqlString.contains("OR EXISTS (SELECT 1 FROM"),
       s"SQL should contain OR EXISTS subquery: ${frag.sqlString}"
@@ -272,7 +272,7 @@ class WhereHasTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .whereHas(authorBooks)(_.whereHas(bookReviews)(_.score >= 4))
-      .build
+      .buildWith(H2)
     assert(
       frag.sqlString.contains("EXISTS (SELECT 1 FROM el_book"),
       s"SQL should contain outer EXISTS: ${frag.sqlString}"
@@ -450,7 +450,7 @@ class WhereHasTests extends QbTestBase:
           sq2.whereHas(tripOwners)(_.id === userId) || sq2.whereHas(tripUsers)(_.id === userId)
         )
       )
-      .build
+      .buildWith(H2)
 
     val sql = frag.sqlString
     // Should have 3 levels of EXISTS nesting + an OR between the two innermost

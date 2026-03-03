@@ -134,7 +134,7 @@ extension (col: ColRef[String])
   infix def notLike(pattern: String)(using DbCodec[String]): WhereFrag =
     likeImpl(col, "NOT LIKE", pattern)
 
-  infix def ilike(pattern: String)(using DbCodec[String]): WhereFrag =
+  infix def ilike(pattern: String)(using DbCodec[String], DbCon[? <: SupportsILike]): WhereFrag =
     likeImpl(col, "ILIKE", pattern)
 
 extension (col: ColRef[Option[String]])
@@ -147,5 +147,5 @@ extension (col: ColRef[Option[String]])
     likeImpl(col, "NOT LIKE", pattern)
 
   @targetName("ilikeOpt")
-  infix def ilike(pattern: String)(using DbCodec[String]): WhereFrag =
+  infix def ilike(pattern: String)(using DbCodec[String], DbCon[? <: SupportsILike]): WhereFrag =
     likeImpl(col, "ILIKE", pattern)

@@ -13,7 +13,7 @@ class H2Tests extends FunSuite:
 
   lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
 
-  def xa(): Transactor =
+  def xa(): Transactor[H2.type] =
     val ds = JdbcDataSource()
     ds.setURL("jdbc:h2:" + h2DbPath)
     ds.setUser("sa")
@@ -31,6 +31,6 @@ class H2Tests extends FunSuite:
       val stmt = use(con.createStatement)
       for ddl <- tableDDLs do stmt.execute(ddl)
     )
-    Transactor(ds)
+    Transactor(H2, ds)
 
 end H2Tests

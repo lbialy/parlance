@@ -3,7 +3,7 @@ package shared
 import com.augustnagro.magnum.*
 import munit.{FunSuite, Location}
 
-def bigDecTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def bigDecTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     Location,
     DbCodec[BigDecimal]
 ): Unit =

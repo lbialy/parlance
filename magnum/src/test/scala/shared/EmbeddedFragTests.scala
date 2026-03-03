@@ -5,13 +5,13 @@ import munit.{FunSuite, Location}
 
 import java.util.UUID
 
-def embeddedFragTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def embeddedFragTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     Location
 ): Unit =
   import suite.*
 
   test("embed Frag into Frag"):
-    def findPersonCnt(filter: Frag)(using DbCon): Int =
+    def findPersonCnt(filter: Frag)(using DbCon[?]): Int =
       val x = sql"id != ${util.Random.nextInt(20) + 20}"
       sql"SELECT count(*) FROM person WHERE $filter AND $x"
         .query[Int]

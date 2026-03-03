@@ -51,7 +51,7 @@ class MultiJoinQueryTests extends QbTestBase:
       assertEquals(results(2)._3.name, "USA")
 
   test("build SQL for 3-table join"):
-    val frag = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry).build
+    val frag = QueryBuilder.from[MjBook].join(bookAuthor).join(authorCountry).buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("t0."), s"Expected t0. alias in: $sql")
     assert(sql.contains("t1."), s"Expected t1. alias in: $sql")

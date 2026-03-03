@@ -41,7 +41,7 @@ class OracleTests extends FunSuite, TestContainersFixtures:
   override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ oracleContainer
 
-  def xa(): Transactor =
+  def xa(): Transactor[Oracle.type] =
     val oracle = oracleContainer()
     val ds = OracleDataSource()
     ds.setURL(oracle.jdbcUrl)
@@ -187,6 +187,6 @@ class OracleTests extends FunSuite, TestContainersFixtures:
         )
       )
       .get
-    Transactor(ds)
+    Transactor(Oracle, ds)
   end xa
 end OracleTests

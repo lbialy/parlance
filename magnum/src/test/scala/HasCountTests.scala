@@ -120,7 +120,7 @@ class HasCountTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .has(authorBooks)(_ >= 2)
-      .build
+      .buildWith(H2)
     assert(
       frag.sqlString.contains("(SELECT COUNT(*) FROM"),
       s"SQL should contain count subquery: ${frag.sqlString}"

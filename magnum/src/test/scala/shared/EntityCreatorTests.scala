@@ -6,7 +6,7 @@ import munit.{FunSuite, Location}
 
 import scala.util.Using
 
-def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     Location
 ): Unit =
   import suite.*

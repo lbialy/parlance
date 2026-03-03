@@ -6,19 +6,19 @@ class LockingTests extends QbTestBase:
 
   test("lockForUpdate.build produces SQL ending with FOR UPDATE"):
     val t = xa()
-    t.connect:
+    t.transact:
       val frag = QueryBuilder.from[QbUser].lockForUpdate.build
       assert(frag.sqlString.endsWith("FOR UPDATE"))
 
   test("forShare.build produces SQL ending with FOR SHARE"):
     val t = xa()
-    t.connect:
+    t.transact:
       val frag = QueryBuilder.from[QbUser].forShare.build
       assert(frag.sqlString.endsWith("FOR SHARE"))
 
   test("lockForUpdate with where + orderBy + limit produces well-formed SQL"):
     val t = xa()
-    t.connect:
+    t.transact:
       val frag = QueryBuilder.from[QbUser]
         .where(_.age > 18)
         .orderBy(_.age)
@@ -74,31 +74,28 @@ class LockingTests extends QbTestBase:
           .lockForUpdate
           .firstOrFail()
 
-  test("lockForUpdate.run() does not compile with DbCon"):
+  test("lockForUpdate does not compile with DbCon"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      def test(using DbCon): Unit =
+      def test(using DbCon[?]): Unit =
         QueryBuilder.from[QbUser].lockForUpdate.run()
     """)
-    assert(errors.contains("No given instance of type com.augustnagro.magnum.DbTx was found"))
-    assert(errors.contains("method run in class LockedQueryBuilder"))
+    assert(errors.contains("No given instance of type com.augustnagro.magnum.DbTx[? <: com.augustnagro.magnum.SupportsRowLocks]"))
 
-  test("lockForUpdate.first() does not compile with DbCon"):
+  test("forShare does not compile with DbCon"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      def test(using DbCon): Unit =
-        QueryBuilder.from[QbUser].lockForUpdate.first()
+      def test(using DbCon[?]): Unit =
+        QueryBuilder.from[QbUser].forShare.run()
     """)
-    assert(errors.contains("No given instance of type com.augustnagro.magnum.DbTx was found"))
-    assert(errors.contains("method first in class LockedQueryBuilder"))
+    assert(errors.contains("No given instance of type com.augustnagro.magnum.DbTx[? <: com.augustnagro.magnum.SupportsForShare]"))
 
-  test("lockForUpdate.firstOrFail() does not compile with DbCon"):
+  test("lockForUpdate does not compile with plain DbTx (no SupportsRowLocks)"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      def test(using DbCon): Unit =
-        QueryBuilder.from[QbUser].lockForUpdate.firstOrFail()
+      def test(using DbTx[SQLite.type]): Unit =
+        QueryBuilder.from[QbUser].lockForUpdate.run()
     """)
-    assert(errors.contains("No given instance of type com.augustnagro.magnum.DbTx was found"))
-    assert(errors.contains("method firstOrFail in class LockedQueryBuilder"))
+    assert(errors.nonEmpty)
 
 end LockingTests

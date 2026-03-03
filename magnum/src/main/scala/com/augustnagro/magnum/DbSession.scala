@@ -3,9 +3,10 @@ package com.augustnagro.magnum
 import java.sql.Connection
 import scala.collection.mutable
 
-class DbSession private[magnum] (
+class DbSession[D <: DatabaseType] private[magnum] (
     val connection: Connection,
-    val sqlLogger: SqlLogger
+    val sqlLogger: SqlLogger,
+    val databaseType: D
 ):
   private[magnum] val identityMap: mutable.HashMap[(String, Any), Any] =
     mutable.HashMap.empty

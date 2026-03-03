@@ -50,7 +50,7 @@ class JoinedQueryTests extends QbTestBase:
     val frag = QueryBuilder
       .from[JnBook]
       .join(bookAuthor)
-      .build
+      .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.matches(".*\\bt0\\.\\w+.*"), s"Expected t0.<col> alias in: $sql")
     assert(sql.matches(".*\\bt1\\.\\w+.*"), s"Expected t1.<col> alias in: $sql")
@@ -158,7 +158,7 @@ class JoinedQueryTests extends QbTestBase:
     val frag = qb
       .where(qb.of[JnBook].title === "Dune")
       .where(qb.of[JnAuthor].name === "Tolkien")
-      .build
+      .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("t0.title = ?"), s"Expected t0.title = ? in: $sql")
     assert(sql.contains("t1.name = ?"), s"Expected t1.name = ? in: $sql")

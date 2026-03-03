@@ -36,7 +36,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
   override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ clickHouseContainer
 
-  def xa(): Transactor =
+  def xa(): Transactor[ClickHouse.type] =
     val clickHouse = clickHouseContainer()
     val ds = ClickHouseDataSource(clickHouse.jdbcUrl)
     val tableDDLs = Vector(
@@ -53,5 +53,5 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
         for ddl <- tableDDLs do stmt.execute(ddl)
       )
       .get
-    Transactor(ds)
+    Transactor(ClickHouse, ds)
 end ClickHouseTests

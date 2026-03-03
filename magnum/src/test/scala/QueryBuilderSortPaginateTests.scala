@@ -49,7 +49,7 @@ class QueryBuilderSortPaginateTests extends QbTestBase:
       .from[QbUser]
       .orderBy(_.firstName)
       .orderBy(_.age)
-      .build
+      .buildWith(H2)
     assert(frag.sqlString.contains("ORDER BY first_name ASC, age ASC"))
 
   test("multiple orderBy calls run against H2"):
@@ -72,7 +72,7 @@ class QueryBuilderSortPaginateTests extends QbTestBase:
       .orderBy(_.age, SortOrder.Desc)
       .limit(10)
       .offset(5)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE age > ? ORDER BY age DESC LIMIT 10 OFFSET 5"

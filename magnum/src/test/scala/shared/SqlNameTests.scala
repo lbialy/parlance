@@ -5,7 +5,7 @@ import munit.{FunSuite, Location}
 
 import java.time.OffsetDateTime
 
-def sqlNameTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def sqlNameTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     Location
 ): Unit =
   import suite.*

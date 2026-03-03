@@ -132,7 +132,7 @@ class JoinedSelectTests extends QbTestBase:
         title = jq.of[JnBook].title,
         author = jq.of[JnAuthor].name
       ))
-      .build
+      .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("SELECT"), s"Expected SELECT in: $sql")
     assert(sql.contains("t0.title AS title"), s"Expected t0.title AS title in: $sql")
@@ -152,7 +152,7 @@ class JoinedSelectTests extends QbTestBase:
       .groupBy(_.author)
       .having(_.cnt > 1L)
       .orderBy(_.author)
-      .build
+      .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("GROUP BY t1.name"), s"Expected GROUP BY in: $sql")
     assert(sql.contains("HAVING COUNT(*) > ?"), s"Expected HAVING in: $sql")
@@ -194,7 +194,7 @@ class LeftJoinSelectTests extends QbTestBase:
         title = jq.of[LjBook].title,
         author = jq.ofLeft[LjAuthor].name
       ))
-      .build
+      .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("LEFT JOIN"), s"Expected LEFT JOIN in: $sql")
     assert(sql.contains("t1.name AS author"), s"Expected t1.name AS author in: $sql")

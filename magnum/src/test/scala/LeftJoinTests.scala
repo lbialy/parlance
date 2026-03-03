@@ -67,7 +67,7 @@ class LeftJoinTests extends QbTestBase:
     val frag = QueryBuilder
       .from[LjBook]
       .leftJoin(bookAuthor)
-      .build
+      .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("LEFT JOIN"), s"Expected LEFT JOIN in: $sql")
     assert(sql.contains("ON t0.author_id = t1.id"), s"Expected ON clause in: $sql")

@@ -8,7 +8,7 @@ import java.time.OffsetDateTime
 def optionalProductTests(
     suite: FunSuite,
     dbType: DbType,
-    xa: () => Transactor
+    xa: () => Transactor[?]
 )(using Location, DbCodec[BigDecimal], DbCodec[OffsetDateTime]): Unit =
   import suite.*
 

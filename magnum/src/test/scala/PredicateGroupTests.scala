@@ -9,7 +9,7 @@ class PredicateGroupTests extends QbTestBase:
       .from[QbUser]
       .where(_.age > 18)
       .orWhere(_.age < 5)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE (age > ? OR age < ?)"
@@ -32,7 +32,7 @@ class PredicateGroupTests extends QbTestBase:
       .from[QbUser]
       .where(sq => (sq.age > 20) && (sq.age < 26))
       .orWhere(_.firstName === Some("Bob"))
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE ((age > ? AND age < ?) OR first_name = ?)"

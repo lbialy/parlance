@@ -242,7 +242,7 @@ class TransitiveScopeTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .whereHas(authorBooks)
-      .build
+      .buildWith(H2)
     assert(
       frag.sqlString.contains("el_book.id <> 4"),
       s"SQL should contain scope condition: ${frag.sqlString}"
@@ -252,7 +252,7 @@ class TransitiveScopeTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .withCount(authorBooks)
-      .build
+      .buildWith(H2)
     val sql = frag.sqlString
     assert(
       sql.contains("el_book.id <> 4"),

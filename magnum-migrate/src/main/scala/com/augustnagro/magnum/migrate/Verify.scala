@@ -1,19 +1,19 @@
 package com.augustnagro.magnum.migrate
 
-import com.augustnagro.magnum.{DbCon, EntityMeta}
+import com.augustnagro.magnum.{DbCon, DatabaseType, EntityMeta}
 
 import java.sql.{Connection, Types}
 import scala.deriving.Mirror
 import scala.quoted.*
 
-inline def verify[E](using con: DbCon, em: EntityMeta[E])(using
+inline def verify[E](using con: DbCon[?], em: EntityMeta[E])(using
     Mirror.ProductOf[E]
 ): VerifyResult =
   ${ Verify.verifyImpl[E]('con, 'em) }
 
 object Verify:
 
-  def verifyImpl[E: Type](con: Expr[DbCon], em: Expr[EntityMeta[E]])(using
+  def verifyImpl[E: Type](con: Expr[DbCon[?]], em: Expr[EntityMeta[E]])(using
       Quotes
   ): Expr[VerifyResult] =
     import quotes.reflect.*
@@ -86,7 +86,7 @@ object Verify:
       em: EntityMeta[?],
       entityName: String,
       fieldMetas: IArray[FieldMeta],
-      con: DbCon
+      con: DbCon[?]
   ): VerifyResult =
     val conn = con.connection
     val schema = Option(conn.getSchema()).getOrElse("PUBLIC")

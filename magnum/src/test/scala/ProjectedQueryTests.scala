@@ -131,7 +131,7 @@ class ProjectedQueryTests extends QbTestBase:
       .having(_.total > 100)
       .orderBy(_.total, SortOrder.Desc)
       .limit(10)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT customer AS customer, SUM(amount) AS total FROM qb_order WHERE status = ? GROUP BY customer HAVING SUM(amount) > ? ORDER BY SUM(amount) DESC LIMIT 10"

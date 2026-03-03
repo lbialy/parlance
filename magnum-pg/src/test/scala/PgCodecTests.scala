@@ -106,15 +106,15 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
   )
 
   test("select all MagUser"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       assert(userRepo.findAll == allUsers)
 
   test("select all MagCar"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       assert(carRepo.findAll == allCars)
 
   test("insert MagUser"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       val u = MagUser(
         id = 3L,
         name = "Matt",
@@ -144,7 +144,7 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
       assert(dbU == u)
 
   test("select MagUser where uuid in set"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       val ids = Vector(
         UUID.fromString("00000000-0000-0000-0000-000000000001"),
         UUID.fromString("00000000-0000-0000-0000-000000000002")
@@ -156,7 +156,7 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
       assert(users == allUsers)
 
   test("insert MagCar"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       val c = MagCar(
         id = 3L,
         textColors = Vector(Color.RedOrange, Color.RedOrange),
@@ -173,7 +173,7 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
       assert(dbC == c)
 
   test("update MagUser arrays"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       val newMatrix = IArray(IArray(0, 0), IArray(0, 9))
       sql"UPDATE mag_user SET matrix = $newMatrix WHERE id = 2".update
         .run()
@@ -181,7 +181,7 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
       assert(Objects.deepEquals(newUser.matrix, newMatrix))
 
   test("update MagCar arrays"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       val newTextColorMap =
         Vector(List(Color.Blue, Color.Blue), List(Color.Blue, Color.Blue))
       sql"UPDATE mag_car SET text_color_map = $newTextColorMap WHERE id = 2".update
@@ -190,7 +190,7 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
       assert(newCar.textColorMap == newTextColorMap)
 
   test("MagCar xml string values"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       val found =
         sql"SELECT my_xml FROM mag_car"
           .query[Option[MyXml]]
@@ -201,14 +201,14 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
       assert(found == expected)
 
   test("where = ANY()"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       val ids = Vector(1L, 2L)
       val cars =
         sql"SELECT * FROM mag_car WHERE id = ANY($ids)".query[MagCar].run()
       assert(cars == allCars)
 
   test("insert MagServiceList interpolated"):
-    connect(ds()):
+    connect(Transactor(Postgres, ds())):
       val service = LastService("James", LocalDate.of(1970, 4, 22))
       val frag = sql"INSERT INTO mag_service_list (service) VALUES ($service)"
       assertEquals(

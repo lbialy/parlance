@@ -9,17 +9,7 @@ import scala.util.{Failure, Success, Using}
 
 object OracleDbType extends DbType:
 
-  private val specImpl = new SpecImpl:
-    override def offsetLimitSql(
-        offset: Option[Long],
-        limit: Option[Int]
-    ): Option[String] =
-      (offset, limit) match
-        case (Some(o), Some(l)) =>
-          Some(s"OFFSET $o ROWS FETCH NEXT $l ROWS ONLY")
-        case (Some(o), None) => Some(s"OFFSET $o ROWS")
-        case (None, Some(l)) => Some(s"FETCH NEXT $l ROWS ONLY")
-        case (None, None)    => None
+  private val specImpl = new SpecImpl {}
 
   def buildRepoDefaults[EC, E, ID](
       tableNameSql: String,
@@ -77,31 +67,31 @@ object OracleDbType extends DbType:
       pos + idCodec.cols.length
 
     new RepoDefaults[EC, E, ID]:
-      def count(using con: DbCon): Long = countQuery.run().head
+      def count(using con: DbCon[?]): Long = countQuery.run().head
 
-      def existsById(id: ID)(using DbCon): Boolean =
+      def existsById(id: ID)(using DbCon[?]): Boolean =
         Frag(existsByIdSql, IArray(id), idWriter(id))
           .query[Int]
           .run()
           .nonEmpty
 
-      def findAll(using DbCon): Vector[E] = findAllQuery.run()
+      def findAll(using DbCon[?]): Vector[E] = findAllQuery.run()
 
-      def findAll(spec: Spec[E])(using DbCon): Vector[E] =
+      def findAll(spec: Spec[E])(using DbCon[?]): Vector[E] =
         specImpl.findAll(spec, tableNameSql)
 
-      def findById(id: ID)(using DbCon): Option[E] =
+      def findById(id: ID)(using DbCon[?]): Option[E] =
         Frag(findByIdSql, IArray(id), idWriter(id))
           .query[E]
           .run()
           .headOption
 
-      def findAllById(ids: Iterable[ID])(using DbCon): Vector[E] =
+      def findAllById(ids: Iterable[ID])(using DbCon[?]): Vector[E] =
         throw UnsupportedOperationException(
           "Oracle does not support SQL arrays, and does not support long IN parameter lists. Use findById in a loop instead."
         )
 
-      def delete(entity: E)(using DbCon): Unit =
+      def delete(entity: E)(using DbCon[?]): Unit =
         deleteById(
           entity
             .asInstanceOf[Product]
@@ -109,38 +99,38 @@ object OracleDbType extends DbType:
             .asInstanceOf[ID]
         )
 
-      def deleteById(id: ID)(using DbCon): Unit =
+      def deleteById(id: ID)(using DbCon[?]): Unit =
         Frag(deleteByIdSql, IArray(id), idWriter(id)).update
           .run()
 
-      def truncate()(using DbCon): Unit = truncateUpdate.run()
+      def truncate()(using DbCon[?]): Unit = truncateUpdate.run()
 
-      def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
+      def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
         deleteAllById(
           entities.map(e => e.asInstanceOf[Product].productElement(idIndex).asInstanceOf[ID])
         )
 
       def deleteAllById(ids: Iterable[ID])(using
-          con: DbCon
+          con: DbCon[?]
       ): BatchUpdateResult =
         handleQuery(deleteByIdSql, ids):
           Using(con.connection.prepareStatement(deleteByIdSql)): ps =>
             idCodec.write(ids, ps)
             timed(batchUpdateResult(ps.executeBatch()))
 
-      def insert(entityCreator: EC)(using con: DbCon): Unit =
+      def insert(entityCreator: EC)(using con: DbCon[?]): Unit =
         handleQuery(insertSql, entityCreator):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)
             timed(ps.executeUpdate())
 
-      def insertAll(entityCreators: Iterable[EC])(using con: DbCon): Unit =
+      def insertAll(entityCreators: Iterable[EC])(using con: DbCon[?]): Unit =
         handleQuery(insertSql, entityCreators):
           Using(con.connection.prepareStatement(insertSql)): ps =>
             ecCodec.write(entityCreators, ps)
             timed(batchUpdateResult(ps.executeBatch()))
 
-      def insertReturning(entityCreator: EC)(using con: DbCon): E =
+      def insertReturning(entityCreator: EC)(using con: DbCon[?]): E =
         handleQuery(insertSql, entityCreator):
           Using.Manager: use =>
             val ps =
@@ -154,11 +144,11 @@ object OracleDbType extends DbType:
 
       def insertAllReturning(
           entityCreators: Iterable[EC]
-      )(using con: DbCon): Vector[E] =
+      )(using con: DbCon[?]): Vector[E] =
         // oracle jdbc does not support batch RETURNING
         entityCreators.map(insertReturning).toVector
 
-      def update(entity: E)(using con: DbCon): Unit =
+      def update(entity: E)(using con: DbCon[?]): Unit =
         handleQuery(updateSql, entity):
           Using(con.connection.prepareStatement(updateSql)): ps =>
             val entityValues: Vector[Any] = entity
@@ -176,7 +166,7 @@ object OracleDbType extends DbType:
               pos += codec.cols.length
             timed(ps.executeUpdate())
 
-      def updatePartial(original: E, current: E)(using con: DbCon): Unit =
+      def updatePartial(original: E, current: E)(using con: DbCon[?]): Unit =
         val origProduct = original.asInstanceOf[Product]
         val currProduct = current.asInstanceOf[Product]
 
@@ -217,7 +207,7 @@ object OracleDbType extends DbType:
       end updatePartial
 
       def updateAll(entities: Iterable[E])(using
-          con: DbCon
+          con: DbCon[?]
       ): BatchUpdateResult =
         handleQuery(updateSql, entities):
           Using(con.connection.prepareStatement(updateSql)): ps =>
@@ -238,16 +228,16 @@ object OracleDbType extends DbType:
               ps.addBatch()
 
             timed(batchUpdateResult(ps.executeBatch()))
-      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon): Unit =
+      def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[?]): Unit =
         throw UnsupportedOperationException("insertOnConflict is not supported for Oracle")
 
-      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon): Unit =
+      def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon[?]): Unit =
         throw UnsupportedOperationException("insertOnConflictUpdateAll is not supported for Oracle")
 
-      def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon): Int =
+      def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon[?]): Int =
         throw UnsupportedOperationException("insertAllIgnoring is not supported for Oracle")
 
-      def upsertByPk(entity: E)(using DbCon): Unit =
+      def upsertByPk(entity: E)(using DbCon[?]): Unit =
         throw UnsupportedOperationException("upsertByPk is not supported for Oracle")
 
     end new

@@ -65,7 +65,7 @@ class VerifyTests extends FunSuite:
     ds.setPassword("")
     ds
 
-  lazy val xa: Transactor = Transactor(freshDs())
+  lazy val xa: Transactor[?] = Transactor(H2, freshDs())
 
   override def beforeEach(context: BeforeEach): Unit =
     val conn = freshDs().getConnection
@@ -151,7 +151,7 @@ class VerifyTests extends FunSuite:
       // but it expects table "missing_col" — let's create verify_user and use it
       // Actually MissingCol maps to table "missing_col" which doesn't exist.
       // Let me use a raw SQL approach instead.
-      val conn = summon[DbCon].connection
+      val conn = summon[DbCon[?]].connection
       conn
         .createStatement()
         .execute(
@@ -183,7 +183,7 @@ class VerifyTests extends FunSuite:
 
   test("TypeMismatch when entity field type does not match DB column"):
     xa.connect:
-      val conn = summon[DbCon].connection
+      val conn = summon[DbCon[?]].connection
       conn
         .createStatement()
         .execute(
@@ -198,7 +198,7 @@ class VerifyTests extends FunSuite:
 
   test("NullabilityMismatch when Option field maps to NOT NULL column"):
     xa.connect:
-      val conn = summon[DbCon].connection
+      val conn = summon[DbCon[?]].connection
       // email is NOT NULL in DB but Option[String] in entity
       conn
         .createStatement()
@@ -219,7 +219,7 @@ class VerifyTests extends FunSuite:
       // bio is nullable in DB but String (non-Option) in NullMismatchUser
       // NullMismatchUser maps to table "null_mismatch_user" which doesn't exist
       // Let's create it manually
-      val conn = summon[DbCon].connection
+      val conn = summon[DbCon[?]].connection
       conn
         .createStatement()
         .execute(
@@ -244,7 +244,7 @@ class VerifyTests extends FunSuite:
 
   test("PrimaryKeyMismatch when entity @Id does not match actual PK"):
     xa.connect:
-      val conn = summon[DbCon].connection
+      val conn = summon[DbCon[?]].connection
       // Table has email as PK, but entity has @Id on id
       conn
         .createStatement()
@@ -269,7 +269,7 @@ class VerifyTests extends FunSuite:
 
   test("single verify call returns all issues found"):
     xa.connect:
-      val conn = summon[DbCon].connection
+      val conn = summon[DbCon[?]].connection
       conn
         .createStatement()
         .execute(

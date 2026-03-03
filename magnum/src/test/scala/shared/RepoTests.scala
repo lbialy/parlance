@@ -7,7 +7,7 @@ import munit.FunSuite
 import java.time.OffsetDateTime
 import java.util.UUID
 
-def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     munit.Location,
     DbCodec[UUID],
     DbCodec[Boolean],

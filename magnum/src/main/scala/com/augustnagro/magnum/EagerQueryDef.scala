@@ -5,7 +5,7 @@ import scala.util.Using
 
 trait EagerQueryDef:
   def parentKeyScalaName: String
-  def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]]
+  def fetchGrouped(parentKeys: Vector[Any])(using DbCon[?]): mutable.LinkedHashMap[Any, Vector[Any]]
   def representativeQueries: Vector[Frag]
 
 object EagerQueryDef:
@@ -35,7 +35,7 @@ object EagerQueryDef:
       keys: Vector[Any],
       codec: DbCodec[A],
       filter: Option[Frag]
-  )(using DbCon): Vector[A] =
+  )(using DbCon[?]): Vector[A] =
     val placeholders = keys.map(_ => "?").mkString(", ")
     val baseSql = buildSql(placeholders)
     filter match
@@ -56,7 +56,7 @@ object EagerQueryDef:
       buildSql: String => String,
       keys: Vector[Any],
       filter: Option[Frag]
-  )(using con: DbCon): Vector[(Any, Any)] =
+  )(using con: DbCon[?]): Vector[(Any, Any)] =
     val placeholders = keys.map(_ => "?").mkString(", ")
     val baseSql = buildSql(placeholders)
     val frag = filter match
@@ -117,7 +117,7 @@ class DirectEagerDef[E, T](
     val childCols = childMeta.columns.map(_.sqlName).mkString(", ")
     s"SELECT $childCols FROM ${childMeta.tableName} WHERE ${rel.pk.sqlName} IN ($placeholders)"
 
-  def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]] =
+  def fetchGrouped(parentKeys: Vector[Any])(using DbCon[?]): mutable.LinkedHashMap[Any, Vector[Any]] =
     val children = fetchByKeys(childQuerySql, parentKeys, childCodec, filter)
     val grouped = groupByKey(children, childMeta, childFkIndex)
     grouped.asInstanceOf[mutable.LinkedHashMap[Any, Vector[Any]]]
@@ -152,7 +152,7 @@ class PivotEagerDef[E, T](
     val targetCols = targetMeta.columns.map(_.sqlName).mkString(", ")
     s"SELECT $targetCols FROM ${targetMeta.tableName} WHERE ${rel.targetPk.sqlName} IN ($placeholders)"
 
-  def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]] =
+  def fetchGrouped(parentKeys: Vector[Any])(using DbCon[?]): mutable.LinkedHashMap[Any, Vector[Any]] =
     val pivotPairs = fetchPairsByKeys(pivotQuerySql, parentKeys, None)
     if pivotPairs.isEmpty then return mutable.LinkedHashMap.empty
 
@@ -214,7 +214,7 @@ class ThroughEagerDef[E, T](
     val targetCols = targetMeta.columns.map(_.sqlName).mkString(", ")
     s"SELECT $targetCols FROM ${targetMeta.tableName} WHERE $targetFkSqlName IN ($placeholders)"
 
-  def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]] =
+  def fetchGrouped(parentKeys: Vector[Any])(using DbCon[?]): mutable.LinkedHashMap[Any, Vector[Any]] =
     val intermediatePairs = fetchPairsByKeys(intermediateQuerySql, parentKeys, None)
     if intermediatePairs.isEmpty then return mutable.LinkedHashMap.empty
 
@@ -273,7 +273,7 @@ class ComposedEagerDef[Root, Intermediate, Target](
     val cols = targetMeta.columns.map(_.sqlName).mkString(", ")
     s"SELECT $cols FROM ${targetMeta.tableName} WHERE ${outerRel.pk.sqlName} IN ($placeholders)"
 
-  def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]] =
+  def fetchGrouped(parentKeys: Vector[Any])(using DbCon[?]): mutable.LinkedHashMap[Any, Vector[Any]] =
     val intermediates = fetchByKeys(intermediateQuerySql, parentKeys, intermediateCodec, intermediateFilter)
     if intermediates.isEmpty then return mutable.LinkedHashMap.empty
 
@@ -345,7 +345,7 @@ class PivotWithDataEagerDef[E, T, P](
     val targetCols = targetMeta.columns.map(_.sqlName).mkString(", ")
     s"SELECT $targetCols FROM ${targetMeta.tableName} WHERE ${rel.targetPk.sqlName} IN ($placeholders)"
 
-  def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]] =
+  def fetchGrouped(parentKeys: Vector[Any])(using DbCon[?]): mutable.LinkedHashMap[Any, Vector[Any]] =
     // 1. Fetch all pivot rows for these source keys
     val pivots = fetchByKeys(pivotQuerySql, parentKeys, pivotCodec, pivotFilter)
     if pivots.isEmpty then return mutable.LinkedHashMap.empty

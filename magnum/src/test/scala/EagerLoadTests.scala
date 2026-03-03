@@ -122,7 +122,7 @@ class EagerLoadTests extends QbTestBase:
     val rootFrag = QueryBuilder
       .from[ElAuthor]
       .where(_.name === "Tolkien")
-      .build
+      .buildWith(H2)
     assert(
       !rootFrag.sqlString.contains("JOIN"),
       s"Root query should not contain JOIN: ${rootFrag.sqlString}"
@@ -256,7 +256,7 @@ class EagerLoadTests extends QbTestBase:
       .from[ElAuthor]
       .withRelated(authorBooksRel)
       .withRelated(authorBooksAgain)
-    val queries = eq.buildQueries
+    val queries = eq.buildQueriesWith(H2)
     // root + 1 child query + 1 child query = 3
     assertEquals(queries.size, 3)
 

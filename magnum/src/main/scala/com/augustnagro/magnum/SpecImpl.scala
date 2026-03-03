@@ -15,12 +15,9 @@ private trait SpecImpl:
       case null              => throw UnsupportedOperationException()
     sort.column + dir + nullOrder
 
-  def offsetLimitSql(offset: Option[Long], limit: Option[Int]): Option[String] =
-    (offset, limit) match
-      case (Some(o), Some(l)) => Some(s"OFFSET $o LIMIT $l")
-      case (Some(o), None)    => Some(s"OFFSET $o")
-      case (None, Some(l))    => Some(s"LIMIT $l")
-      case (None, None)       => None
+  def offsetLimitSql(offset: Option[Long], limit: Option[Int], dt: DatabaseType): Option[String] =
+    val rendered = dt.renderLimitOffset(limit, offset)
+    if rendered.isEmpty then None else Some(rendered.trim)
 
   def seekSql(seek: Seek): String =
     val seekDir = seek.seekDirection match
@@ -30,7 +27,7 @@ private trait SpecImpl:
     s"${seek.column} $seekDir ?"
 
   def findAll[E: DbCodec](spec: Spec[E], tableNameSql: String)(using
-      DbCon
+      con: DbCon[?]
   ): Vector[E] =
     val whereClause = StringJoiner(" AND ", "WHERE ", "").setEmptyValue("")
 
@@ -70,7 +67,7 @@ private trait SpecImpl:
     val orderByClauseStr = orderByClause.toString
     if orderByClauseStr.nonEmpty then finalSj.add(orderByClauseStr)
 
-    for offsetLimit <- offsetLimitSql(spec.offset, spec.limit) do finalSj.add(offsetLimit)
+    for offsetLimit <- offsetLimitSql(spec.offset, spec.limit, con.databaseType) do finalSj.add(offsetLimit)
 
     val allFrags = prefixFrag +: whereFrags
     val fragWriter: FragWriter = (ps, startingPos) => allFrags.foldLeft(startingPos)((pos, frag) => frag.writer.write(ps, pos))

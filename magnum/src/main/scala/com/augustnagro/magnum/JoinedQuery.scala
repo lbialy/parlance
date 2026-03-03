@@ -170,7 +170,10 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     (fromJoinSql + whereSql, allParams, combinedWriter)
   end buildFromJoinWhere
 
-  def build: Frag =
+  def build(using con: DbCon[?]): Frag =
+    buildWith(con.databaseType)
+
+  def buildWith(dt: DatabaseType): Frag =
     val selectParts = metas.zipWithIndex.map { (meta, idx) =>
       meta.columns.map(c => s"t$idx.${c.sqlName}").mkString(", ")
     }
@@ -179,32 +182,32 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     val (fromJoinWhereSql, params, writer) = buildFromJoinWhere
 
     val (orderBySql, _, _) = QuerySqlBuilder.buildOrderBy(orderEntries)
-    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
+    val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt, dt)
 
     Frag(selectSql + fromJoinWhereSql + orderBySql + limitOffsetSql, params, writer)
 
-  def run()(using DbCon): Vector[R] =
+  def run()(using DbCon[?]): Vector[R] =
     given codec: DbCodec[R] = resultCodec
     build.query[R].run()
 
-  def first()(using DbCon): Option[R] =
+  def first()(using DbCon[?]): Option[R] =
     limit(1).run().headOption
 
-  def firstOrFail()(using DbCon): R =
+  def firstOrFail()(using DbCon[?]): R =
     first().getOrElse(
       throw QueryBuilderException(
         s"No result found matching joined query"
       )
     )
 
-  def count()(using DbCon): Long =
+  def count()(using DbCon[?]): Long =
     val (fromJoinWhereSql, params, writer) = buildFromJoinWhere
     Frag(s"SELECT COUNT(*) $fromJoinWhereSql", params, writer)
       .query[Long]
       .run()
       .head
 
-  def exists()(using DbCon): Boolean =
+  def exists()(using DbCon[?]): Boolean =
     val (fromJoinWhereSql, params, writer) = buildFromJoinWhere
     Frag(s"SELECT EXISTS(SELECT 1 $fromJoinWhereSql)", params, writer)
       .query[Boolean]
@@ -214,7 +217,7 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
   def select: JoinedQuery.JoinedSelectPhase[R] =
     JoinedQuery.JoinedSelectPhase(this)
 
-  def debugPrintSql(using DbCon): this.type =
+  def debugPrintSql(using DbCon[?]): this.type =
     DebugSql.printDebug(Vector(build))
     this
 

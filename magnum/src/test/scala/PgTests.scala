@@ -29,7 +29,7 @@ class PgTests extends FunSuite, TestContainersFixtures:
   override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ pgContainer
 
-  def xa(): Transactor =
+  def xa(): Transactor[Postgres.type] =
     val ds = PGSimpleDataSource()
     val pg = pgContainer()
     ds.setUrl(pg.jdbcUrl)
@@ -49,6 +49,6 @@ class PgTests extends FunSuite, TestContainersFixtures:
       val stmt = use(con.createStatement)
       for ddl <- tableDDLs do stmt.execute(ddl)
     ).get
-    Transactor(ds)
+    Transactor(Postgres, ds)
   end xa
 end PgTests

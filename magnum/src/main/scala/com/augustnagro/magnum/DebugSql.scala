@@ -2,7 +2,7 @@ package com.augustnagro.magnum
 
 private[magnum] object DebugSql:
 
-  def printDebug(frags: Vector[Frag])(using dbCon: DbCon): Unit =
+  def printDebug(frags: Vector[Frag])(using dbCon: DbCon[?]): Unit =
     frags.foreach: frag =>
       println(s"SQL: ${frag.sqlString}")
       if frag.params.nonEmpty then println(s"Params: ${frag.params.mkString(", ")}")

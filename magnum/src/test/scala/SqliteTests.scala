@@ -37,7 +37,7 @@ class SqliteTests extends FunSuite:
 
   lazy val sqliteDbPath = Files.createTempFile(null, ".db").toAbsolutePath
 
-  def xa(): Transactor =
+  def xa(): Transactor[SQLite.type] =
     val ds = SQLiteDataSource()
     ds.setUrl("jdbc:sqlite:" + sqliteDbPath)
     Manager(use =>
@@ -136,6 +136,6 @@ class SqliteTests extends FunSuite:
           |('2025-03-31T21:19:23Z', '2025-03-31', '05:30:04', '2025-04-02T20:17:38')""".stripMargin
       )
     ).get
-    Transactor(ds)
+    Transactor(SQLite, ds)
   end xa
 end SqliteTests

@@ -139,7 +139,7 @@ class PivotTests extends QbTestBase:
     val rootFrag = QueryBuilder
       .from[PvUser]
       .where(_.name === "Alice")
-      .build
+      .buildWith(H2)
     assert(
       !rootFrag.sqlString.contains("JOIN"),
       s"Root query should not contain JOIN: ${rootFrag.sqlString}"

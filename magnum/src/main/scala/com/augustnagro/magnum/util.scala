@@ -17,23 +17,10 @@ import scala.concurrent.duration.FiniteDuration
 import scala.reflect.ClassTag
 import scala.quoted.*
 
-def connect[T](transactor: Transactor)(f: DbCon ?=> T): T =
+def connect[D <: DatabaseType, T](transactor: Transactor[D])(f: DbCon[D] ?=> T): T =
   transactor.connect(f)
 
-def connect[T](dataSource: DataSource)(f: DbCon ?=> T): T =
-  Transactor(dataSource).connect(f)
-
-def transact[T](transactor: Transactor)(f: DbTx ?=> T): T =
-  transactor.transact(f)
-
-def transact[T](dataSource: DataSource)(f: DbTx ?=> T): T =
-  Transactor(dataSource).transact(f)
-
-def transact[T](dataSource: DataSource, connectionConfig: Connection => Unit)(
-    f: DbTx ?=> T
-): T =
-  val transactor =
-    Transactor(dataSource = dataSource, connectionConfig = connectionConfig)
+def transact[D <: DatabaseType, T](transactor: Transactor[D])(f: DbTx[D] ?=> T): T =
   transactor.transact(f)
 
 extension (inline sc: StringContext)
@@ -163,7 +150,7 @@ private def summonWriter[T: Type](using Quotes): Expr[DbCodec[T]] =
       '{ DbCodec.AnyCodec.asInstanceOf[DbCodec[T]] }
 
 def batchUpdate[T](values: Iterable[T])(f: T => Update)(using
-    con: DbCon
+    con: DbCon[?]
 ): BatchUpdateResult =
   val it = values.iterator
   if !it.hasNext then return BatchUpdateResult.Success(0)
@@ -376,7 +363,7 @@ private def sqlNameAnnot[T: Type](elemName: String)(using
 
 private def handleQuery[A](sql: String, params: Any)(
     attempt: Try[(A, FiniteDuration)]
-)(using con: DbCon): A =
+)(using con: DbCon[?]): A =
   attempt match
     case Success((res, execTime)) =>
       con.sqlLogger.log(SqlSuccessEvent(sql, params, execTime))

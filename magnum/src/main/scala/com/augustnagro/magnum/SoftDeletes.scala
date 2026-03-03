@@ -45,24 +45,24 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
 
   // --- write overrides: soft-delete instead of hard-delete ---
 
-  override def delete(entity: E)(using DbCon): Unit =
+  override def delete(entity: E)(using DbCon[?]): Unit =
     deleteById(extractId(entity))
 
-  override def deleteById(id: ID)(using DbCon): Unit =
+  override def deleteById(id: ID)(using DbCon[?]): Unit =
     Frag(
       s"UPDATE $tbl SET $sdColSql = CURRENT_TIMESTAMP WHERE $pkSql = ?",
       Seq(id),
       FragWriter.fromKeys(Vector(id.asInstanceOf[Any]))
     ).update.run()
 
-  override def deleteAll(entities: Iterable[E])(using DbCon): BatchUpdateResult =
+  override def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
     var count = 0L
     entities.foreach { e =>
       delete(e); count += 1
     }
     BatchUpdateResult.Success(count)
 
-  override def deleteAllById(ids: Iterable[ID])(using DbCon): BatchUpdateResult =
+  override def deleteAllById(ids: Iterable[ID])(using DbCon[?]): BatchUpdateResult =
     var count = 0L
     ids.foreach { id =>
       deleteById(id); count += 1
@@ -72,11 +72,11 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
   // --- new methods: force delete, restore, inspection ---
 
   /** Hard-delete an entity (real DELETE FROM). */
-  def forceDelete(entity: E)(using DbCon): Unit =
+  def forceDelete(entity: E)(using DbCon[?]): Unit =
     forceDeleteById(extractId(entity))
 
   /** Hard-delete by id (real DELETE FROM). */
-  def forceDeleteById(id: ID)(using DbCon): Unit =
+  def forceDeleteById(id: ID)(using DbCon[?]): Unit =
     Frag(
       s"DELETE FROM $tbl WHERE $pkSql = ?",
       Seq(id),
@@ -84,11 +84,11 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
     ).update.run()
 
   /** Restore a soft-deleted entity by clearing the deleted-at column. */
-  def restore(entity: E)(using DbCon): Unit =
+  def restore(entity: E)(using DbCon[?]): Unit =
     restoreById(extractId(entity))
 
   /** Restore a soft-deleted entity by id. */
-  def restoreById(id: ID)(using DbCon): Unit =
+  def restoreById(id: ID)(using DbCon[?]): Unit =
     Frag(
       s"UPDATE $tbl SET $sdColSql = NULL WHERE $pkSql = ?",
       Seq(id),

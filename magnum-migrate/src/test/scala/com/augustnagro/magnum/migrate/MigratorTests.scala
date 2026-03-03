@@ -1,6 +1,6 @@
 package com.augustnagro.magnum.migrate
 
-import com.augustnagro.magnum.Transactor
+import com.augustnagro.magnum.{H2, Transactor}
 import munit.FunSuite
 import org.h2.jdbcx.JdbcDataSource
 
@@ -25,7 +25,7 @@ class MigratorTests extends FunSuite:
     ds.setPassword("")
     ds
 
-  lazy val xa: Transactor = Transactor(freshDs())
+  lazy val xa: Transactor[?] = Transactor(H2, freshDs())
 
   // -- Test fixtures: 3 MigrationDefs --
 
@@ -154,7 +154,7 @@ class MigratorTests extends FunSuite:
     m.migrate()
     // Verify table exists by querying it
     xa.connect:
-      val conn = summon[com.augustnagro.magnum.DbCon].connection
+      val conn = summon[com.augustnagro.magnum.DbCon[?]].connection
       val rs = conn.createStatement().executeQuery("SELECT COUNT(*) FROM users")
       rs.next()
       assertEquals(rs.getInt(1), 0)
@@ -257,7 +257,7 @@ class MigratorTests extends FunSuite:
     assert(results.head.compiledSql.exists(_.contains("CREATE")))
     // Verify users table does NOT exist by trying to query it
     xa.connect:
-      val conn = summon[com.augustnagro.magnum.DbCon].connection
+      val conn = summon[com.augustnagro.magnum.DbCon[?]].connection
       val threw = try
         conn.createStatement().executeQuery("SELECT COUNT(*) FROM users")
         false
@@ -283,7 +283,7 @@ class MigratorTests extends FunSuite:
     val m = Migrator(List(v1, v2, v3, insertMigration), xa, H2Compiler)
     m.migrate()
     xa.connect:
-      val conn = summon[com.augustnagro.magnum.DbCon].connection
+      val conn = summon[com.augustnagro.magnum.DbCon[?]].connection
       val rs = conn.createStatement().executeQuery(
         "SELECT email, name FROM users WHERE email = 'test@example.com'"
       )

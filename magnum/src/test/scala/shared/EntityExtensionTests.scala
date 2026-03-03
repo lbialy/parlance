@@ -9,7 +9,7 @@ import java.util.UUID
 def entityExtensionTests(
     suite: FunSuite,
     dbType: DbType,
-    xa: () => Transactor
+    xa: () => Transactor[?]
 )(using
     munit.Location,
     DbCodec[UUID],

@@ -6,7 +6,7 @@ import munit.{FunSuite, Location}
 import java.time.{LocalTime, OffsetDateTime}
 import java.util.UUID
 
-def sharedTests(suite: FunSuite, dbType: DbType, xa: () => Transactor)(using
+def sharedTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     Location,
     DbCodec[UUID],
     DbCodec[Boolean],

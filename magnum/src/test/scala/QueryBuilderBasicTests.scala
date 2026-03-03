@@ -68,7 +68,7 @@ class QueryBuilderBasicTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbUser]
       .where(_.age > 18)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE age > ?"
@@ -228,7 +228,7 @@ class QueryBuilderBasicTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbUser]
       .where(_.age > 18)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE age > ?"
@@ -240,7 +240,7 @@ class QueryBuilderBasicTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbUser]
       .distinct
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT DISTINCT id, first_name, age FROM qb_user"
@@ -251,7 +251,7 @@ class QueryBuilderBasicTests extends QbTestBase:
       .from[QbUser]
       .distinct
       .where(_.age > 18)
-      .build
+      .buildWith(H2)
     assertEquals(
       frag.sqlString,
       "SELECT DISTINCT id, first_name, age FROM qb_user WHERE age > ?"
