@@ -44,15 +44,23 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
   def join[S, U](rel: Relationship[S, U])(using
       sMeta: TableMeta[S],
       uMeta: TableMeta[U],
-      uCodec: DbCodec[U]
+      uCodec: DbCodec[U],
+      scoped: Scoped[U]
   ): JoinedQuery[Tuple.Append[R, U]] =
     val sourceIdx = metas.indexWhere(_.tableName == sMeta.tableName)
     require(sourceIdx >= 0, s"Table ${sMeta.tableName} not in join chain")
     val newIdx = metas.size
+    val alias = s"t$newIdx"
+    val baseOn = s"t$sourceIdx.${rel.fk.sqlName} = $alias.${rel.pk.sqlName}"
+    val onFrag = ExistsBuilder.scopeConditions(scoped.scopes, uMeta) match
+      case None => Frag(baseOn, Seq.empty, FragWriter.empty)
+      case Some(sc) =>
+        val scopeSql = sc.sqlString.replace(uMeta.tableName + ".", alias + ".")
+        Frag(s"$baseOn AND $scopeSql", sc.params, sc.writer)
     val entry = JoinEntry(
-      TableRef(uMeta.tableName, s"t$newIdx", uMeta.tableName),
+      TableRef(uMeta.tableName, alias, uMeta.tableName),
       JoinType.Inner,
-      Frag(s"t$sourceIdx.${rel.fk.sqlName} = t$newIdx.${rel.pk.sqlName}", Seq.empty, FragWriter.empty)
+      onFrag
     )
     new JoinedQuery[Tuple.Append[R, U]](
       metas :+ uMeta,
@@ -68,16 +76,24 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
   def leftJoin[S, U](rel: Relationship[S, U])(using
       sMeta: TableMeta[S],
       uMeta: TableMeta[U],
-      uCodec: DbCodec[U]
+      uCodec: DbCodec[U],
+      scoped: Scoped[U]
   ): JoinedQuery[Tuple.Append[R, Option[U]]] =
     val sourceIdx = metas.indexWhere(_.tableName == sMeta.tableName)
     require(sourceIdx >= 0, s"Table ${sMeta.tableName} not in join chain")
     val newIdx = metas.size
+    val alias = s"t$newIdx"
     val optCodec = DbCodec.OptionCodec[U](using uCodec)
+    val baseOn = s"t$sourceIdx.${rel.fk.sqlName} = $alias.${rel.pk.sqlName}"
+    val onFrag = ExistsBuilder.scopeConditions(scoped.scopes, uMeta) match
+      case None => Frag(baseOn, Seq.empty, FragWriter.empty)
+      case Some(sc) =>
+        val scopeSql = sc.sqlString.replace(uMeta.tableName + ".", alias + ".")
+        Frag(s"$baseOn AND $scopeSql", sc.params, sc.writer)
     val entry = JoinEntry(
-      TableRef(uMeta.tableName, s"t$newIdx", uMeta.tableName),
+      TableRef(uMeta.tableName, alias, uMeta.tableName),
       JoinType.Left,
-      Frag(s"t$sourceIdx.${rel.fk.sqlName} = t$newIdx.${rel.pk.sqlName}", Seq.empty, FragWriter.empty)
+      onFrag
     )
     new JoinedQuery[Tuple.Append[R, Option[U]]](
       metas :+ uMeta,
@@ -162,7 +178,7 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
 
     val (fromJoinWhereSql, params, writer) = buildFromJoinWhere
 
-    val orderBySql = QuerySqlBuilder.buildOrderBy(orderEntries)
+    val (orderBySql, _, _) = QuerySqlBuilder.buildOrderBy(orderEntries)
     val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
 
     Frag(selectSql + fromJoinWhereSql + orderBySql + limitOffsetSql, params, writer)

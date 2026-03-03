@@ -61,14 +61,15 @@ class ProjectedQuery[P, PC](
     val (whereSql, whereParams, whereWriter) = QuerySqlBuilder.buildWhere(wherePredicate)
     val groupBySql = QuerySqlBuilder.buildGroupBy(groupByExprs)
     val (havingSql, havingParams, havingWriter) = QuerySqlBuilder.buildHaving(havingPredicate)
-    val orderBySql = QuerySqlBuilder.buildOrderBy(orderEntries)
+    val (orderBySql, orderByParams, orderByWriter) = QuerySqlBuilder.buildOrderBy(orderEntries)
     val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
 
-    val allParams = fromParams ++ whereParams ++ havingParams
+    val allParams = fromParams ++ whereParams ++ havingParams ++ orderByParams
     val combinedWriter: FragWriter = (ps, pos) =>
       val afterFrom = fromWriter.write(ps, pos)
       val afterWhere = whereWriter.write(ps, afterFrom)
-      havingWriter.write(ps, afterWhere)
+      val afterHaving = havingWriter.write(ps, afterWhere)
+      orderByWriter.write(ps, afterHaving)
 
     Frag(baseSql + whereSql + groupBySql + havingSql + orderBySql + limitOffsetSql, allParams, combinedWriter)
 

@@ -89,10 +89,8 @@ class RepoQueryTests extends QbTestBase:
     val t = xa()
     t.connect:
       val activeScope = new Scope[RepoItem]:
-        def apply[C <: Selectable](
-            qb: QueryBuilder[HasRoot, RepoItem, C]
-        ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"status = 'active'".unsafeAsWhere)
+        override def conditions(meta: TableMeta[RepoItem]): Vector[WhereFrag] =
+          Vector(sql"status = 'active'".unsafeAsWhere)
 
       val scopedRepo =
         Repo[RepoItem, RepoItem, Long](Vector(activeScope))
@@ -105,10 +103,8 @@ class RepoQueryTests extends QbTestBase:
     val t = xa()
     t.connect:
       val activeScope = new Scope[RepoItem]:
-        def apply[C <: Selectable](
-            qb: QueryBuilder[HasRoot, RepoItem, C]
-        ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"status = 'active'".unsafeAsWhere)
+        override def conditions(meta: TableMeta[RepoItem]): Vector[WhereFrag] =
+          Vector(sql"status = 'active'".unsafeAsWhere)
 
       val scopedRepo =
         Repo[RepoItem, RepoItem, Long](Vector(activeScope))
@@ -120,10 +116,8 @@ class RepoQueryTests extends QbTestBase:
     val t = xa()
     t.connect:
       val activeScope = new Scope[RepoItem]:
-        def apply[C <: Selectable](
-            qb: QueryBuilder[HasRoot, RepoItem, C]
-        ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"status = 'active'".unsafeAsWhere)
+        override def conditions(meta: TableMeta[RepoItem]): Vector[WhereFrag] =
+          Vector(sql"status = 'active'".unsafeAsWhere)
 
       val scopedRepo =
         Repo[RepoItem, RepoItem, Long](Vector(activeScope))
@@ -140,10 +134,8 @@ class RepoQueryTests extends QbTestBase:
     val t = xa()
     t.connect:
       val localScope = new Scope[RepoItem]:
-        def apply[C <: Selectable](
-            qb: QueryBuilder[HasRoot, RepoItem, C]
-        ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"amount >= 30".unsafeAsWhere)
+        override def conditions(meta: TableMeta[RepoItem]): Vector[WhereFrag] =
+          Vector(sql"amount >= 30".unsafeAsWhere)
 
       val customRepo = new Repo[RepoItem, RepoItem, Long]():
         override def finalScopes: Vector[Scope[RepoItem]] =
@@ -202,16 +194,12 @@ class RepoQueryTests extends QbTestBase:
     val t = xa()
     t.connect:
       class ActiveScope extends Scope[RepoItem]:
-        def apply[C <: Selectable](
-            qb: QueryBuilder[HasRoot, RepoItem, C]
-        ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"status = 'active'".unsafeAsWhere)
+        override def conditions(meta: TableMeta[RepoItem]): Vector[WhereFrag] =
+          Vector(sql"status = 'active'".unsafeAsWhere)
 
       class HighAmountScope extends Scope[RepoItem]:
-        def apply[C <: Selectable](
-            qb: QueryBuilder[HasRoot, RepoItem, C]
-        ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"amount >= 20".unsafeAsWhere)
+        override def conditions(meta: TableMeta[RepoItem]): Vector[WhereFrag] =
+          Vector(sql"amount >= 20".unsafeAsWhere)
 
       val scopedRepo = Repo[RepoItem, RepoItem, Long](
         Vector(new ActiveScope, new HighAmountScope)
@@ -234,16 +222,11 @@ class RepoQueryTests extends QbTestBase:
   test("queryWithout for a scope that isn't present is a no-op"):
     val t = xa()
     t.connect:
-      class UnusedScope extends Scope[RepoItem]:
-        def apply[C <: Selectable](
-            qb: QueryBuilder[HasRoot, RepoItem, C]
-        ): QueryBuilder[HasRoot, RepoItem, C] = qb
+      class UnusedScope extends Scope[RepoItem]
 
       val activeScope = new Scope[RepoItem]:
-        def apply[C <: Selectable](
-            qb: QueryBuilder[HasRoot, RepoItem, C]
-        ): QueryBuilder[HasRoot, RepoItem, C] =
-          qb.where(sql"status = 'active'".unsafeAsWhere)
+        override def conditions(meta: TableMeta[RepoItem]): Vector[WhereFrag] =
+          Vector(sql"status = 'active'".unsafeAsWhere)
 
       val scopedRepo =
         Repo[RepoItem, RepoItem, Long](Vector(activeScope))

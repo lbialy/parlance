@@ -11,25 +11,43 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
 
   import EagerQueryDef.*
 
+  /** Merge scope conditions with an optional user filter. */
+  private def mergeFilter[T](userFilter: Option[Frag], targetMeta: TableMeta[T], scoped: Scoped[T]): Option[Frag] =
+    val scopeFrag = ExistsBuilder.scopeConditions(scoped.scopes, targetMeta).map(f => f: Frag)
+    (userFilter, scopeFrag) match
+      case (None, None)       => None
+      case (Some(u), None)    => Some(u)
+      case (None, Some(s))    => Some(s)
+      case (Some(u), Some(s)) =>
+        val sql = s"${u.sqlString} AND ${s.sqlString}"
+        val params = u.params ++ s.params
+        val writer: FragWriter = (ps, pos) =>
+          val next = u.writer.write(ps, pos)
+          s.writer.write(ps, next)
+        Some(Frag(sql, params, writer))
+
   // --- Unconstrained withRelated ---
 
   def withRelated[T](rel: HasMany[E, T, ?])(using
       childMeta: TableMeta[T],
-      childCodec: DbCodec[T]
+      childCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
-    val d = DirectEagerDef(rootMeta, rel, childMeta, childCodec, None)
+    val d = DirectEagerDef(rootMeta, rel, childMeta, childCodec, mergeFilter(None, childMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[T](rel: BelongsToMany[E, T, ?])(using
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
-    val d = PivotEagerDef(rootMeta, rel, targetMeta, targetCodec, None)
+    val d = PivotEagerDef(rootMeta, rel, targetMeta, targetCodec, mergeFilter(None, targetMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[T](rel: HasManyThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val d = ThroughEagerDef(
       rootMeta,
@@ -41,13 +59,14 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       rel.sourcePk.scalaName,
       targetMeta,
       targetCodec,
-      None
+      mergeFilter(None, targetMeta, scoped)
     )
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[T](rel: HasOneThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val d = ThroughEagerDef(
       rootMeta,
@@ -59,7 +78,7 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       rel.sourcePk.scalaName,
       targetMeta,
       targetCodec,
-      None
+      mergeFilter(None, targetMeta, scoped)
     )
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
@@ -67,23 +86,26 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
 
   def withRelated[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: CT => Frag)(using
       childMeta: TableMeta[T],
-      childCodec: DbCodec[T]
+      childCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val cols = new Columns[T](childMeta.columns).asInstanceOf[CT]
-    val d = DirectEagerDef(rootMeta, rel, childMeta, childCodec, Some(f(cols)))
+    val d = DirectEagerDef(rootMeta, rel, childMeta, childCodec, mergeFilter(Some(f(cols)), childMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: CT => Frag)(using
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val d = PivotEagerDef(rootMeta, rel, targetMeta, targetCodec, Some(f(cols)))
+    val d = PivotEagerDef(rootMeta, rel, targetMeta, targetCodec, mergeFilter(Some(f(cols)), targetMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(f: CT => Frag)(using
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
     val d = ThroughEagerDef(
@@ -96,13 +118,14 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       rel.sourcePk.scalaName,
       targetMeta,
       targetCodec,
-      Some(f(cols))
+      mergeFilter(Some(f(cols)), targetMeta, scoped)
     )
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: CT => Frag)(using
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
     val d = ThroughEagerDef(
@@ -115,7 +138,7 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       rel.sourcePk.scalaName,
       targetMeta,
       targetCodec,
-      Some(f(cols))
+      mergeFilter(Some(f(cols)), targetMeta, scoped)
     )
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
@@ -123,9 +146,10 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
 
   def withRelated[T, P, CT <: Selectable, PCT <: Selectable](rel: PivotRelation[E, T, P, CT, PCT])(using
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
-    val d = PivotEagerDef(rootMeta, rel.underlying, targetMeta, targetCodec, None)
+    val d = PivotEagerDef(rootMeta, rel.underlying, targetMeta, targetCodec, mergeFilter(None, targetMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   // --- withRelatedAndPivot ---
@@ -136,9 +160,10 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
       pivotMeta: TableMeta[P],
-      pivotCodec: DbCodec[P]
+      pivotCodec: DbCodec[P],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[(T, P)]]] =
-    val d = PivotWithDataEagerDef(rootMeta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, None)
+    val d = PivotWithDataEagerDef(rootMeta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, mergeFilter(None, targetMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelatedAndPivot[T, P, CT <: Selectable, PCT <: Selectable](
@@ -148,9 +173,10 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
       pivotMeta: TableMeta[P],
-      pivotCodec: DbCodec[P]
+      pivotCodec: DbCodec[P],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[(T, P)]]] =
-    val d = PivotWithDataEagerDef(rootMeta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, Some(pivotFilter))
+    val d = PivotWithDataEagerDef(rootMeta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, mergeFilter(Some(pivotFilter), targetMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   // --- Composed (via) withRelated ---
@@ -159,19 +185,23 @@ class EagerQuery[E, R <: Tuple] private[magnum] (
       intermediateMeta: TableMeta[I],
       intermediateCodec: DbCodec[I],
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      intermediateScoped: Scoped[I],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
-    val d = ComposedEagerDef(rootMeta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, None)
+    val d = ComposedEagerDef(rootMeta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, mergeFilter(None, intermediateMeta, intermediateScoped), mergeFilter(None, targetMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: CT => Frag)(using
       intermediateMeta: TableMeta[I],
       intermediateCodec: DbCodec[I],
       targetMeta: TableMeta[T],
-      targetCodec: DbCodec[T]
+      targetCodec: DbCodec[T],
+      intermediateScoped: Scoped[I],
+      scoped: Scoped[T]
   ): EagerQuery[E, Tuple.Append[R, Vector[T]]] =
     val cols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val d = ComposedEagerDef(rootMeta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, Some(f(cols)))
+    val d = ComposedEagerDef(rootMeta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, mergeFilter(None, intermediateMeta, intermediateScoped), mergeFilter(Some(f(cols)), targetMeta, scoped))
     EagerQuery(rootFrag, rootCodec, rootMeta, defs :+ d)
 
   // --- Execution ---

@@ -36,10 +36,8 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
   // --- scope: the only thing needed for reads ---
 
   private val softDeleteScope: Scope[E] = new Scope[E]:
-    def apply[C <: Selectable](
-        qb: QueryBuilder[HasRoot, E, C]
-    ): QueryBuilder[HasRoot, E, C] =
-      qb.where(WhereFrag(Frag(s"$sdColSql IS NULL", Seq.empty, FragWriter.empty)))
+    override def conditions(meta: TableMeta[E]): Vector[WhereFrag] =
+      Vector(WhereFrag(Frag(s"$sdColSql IS NULL", Seq.empty, FragWriter.empty)))
     override def key: ClassTag[?] = classTag[SoftDeletes[?, ?, ?]]
 
   override def finalScopes: Vector[Scope[E]] =
@@ -115,12 +113,11 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
     val cols = new Columns[E](meta.columns)
     val qb = QueryBuilder.build0[E, Columns[E]](meta, codec, cols)
     val scopes = onlyTrashedScopes
-    scopes.foldLeft(qb)((q, s) => s.apply(q))
+    val withWheres = scopes.flatMap(_.conditions(meta)).foldLeft(qb)(_.where(_))
+    scopes.flatMap(_.orderings(meta)).foldLeft(withWheres)(_.orderBy(_))
 
   private def onlyTrashedScopes: Vector[Scope[E]] =
     self.injectedScopes :+ new Scope[E]:
-      def apply[C <: Selectable](
-          qb: QueryBuilder[HasRoot, E, C]
-      ): QueryBuilder[HasRoot, E, C] =
-        qb.where(WhereFrag(Frag(s"$sdColSql IS NOT NULL", Seq.empty, FragWriter.empty)))
+      override def conditions(meta: TableMeta[E]): Vector[WhereFrag] =
+        Vector(WhereFrag(Frag(s"$sdColSql IS NOT NULL", Seq.empty, FragWriter.empty)))
 end SoftDeletes

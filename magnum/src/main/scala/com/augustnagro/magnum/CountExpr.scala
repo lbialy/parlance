@@ -18,3 +18,8 @@ class CountExpr(
       ps.setLong(next, n)
       next + 1
     WhereFrag(Frag(s"($subquerySql) $operator ?", condParams :+ n, writer))
+
+object CountExpr:
+  /** Create a CountExpr from a Frag (for scope-aware count queries that carry parameters). */
+  def fromFrag(baseFrag: Frag): CountExpr =
+    CountExpr(baseFrag.sqlString, baseFrag.params, baseFrag.writer)

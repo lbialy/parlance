@@ -8,7 +8,9 @@ class CountQuery[E] private[magnum] (
     private val rootPredicate: Option[Predicate],
     private val orderEntries: Vector[(ColRef[?], SortOrder, NullOrder)],
     private val limitOpt: Option[Int],
-    private val offsetOpt: Option[Long]
+    private val offsetOpt: Option[Long],
+    private val countBaseParams: Seq[Any] = Seq.empty,
+    private val countBaseWriter: FragWriter = FragWriter.empty
 ):
 
   def build: Frag =
@@ -21,18 +23,20 @@ class CountQuery[E] private[magnum] (
     val baseSql = s"SELECT $selectCols, $countSql AS cnt FROM ${meta.tableName}"
 
     val (whereSql, whereParams, whereWriter) = QuerySqlBuilder.buildWhere(rootPredicate)
-    val orderBySql = QuerySqlBuilder.buildOrderBy(orderEntries)
+    val (orderBySql, _, _) = QuerySqlBuilder.buildOrderBy(orderEntries)
     val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
 
     val fullSql = baseSql + whereSql + orderBySql + limitOffsetSql
 
-    // Count condition params appear in SELECT (before WHERE),
-    // so combined writer writes count params first, then WHERE params
-    val combinedParams = countCondition.map(_.params).getOrElse(Seq.empty) ++ whereParams
+    // Count params appear in SELECT (before WHERE):
+    // first base params (scope conditions), then condition params, then WHERE params
+    val countCondParams = countCondition.map(_.params).getOrElse(Seq.empty)
+    val combinedParams = countBaseParams ++ countCondParams ++ whereParams
     val combinedWriter: FragWriter = (ps, pos) =>
+      val afterBase = countBaseWriter.write(ps, pos)
       val afterCount = countCondition match
-        case None       => pos
-        case Some(cond) => cond.writer.write(ps, pos)
+        case None       => afterBase
+        case Some(cond) => cond.writer.write(ps, afterBase)
       whereWriter.write(ps, afterCount)
 
     Frag(fullSql, combinedParams, combinedWriter)
@@ -44,7 +48,7 @@ class CountQuery[E] private[magnum] (
 
   def first()(using DbCon): Option[(E, Long)] =
     given DbCodec[E] = rootCodec
-    val q = new CountQuery(meta, rootCodec, countSubquerySql, countCondition, rootPredicate, orderEntries, Some(1), offsetOpt)
+    val q = new CountQuery(meta, rootCodec, countSubquerySql, countCondition, rootPredicate, orderEntries, Some(1), offsetOpt, countBaseParams, countBaseWriter)
     q.build.query[(E, Long)].run().headOption
 
   def buildQueries: Vector[Frag] = Vector(build)

@@ -248,6 +248,7 @@ class ComposedEagerDef[Root, Intermediate, Target](
     private val outerRel: HasMany[Intermediate, Target, ?],
     private val targetMeta: TableMeta[Target],
     private val targetCodec: DbCodec[Target],
+    private val intermediateFilter: Option[Frag],
     private val filter: Option[Frag]
 ) extends EagerQueryDef:
 
@@ -273,7 +274,7 @@ class ComposedEagerDef[Root, Intermediate, Target](
     s"SELECT $cols FROM ${targetMeta.tableName} WHERE ${outerRel.pk.sqlName} IN ($placeholders)"
 
   def fetchGrouped(parentKeys: Vector[Any])(using DbCon): mutable.LinkedHashMap[Any, Vector[Any]] =
-    val intermediates = fetchByKeys(intermediateQuerySql, parentKeys, intermediateCodec, None)
+    val intermediates = fetchByKeys(intermediateQuerySql, parentKeys, intermediateCodec, intermediateFilter)
     if intermediates.isEmpty then return mutable.LinkedHashMap.empty
 
     val iPkIdx = innerPkIndex

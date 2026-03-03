@@ -163,4 +163,71 @@ class ViaTests extends QbTestBase:
     // root + intermediate query + target query = 3
     assertEquals(queries.size, 3)
 
+  // --- Transitive scope tests for ComposedRelationship ---
+
+  // Scope that excludes author id=2 (Bob) from the intermediate step
+  private val excludeBobAuthorScope = new Scope[ViaAuthor]:
+    override def conditions(meta: TableMeta[ViaAuthor]): Vector[WhereFrag] =
+      Vector(Frag(s"${meta.tableName}.id <> 2", Seq.empty, FragWriter.empty).unsafeAsWhere)
+
+  test("via with intermediate scope excludes intermediates"):
+    given Scoped[ViaAuthor] with
+      def scopes: Vector[Scope[ViaAuthor]] = Vector(excludeBobAuthorScope)
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[ViaPost]
+        .orderBy(_.id)
+        .withRelated(contactsViaPostAuthor)
+        .run()
+      assertEquals(results.size, 3)
+      // Alice's posts → Alice passes scope → her 2 contacts visible
+      assertEquals(results(0)._2.size, 2)
+      assertEquals(results(1)._2.size, 2)
+      // Bob's post → Bob excluded by intermediate scope → 0 contacts
+      assertEquals(results(2)._2.size, 0)
+
+  // Scope on the target (ViaContact) — excludes inactive contacts
+  private val activeOnlyScope = new Scope[ViaContact]:
+    override def conditions(meta: TableMeta[ViaContact]): Vector[WhereFrag] =
+      Vector(Frag(s"${meta.tableName}.active = true", Seq.empty, FragWriter.empty).unsafeAsWhere)
+
+  test("via with both intermediate and target scopes"):
+    given Scoped[ViaAuthor] with
+      def scopes: Vector[Scope[ViaAuthor]] = Vector(excludeBobAuthorScope)
+    given Scoped[ViaContact] with
+      def scopes: Vector[Scope[ViaContact]] = Vector(activeOnlyScope)
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[ViaPost]
+        .orderBy(_.id)
+        .withRelated(contactsViaPostAuthor)
+        .run()
+      assertEquals(results.size, 3)
+      // Alice's posts → Alice passes scope → only 1 active contact
+      assertEquals(results(0)._2.size, 1)
+      assertEquals(results(0)._2.head.email, "alice@example.com")
+      assertEquals(results(1)._2.size, 1)
+      // Bob's post → Bob excluded by intermediate scope → 0 contacts
+      assertEquals(results(2)._2.size, 0)
+
+  test("via with target scope only (intermediate unscoped)"):
+    given Scoped[ViaContact] with
+      def scopes: Vector[Scope[ViaContact]] = Vector(activeOnlyScope)
+    val t = xa()
+    t.connect:
+      val results = QueryBuilder
+        .from[ViaPost]
+        .orderBy(_.id)
+        .withRelated(contactsViaPostAuthor)
+        .run()
+      assertEquals(results.size, 3)
+      // Alice's posts → 1 active contact each
+      assertEquals(results(0)._2.size, 1)
+      assertEquals(results(1)._2.size, 1)
+      // Bob's post → 1 active contact (bob@example.com is active)
+      assertEquals(results(2)._2.size, 1)
+      assertEquals(results(2)._2.head.email, "bob@example.com")
+
 end ViaTests

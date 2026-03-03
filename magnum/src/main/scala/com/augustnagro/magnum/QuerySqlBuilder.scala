@@ -22,14 +22,25 @@ private[magnum] object QuerySqlBuilder:
         if frag.sqlString.isEmpty then ("", Seq.empty, FragWriter.empty)
         else (" WHERE " + frag.sqlString, frag.params, frag.writer)
 
-  def buildOrderBy(entries: Vector[(ColRef[?], SortOrder, NullOrder)]): String =
-    if entries.isEmpty then ""
+  def buildOrderBy(
+      entries: Vector[(ColRef[?], SortOrder, NullOrder)],
+      rawFrags: Vector[OrderByFrag] = Vector.empty
+  ): (String, Seq[Any], FragWriter) =
+    val structuredParts = entries.map((col, ord, nullOrd) =>
+      val base = s"${col.queryRepr} ${ord.queryRepr}"
+      if nullOrd.queryRepr.isEmpty then base else s"$base ${nullOrd.queryRepr}"
+    )
+    val rawParts = rawFrags.filter(_.sqlString.nonEmpty)
+    val allParts = structuredParts ++ rawParts.map(_.sqlString)
+    if allParts.isEmpty then ("", Seq.empty, FragWriter.empty)
     else
-      val parts = entries.map((col, ord, nullOrd) =>
-        val base = s"${col.queryRepr} ${ord.queryRepr}"
-        if nullOrd.queryRepr.isEmpty then base else s"$base ${nullOrd.queryRepr}"
-      )
-      " ORDER BY " + parts.mkString(", ")
+      val sql = " ORDER BY " + allParts.mkString(", ")
+      val params = rawParts.flatMap(_.params)
+      val writer: FragWriter =
+        if rawParts.isEmpty then FragWriter.empty
+        else (ps, pos) =>
+          rawParts.foldLeft(pos)((p, f) => f.writer.write(ps, p))
+      (sql, params, writer)
 
   def buildLimitOffset(limitOpt: Option[Int], offsetOpt: Option[Long]): String =
     val limitSql = limitOpt.fold("")(n => s" LIMIT $n")

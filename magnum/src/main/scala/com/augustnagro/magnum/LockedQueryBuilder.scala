@@ -9,23 +9,30 @@ class LockedQueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     private val limitOpt: Option[Int],
     private val offsetOpt: Option[Long],
     private val distinctFlag: Boolean,
-    private val lockMode: LockMode
+    private val lockMode: LockMode,
+    private val rawOrderFrags: Vector[OrderByFrag] = Vector.empty
 ):
 
   def build: Frag =
     val selectCols = meta.columns.map(_.sqlName).mkString(", ")
     val keyword = if distinctFlag then "SELECT DISTINCT" else "SELECT"
     val baseSql = s"$keyword $selectCols FROM ${meta.tableName}"
-    val (whereSql, params, writer) = QuerySqlBuilder.buildWhere(rootPredicate)
-    val orderBySql = QuerySqlBuilder.buildOrderBy(orderEntries)
+    val (whereSql, whereParams, whereWriter) = QuerySqlBuilder.buildWhere(rootPredicate)
+    val (orderBySql, orderParams, orderWriter) = QuerySqlBuilder.buildOrderBy(orderEntries, rawOrderFrags)
     val limitOffsetSql = QuerySqlBuilder.buildLimitOffset(limitOpt, offsetOpt)
-    Frag(baseSql + whereSql + orderBySql + limitOffsetSql + " " + lockMode.sql, params, writer)
+    val allParams = whereParams ++ orderParams
+    val combinedWriter: FragWriter =
+      if orderParams.isEmpty then whereWriter
+      else (ps, pos) =>
+        val next = whereWriter.write(ps, pos)
+        orderWriter.write(ps, next)
+    Frag(baseSql + whereSql + orderBySql + limitOffsetSql + " " + lockMode.sql, allParams, combinedWriter)
 
   def run()(using DbTx): Vector[E] =
     build.query[E](using codec).run()
 
   def first()(using DbTx): Option[E] =
-    LockedQueryBuilder(meta, codec, cols, rootPredicate, orderEntries, Some(1), offsetOpt, distinctFlag, lockMode)
+    LockedQueryBuilder(meta, codec, cols, rootPredicate, orderEntries, Some(1), offsetOpt, distinctFlag, lockMode, rawOrderFrags)
       .run().headOption
 
   def firstOrFail()(using DbTx): E =

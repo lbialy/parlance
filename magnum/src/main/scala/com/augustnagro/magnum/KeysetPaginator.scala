@@ -33,7 +33,7 @@ class KeysetPaginator[E, K] private[magnum] (
         (" WHERE " + combined.sqlString, combined.params, combined.writer)
 
     // Build ORDER BY
-    val orderBySql = QuerySqlBuilder.buildOrderBy(
+    val (orderBySql, _, _) = QuerySqlBuilder.buildOrderBy(
       entries.map(e => (e.colRef, e.sortOrder, e.nullOrder))
     )
 

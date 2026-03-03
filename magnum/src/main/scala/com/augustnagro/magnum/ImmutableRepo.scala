@@ -16,7 +16,7 @@ open class ImmutableRepo[E, ID](
 )(using
     defaults: RepoDefaults[?, E, ID],
     meta: EntityMeta[E]
-):
+) extends Scoped[E]:
 
   /** Expose table metadata for traits with self-type. */
   protected def entityMeta: TableMeta[E] = meta
@@ -106,11 +106,18 @@ open class ImmutableRepo[E, ID](
     */
   def finalScopes: Vector[Scope[E]] = injectedScopes
 
+  /** Implements Scoped[E] — delegates to finalScopes. */
+  def scopes: Vector[Scope[E]] = finalScopes
+
   /** Apply all finalScopes to a QueryBuilder. */
   final def applyScopes[C <: Selectable](
       qb: QueryBuilder[HasRoot, E, C]
   ): QueryBuilder[HasRoot, E, C] =
-    finalScopes.foldLeft(qb)((q, s) => s.apply(q))
+    val m = entityMeta
+    val withWheres = finalScopes.flatMap(_.conditions(m))
+      .foldLeft(qb)(_.where(_))
+    finalScopes.flatMap(_.orderings(m))
+      .foldLeft(withWheres)(_.orderBy(_))
 
   /** Create a QueryBuilder with all scopes applied. */
   transparent inline def query: Any =
