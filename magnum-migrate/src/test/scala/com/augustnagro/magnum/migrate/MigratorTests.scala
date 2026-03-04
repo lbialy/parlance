@@ -258,10 +258,11 @@ class MigratorTests extends FunSuite:
     // Verify users table does NOT exist by trying to query it
     xa.connect:
       val conn = summon[com.augustnagro.magnum.DbCon[?]].connection
-      val threw = try
-        conn.createStatement().executeQuery("SELECT COUNT(*) FROM users")
-        false
-      catch case _: Exception => true
+      val threw =
+        try
+          conn.createStatement().executeQuery("SELECT COUNT(*) FROM users")
+          false
+        catch case _: Exception => true
       assert(threw, "Expected users table to not exist after pretend()")
 
   // --- RawParameterized ---
@@ -284,9 +285,11 @@ class MigratorTests extends FunSuite:
     m.migrate()
     xa.connect:
       val conn = summon[com.augustnagro.magnum.DbCon[?]].connection
-      val rs = conn.createStatement().executeQuery(
-        "SELECT email, name FROM users WHERE email = 'test@example.com'"
-      )
+      val rs = conn
+        .createStatement()
+        .executeQuery(
+          "SELECT email, name FROM users WHERE email = 'test@example.com'"
+        )
       assert(rs.next(), "Expected a row")
       assertEquals(rs.getString("email"), "test@example.com")
       assertEquals(rs.getString("name"), "Test User")

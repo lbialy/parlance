@@ -38,8 +38,7 @@ private[magnum] object QuerySqlBuilder:
       val params = rawParts.flatMap(_.params)
       val writer: FragWriter =
         if rawParts.isEmpty then FragWriter.empty
-        else (ps, pos) =>
-          rawParts.foldLeft(pos)((p, f) => f.writer.write(ps, p))
+        else (ps, pos) => rawParts.foldLeft(pos)((p, f) => f.writer.write(ps, p))
       (sql, params, writer)
 
   def buildLimitOffset(limitOpt: Option[Int], offsetOpt: Option[Long], dt: DatabaseType): String =

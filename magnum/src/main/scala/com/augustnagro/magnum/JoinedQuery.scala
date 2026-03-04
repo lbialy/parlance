@@ -153,10 +153,9 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
     joinClauses.flatMap(_.onCondition.params)
 
   private[magnum] def joinOnWriter: FragWriter =
-    joinClauses.foldLeft(FragWriter.empty) { (acc, entry) =>
-      (ps, pos) =>
-        val afterAcc = acc.write(ps, pos)
-        entry.onCondition.writer.write(ps, afterAcc)
+    joinClauses.foldLeft(FragWriter.empty) { (acc, entry) => (ps, pos) =>
+      val afterAcc = acc.write(ps, pos)
+      entry.onCondition.writer.write(ps, afterAcc)
     }
 
   private def buildFromJoinWhere: (String, Seq[Any], FragWriter) =
@@ -168,7 +167,6 @@ class JoinedQuery[R <: NonEmptyTuple] private[magnum] (
       val afterJoin = joinOnWriter.write(ps, pos)
       whereWriter.write(ps, afterJoin)
     (fromJoinSql + whereSql, allParams, combinedWriter)
-  end buildFromJoinWhere
 
   def build(using con: DbCon[?]): Frag =
     buildWith(con.databaseType)
@@ -346,7 +344,7 @@ object JoinedQuery:
 
   // --- joinedSelectImpl macro ---
 
-  private def joinedSelectImpl[R <: NonEmptyTuple : Type, P: Type](
+  private def joinedSelectImpl[R <: NonEmptyTuple: Type, P: Type](
       phaseExpr: Expr[JoinedSelectPhase[R]],
       f: Expr[JoinedQuery[R] => P]
   )(using Quotes): Expr[Any] =
@@ -386,8 +384,7 @@ object JoinedQuery:
     val codecExprs: List[Expr[DbCodec[?]]] = elemInfos.map { case (name, innerTpe, isSE) =>
       innerTpe match
         case '[a] =>
-          if isSE then
-            '{ null.asInstanceOf[DbCodec[?]] }
+          if isSE then '{ null.asInstanceOf[DbCodec[?]] }
           else
             Expr.summon[DbCodec[a]] match
               case Some(c) => '{ $c.asInstanceOf[DbCodec[?]] }
@@ -452,6 +449,7 @@ object JoinedQuery:
         }
       case _ =>
         report.errorAndAbort("select() failed to construct result types. This is a bug in magnum.")
+    end match
   end joinedSelectImpl
 
 end JoinedQuery

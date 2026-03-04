@@ -37,6 +37,7 @@ case class VerifyResult(
         case _ => () // already rendered via columnDetails
 
     sb.result()
+  end prettyPrint
 
   private def issueLabel(i: VerifyIssue): String = i match
     case _: VerifyIssue.TypeMismatch        => "TypeMismatch"
@@ -55,8 +56,7 @@ case class VerifyColumnDetail(
 
 enum VerifyIssue(val isWarning: Boolean):
   case TableMissing(tableName: String) extends VerifyIssue(false)
-  case ColumnMissing(columnName: String, scalaType: String)
-      extends VerifyIssue(false)
+  case ColumnMissing(columnName: String, scalaType: String) extends VerifyIssue(false)
   case TypeMismatch(
       columnName: String,
       scalaType: String,
@@ -68,6 +68,4 @@ enum VerifyIssue(val isWarning: Boolean):
       isNullableInDb: Boolean
   ) extends VerifyIssue(true)
   case ExtraColumnInDb(columnName: String) extends VerifyIssue(true)
-  case PrimaryKeyMismatch(expected: List[String], actual: List[String])
-      extends VerifyIssue(false)
-end VerifyIssue
+  case PrimaryKeyMismatch(expected: List[String], actual: List[String]) extends VerifyIssue(false)

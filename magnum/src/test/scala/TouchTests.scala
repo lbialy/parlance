@@ -3,8 +3,7 @@ import com.augustnagro.magnum.*
 import java.time.OffsetDateTime
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class TouchableItem(@Id id: Long, name: String, status: String, @updatedAt updatedAt: OffsetDateTime)
-  derives EntityMeta
+case class TouchableItem(@Id id: Long, name: String, status: String, @updatedAt updatedAt: OffsetDateTime) derives EntityMeta
 
 class TouchTests extends QbTestBase:
 

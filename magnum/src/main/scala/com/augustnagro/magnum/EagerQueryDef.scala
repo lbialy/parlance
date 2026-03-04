@@ -305,6 +305,7 @@ class ComposedEagerDef[Root, Intermediate, Target](
         targetsByOuterPk.getOrElse(outerFkVal, Vector.empty)
       if myTargets.nonEmpty then result(rootKey) = myTargets
     result.asInstanceOf[mutable.LinkedHashMap[Any, Vector[Any]]]
+  end fetchGrouped
 
   def representativeQueries: Vector[Frag] =
     Vector(
@@ -371,12 +372,15 @@ class PivotWithDataEagerDef[E, T, P](
     // 4. Build result: sourceKey → Vector[(T, P)] stored as Any tuples
     val result = mutable.LinkedHashMap.empty[Any, Vector[Any]]
     pivotsBySourceAndTarget.foreach: (srcKey, tgtKey, pivot) =>
-      targetByKey.get(tgtKey).foreach: target =>
-        val pair: (T, P) = (target, pivot)
-        result.updateWith(srcKey):
-          case Some(existing) => Some(existing :+ pair)
-          case None           => Some(Vector(pair))
+      targetByKey
+        .get(tgtKey)
+        .foreach: target =>
+          val pair: (T, P) = (target, pivot)
+          result.updateWith(srcKey):
+            case Some(existing) => Some(existing :+ pair)
+            case None           => Some(Vector(pair))
     result
+  end fetchGrouped
 
   def representativeQueries: Vector[Frag] =
     Vector(

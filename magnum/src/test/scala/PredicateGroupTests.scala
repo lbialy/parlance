@@ -56,17 +56,13 @@ class PredicateGroupTests extends QbTestBase:
       val results = QueryBuilder
         .from[QbUser]
         .where(_.age > 10)
-        .where(sq =>
-          (sq.firstName === Some("Alice")) || (sq.firstName === Some("Bob"))
-        )
+        .where(sq => (sq.firstName === Some("Alice")) || (sq.firstName === Some("Bob")))
         .run()
       assertEquals(results.length, 2)
       val frag = QueryBuilder
         .from[QbUser]
         .where(_.age > 10)
-        .where(sq =>
-          (sq.firstName === Some("Alice")) || (sq.firstName === Some("Bob"))
-        )
+        .where(sq => (sq.firstName === Some("Alice")) || (sq.firstName === Some("Bob")))
         .build
       assertEquals(
         frag.sqlString,

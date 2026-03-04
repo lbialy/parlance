@@ -274,10 +274,11 @@ object H2DbType extends DbType:
             // Conditional INSERT: skip if a matching row exists
             val keyColNames = target match
               case ConflictTarget.Columns(cols*) if cols.nonEmpty => cols.map(_.sqlName).toSeq
-              case _ => Seq(eElemNamesSql(idIndex))
+              case _                                              => Seq(eElemNamesSql(idIndex))
             val whereClause = keyColNames.map(c => s"$c = ?").mkString(" AND ")
             val ecCols = ecElemNamesSql.mkString(", ")
-            val sql = s"INSERT INTO $tableNameSql ($ecCols) SELECT ${ecCodec.queryRepr} WHERE NOT EXISTS (SELECT 1 FROM $tableNameSql WHERE $whereClause)"
+            val sql =
+              s"INSERT INTO $tableNameSql ($ecCols) SELECT ${ecCodec.queryRepr} WHERE NOT EXISTS (SELECT 1 FROM $tableNameSql WHERE $whereClause)"
             handleQuery(sql, entityCreator):
               Using(con.connection.prepareStatement(sql)): ps =>
                 ecCodec.writeSingle(entityCreator, ps)
@@ -311,7 +312,8 @@ object H2DbType extends DbType:
       def insertAllIgnoring(entityCreators: Iterable[EC])(using con: DbCon[?]): Int =
         // Conditional INSERT: skip rows where PK already exists
         val ecCols = ecElemNamesSql.mkString(", ")
-        val sql = s"INSERT INTO $tableNameSql ($ecCols) SELECT ${ecCodec.queryRepr} WHERE NOT EXISTS (SELECT 1 FROM $tableNameSql WHERE $idName = ?)"
+        val sql =
+          s"INSERT INTO $tableNameSql ($ecCols) SELECT ${ecCodec.queryRepr} WHERE NOT EXISTS (SELECT 1 FROM $tableNameSql WHERE $idName = ?)"
         handleQuery(sql, entityCreators):
           Using(con.connection.prepareStatement(sql)): ps =>
             timed:

@@ -7,8 +7,7 @@ import scala.util.Using
 
 case class SyncResult(attached: Int, detached: Int, unchanged: Int)
 
-/** Read-only pivot relation — supports withRelatedAndPivot and detach, but NOT attach.
-  * Created via `belongsToMany.withPivot[P]`.
+/** Read-only pivot relation — supports withRelatedAndPivot and detach, but NOT attach. Created via `belongsToMany.withPivot[P]`.
   */
 class PivotRelation[S, T, P, +CT <: Selectable, +PCT <: Selectable](
     val underlying: BelongsToMany[S, T, CT],
@@ -24,8 +23,7 @@ class PivotRelation[S, T, P, +CT <: Selectable, +PCT <: Selectable](
   def detachAll(source: S)(using sm: EntityMeta[S], con: DbCon[?]): Int =
     BelongsToManyOps.detachAllImpl(underlying, source, sm, con)
 
-/** Writable pivot relation — supports attach with typed creator.
-  * Created via `belongsToMany.withPivot[P, PC]`.
+/** Writable pivot relation — supports attach with typed creator. Created via `belongsToMany.withPivot[P, PC]`.
   */
 class WritablePivotRelation[S, T, P, PC, +CT <: Selectable, +PCT <: Selectable](
     underlying: BelongsToMany[S, T, CT],
@@ -61,9 +59,7 @@ class WritablePivotRelation[S, T, P, PC, +CT <: Selectable, +PCT <: Selectable](
     val currentKeySet = currentKeys.toSet
 
     val desiredTargets = targets.toVector
-    val desiredKeys = desiredTargets.map(t =>
-      t.asInstanceOf[Product].productElement(targetPkIdx)
-    )
+    val desiredKeys = desiredTargets.map(t => t.asInstanceOf[Product].productElement(targetPkIdx))
     val desiredKeySet = desiredKeys.toSet
 
     val toDetach = currentKeySet -- desiredKeySet
@@ -76,10 +72,10 @@ class WritablePivotRelation[S, T, P, PC, +CT <: Selectable, +PCT <: Selectable](
       if toDetach.isEmpty then 0
       else BelongsToManyOps.detachByTargetKeys(rel, sourceKey, toDetach.toVector, con)
 
-    if toAttach.nonEmpty then
-      attachAll(toAttach.map(creator))
+    if toAttach.nonEmpty then attachAll(toAttach.map(creator))
 
     SyncResult(attached = toAttach.size, detached = detached, unchanged = unchanged)
+  end sync
 
 end WritablePivotRelation
 
@@ -117,6 +113,7 @@ extension [S, T, CT <: Selectable](rel: BelongsToMany[S, T, CT])
       con: DbCon[?]
   ): SyncResult =
     BelongsToManyOps.syncImpl(rel, source, targets, sm, tm, con)
+end extension
 
 // === Macro implementations for withPivot ===
 
@@ -165,6 +162,7 @@ private[magnum] object BelongsToManyOps:
         ps.setObject(2, targetKey)
         ps.addBatch()
       ps.executeBatch().sum
+  end attachImpl
 
   def detachImpl[S, T](
       rel: BelongsToMany[S, T, ?],
@@ -238,9 +236,7 @@ private[magnum] object BelongsToManyOps:
     val currentKeySet = currentKeys.toSet
 
     val desiredTargets = targets.toVector
-    val desiredKeys = desiredTargets.map(t =>
-      t.asInstanceOf[Product].productElement(targetPkIdx)
-    )
+    val desiredKeys = desiredTargets.map(t => t.asInstanceOf[Product].productElement(targetPkIdx))
     val desiredKeySet = desiredKeys.toSet
 
     val toDetachKeys = currentKeySet -- desiredKeySet
@@ -266,5 +262,6 @@ private[magnum] object BelongsToManyOps:
           ps.executeBatch().sum
 
     SyncResult(attached = attached, detached = detached, unchanged = unchanged)
+  end syncImpl
 
 end BelongsToManyOps

@@ -48,3 +48,4 @@ enum ColumnType:
 
   // Escape hatch
   case Custom(sqlTypeName: String)
+end ColumnType

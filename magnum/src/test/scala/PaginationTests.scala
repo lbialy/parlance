@@ -3,8 +3,7 @@ import com.augustnagro.magnum.*
 import java.time.LocalDateTime
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class QbPaginated(@Id id: Long, name: String, score: Int, createdAt: LocalDateTime)
-    derives EntityMeta
+case class QbPaginated(@Id id: Long, name: String, score: Int, createdAt: LocalDateTime) derives EntityMeta
 
 class PaginationTests extends QbTestBase:
 
@@ -93,7 +92,8 @@ class PaginationTests extends QbTestBase:
   test("keyset multi-column: desc score, asc id"):
     val t = xa()
     t.connect:
-      val paginator = QueryBuilder.from[QbPaginated]
+      val paginator = QueryBuilder
+        .from[QbPaginated]
         .keysetPaginate(3)(k => k.desc(_.score).asc(_.id))
       val page1 = paginator.run()
       // Top 3 by score desc: Diana(95), Alice(90), Ivy(88)
@@ -103,7 +103,8 @@ class PaginationTests extends QbTestBase:
   test("keyset multi-column: second page"):
     val t = xa()
     t.connect:
-      val paginator = QueryBuilder.from[QbPaginated]
+      val paginator = QueryBuilder
+        .from[QbPaginated]
         .keysetPaginate(3)(k => k.desc(_.score).asc(_.id))
       val page1 = paginator.run()
       val key1 = page1.nextKey.get
@@ -115,7 +116,8 @@ class PaginationTests extends QbTestBase:
   test("keyset multi-column: iterate to end, no overlaps"):
     val t = xa()
     t.connect:
-      val paginator = QueryBuilder.from[QbPaginated]
+      val paginator = QueryBuilder
+        .from[QbPaginated]
         .keysetPaginate(3)(k => k.desc(_.score).asc(_.id))
       var page = paginator.run()
       var allNames = page.items.map(_.name)
@@ -130,7 +132,8 @@ class PaginationTests extends QbTestBase:
   test("keyset with WHERE filter"):
     val t = xa()
     t.connect:
-      val paginator = QueryBuilder.from[QbPaginated]
+      val paginator = QueryBuilder
+        .from[QbPaginated]
         .where(_.score > 70)
         .keysetPaginate(3)(_.asc(_.id))
       val page1 = paginator.run()
@@ -146,7 +149,8 @@ class PaginationTests extends QbTestBase:
   test("keyset SQL contains expanded OR/AND form"):
     val t = xa()
     t.connect:
-      val paginator = QueryBuilder.from[QbPaginated]
+      val paginator = QueryBuilder
+        .from[QbPaginated]
         .keysetPaginate(3)(k => k.asc(_.id).desc(_.score))
       val page1 = paginator.run()
       // We can't directly inspect SQL, but we verify correctness through behavior

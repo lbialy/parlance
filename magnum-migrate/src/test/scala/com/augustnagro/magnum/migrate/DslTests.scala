@@ -180,3 +180,4 @@ class DslTests extends FunSuite:
   test("Option[T] column is nullable by default via inference"):
     val col = column[Option[java.time.Instant]]("deleted_at").nullable
     assert(col.modifiers.nullable)
+end DslTests

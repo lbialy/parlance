@@ -12,10 +12,12 @@ class JoinedSelectTests extends QbTestBase:
       val results = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .select(jq => (
-          title = jq.of[JnBook].title,
-          author = jq.of[JnAuthor].name
-        ))
+        .select(jq =>
+          (
+            title = jq.of[JnBook].title,
+            author = jq.of[JnAuthor].name
+          )
+        )
         .run()
       assertEquals(results.length, 5)
       val dune = results.find(_.title == "Dune")
@@ -28,10 +30,12 @@ class JoinedSelectTests extends QbTestBase:
       val results = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .select(jq => (
-          author = jq.of[JnAuthor].name,
-          cnt = Expr.count
-        ))
+        .select(jq =>
+          (
+            author = jq.of[JnAuthor].name,
+            cnt = Expr.count
+          )
+        )
         .groupBy(_.author)
         .orderBy(_.author)
         .run()
@@ -49,10 +53,12 @@ class JoinedSelectTests extends QbTestBase:
       val results = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .select(jq => (
-          author = jq.of[JnAuthor].name,
-          cnt = Expr.count
-        ))
+        .select(jq =>
+          (
+            author = jq.of[JnAuthor].name,
+            cnt = Expr.count
+          )
+        )
         .groupBy(_.author)
         .having(_.cnt > 1L)
         .run()
@@ -66,10 +72,12 @@ class JoinedSelectTests extends QbTestBase:
       val results = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .select(jq => (
-          author = jq.of[JnAuthor].name,
-          cnt = Expr.count
-        ))
+        .select(jq =>
+          (
+            author = jq.of[JnAuthor].name,
+            cnt = Expr.count
+          )
+        )
         .groupBy(_.author)
         .orderBy(_.cnt, SortOrder.Desc)
         .run()
@@ -83,10 +91,12 @@ class JoinedSelectTests extends QbTestBase:
       val results = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .select(jq => (
-          title = jq.of[JnBook].title,
-          author = jq.of[JnAuthor].name
-        ))
+        .select(jq =>
+          (
+            title = jq.of[JnBook].title,
+            author = jq.of[JnAuthor].name
+          )
+        )
         .orderBy(_.title)
         .limit(2)
         .offset(1)
@@ -102,9 +112,11 @@ class JoinedSelectTests extends QbTestBase:
       val results = QueryBuilder
         .from[JnBook]
         .join(bookAuthor)
-        .select(jq => (
-          author = jq.of[JnAuthor].name
-        ))
+        .select(jq =>
+          (
+            author = jq.of[JnAuthor].name
+          )
+        )
         .distinct
         .run()
       assertEquals(results.length, 3)
@@ -115,9 +127,11 @@ class JoinedSelectTests extends QbTestBase:
       val jq = QueryBuilder.from[JnBook].join(bookAuthor)
       val results = jq
         .where(jq.of[JnAuthor].name === "Tolkien")
-        .select(jq2 => (
-          title = jq2.of[JnBook].title
-        ))
+        .select(jq2 =>
+          (
+            title = jq2.of[JnBook].title
+          )
+        )
         .orderBy(_.title)
         .run()
       assertEquals(results.length, 2)
@@ -128,10 +142,12 @@ class JoinedSelectTests extends QbTestBase:
     val frag = QueryBuilder
       .from[JnBook]
       .join(bookAuthor)
-      .select(jq => (
-        title = jq.of[JnBook].title,
-        author = jq.of[JnAuthor].name
-      ))
+      .select(jq =>
+        (
+          title = jq.of[JnBook].title,
+          author = jq.of[JnAuthor].name
+        )
+      )
       .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("SELECT"), s"Expected SELECT in: $sql")
@@ -145,10 +161,12 @@ class JoinedSelectTests extends QbTestBase:
     val frag = QueryBuilder
       .from[JnBook]
       .join(bookAuthor)
-      .select(jq => (
-        author = jq.of[JnAuthor].name,
-        cnt = Expr.count
-      ))
+      .select(jq =>
+        (
+          author = jq.of[JnAuthor].name,
+          cnt = Expr.count
+        )
+      )
       .groupBy(_.author)
       .having(_.cnt > 1L)
       .orderBy(_.author)
@@ -172,10 +190,12 @@ class LeftJoinSelectTests extends QbTestBase:
       val results = QueryBuilder
         .from[LjBook]
         .leftJoin(bookAuthor)
-        .select(jq => (
-          title = jq.of[LjBook].title,
-          author = jq.ofLeft[LjAuthor].name
-        ))
+        .select(jq =>
+          (
+            title = jq.of[LjBook].title,
+            author = jq.ofLeft[LjAuthor].name
+          )
+        )
         .orderBy(_.title)
         .run()
       assertEquals(results.length, 3)
@@ -190,10 +210,12 @@ class LeftJoinSelectTests extends QbTestBase:
     val frag = QueryBuilder
       .from[LjBook]
       .leftJoin(bookAuthor)
-      .select(jq => (
-        title = jq.of[LjBook].title,
-        author = jq.ofLeft[LjAuthor].name
-      ))
+      .select(jq =>
+        (
+          title = jq.of[LjBook].title,
+          author = jq.ofLeft[LjAuthor].name
+        )
+      )
       .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("LEFT JOIN"), s"Expected LEFT JOIN in: $sql")
@@ -215,11 +237,13 @@ class MultiJoinSelectTests extends QbTestBase:
         .from[MjBook]
         .join(bookAuthor)
         .join(authorCountry)
-        .select(jq => (
-          title = jq.of[MjBook].title,
-          author = jq.of[MjAuthor].name,
-          country = jq.of[MjCountry].name
-        ))
+        .select(jq =>
+          (
+            title = jq.of[MjBook].title,
+            author = jq.of[MjAuthor].name,
+            country = jq.of[MjCountry].name
+          )
+        )
         .orderBy(_.title)
         .run()
       assertEquals(results.length, 5)
@@ -235,10 +259,12 @@ class MultiJoinSelectTests extends QbTestBase:
         .from[MjBook]
         .join(bookAuthor)
         .join(authorCountry)
-        .select(jq => (
-          country = jq.of[MjCountry].name,
-          cnt = Expr.count
-        ))
+        .select(jq =>
+          (
+            country = jq.of[MjCountry].name,
+            cnt = Expr.count
+          )
+        )
         .groupBy(_.country)
         .orderBy(_.country)
         .run()

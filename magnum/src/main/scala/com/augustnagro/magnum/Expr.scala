@@ -32,3 +32,4 @@ object Expr:
   /** Raw SQL expression with a declared result type. */
   def raw[A](sql: String, alias: String)(using c: DbCodec[A]): SelectExpr[A] =
     SelectExpr(sql, alias, c)
+end Expr

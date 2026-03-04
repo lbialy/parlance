@@ -88,11 +88,13 @@ extension [A](col: ColRef[A])
 
   @targetName("neCol")
   def !==(other: ColRef[A]): WhereFrag =
-    WhereFrag(Frag(
-      s"${col.queryRepr} <> ${other.queryRepr}",
-      Seq.empty,
-      FragWriter.empty
-    ))
+    WhereFrag(
+      Frag(
+        s"${col.queryRepr} <> ${other.queryRepr}",
+        Seq.empty,
+        FragWriter.empty
+      )
+    )
 
   @targetName("gtCol")
   def >(other: ColRef[A]): WhereFrag =
@@ -104,23 +106,27 @@ extension [A](col: ColRef[A])
 
   @targetName("geCol")
   def >=(other: ColRef[A]): WhereFrag =
-    WhereFrag(Frag(
-      s"${col.queryRepr} >= ${other.queryRepr}",
-      Seq.empty,
-      FragWriter.empty
-    ))
+    WhereFrag(
+      Frag(
+        s"${col.queryRepr} >= ${other.queryRepr}",
+        Seq.empty,
+        FragWriter.empty
+      )
+    )
 
   @targetName("leCol")
   def <=(other: ColRef[A]): WhereFrag =
-    WhereFrag(Frag(
-      s"${col.queryRepr} <= ${other.queryRepr}",
-      Seq.empty,
-      FragWriter.empty
-    ))
+    WhereFrag(
+      Frag(
+        s"${col.queryRepr} <= ${other.queryRepr}",
+        Seq.empty,
+        FragWriter.empty
+      )
+    )
 end extension
 
-private def likeImpl(col: ColRef[?], op: String, pattern: String)(
-    using codec: DbCodec[String]
+private def likeImpl(col: ColRef[?], op: String, pattern: String)(using
+    codec: DbCodec[String]
 ): WhereFrag =
   val writer: FragWriter = (ps, pos) =>
     codec.writeSingle(pattern, ps, pos)

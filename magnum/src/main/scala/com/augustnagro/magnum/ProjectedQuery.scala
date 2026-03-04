@@ -19,39 +19,165 @@ class ProjectedQuery[P, PC](
 ):
 
   def groupBy(f: PC => ColRef[?]): ProjectedQuery[P, PC] =
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs :+ f(projCols), havingPredicate, orderEntries, limitOpt, offsetOpt, distinctFlag)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs :+ f(projCols),
+      havingPredicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      distinctFlag
+    )
 
   def having(f: PC => WhereFrag): ProjectedQuery[P, PC] =
     val pred = Predicate.Leaf(f(projCols))
     val newHaving = QuerySqlBuilder.addAnd(havingPredicate, pred)
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, newHaving, orderEntries, limitOpt, offsetOpt, distinctFlag)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs,
+      newHaving,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      distinctFlag
+    )
 
   def having(frag: WhereFrag): ProjectedQuery[P, PC] =
     val pred = Predicate.Leaf(frag)
     val newHaving = QuerySqlBuilder.addAnd(havingPredicate, pred)
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, newHaving, orderEntries, limitOpt, offsetOpt, distinctFlag)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs,
+      newHaving,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      distinctFlag
+    )
 
   def orHaving(f: PC => WhereFrag): ProjectedQuery[P, PC] =
     val pred = Predicate.Leaf(f(projCols))
     val newHaving = QuerySqlBuilder.addOr(havingPredicate, pred)
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, newHaving, orderEntries, limitOpt, offsetOpt, distinctFlag)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs,
+      newHaving,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      distinctFlag
+    )
 
   def orderBy(f: PC => ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): ProjectedQuery[P, PC] =
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, havingPredicate, orderEntries :+ (f(projCols), order, nullOrder), limitOpt, offsetOpt, distinctFlag)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs,
+      havingPredicate,
+      orderEntries :+ (f(projCols), order, nullOrder),
+      limitOpt,
+      offsetOpt,
+      distinctFlag
+    )
 
   def orderBy(f: PC => ColRef[?]): ProjectedQuery[P, PC] =
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, havingPredicate, orderEntries :+ (f(projCols), SortOrder.Asc, NullOrder.Default), limitOpt, offsetOpt, distinctFlag)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs,
+      havingPredicate,
+      orderEntries :+ (f(projCols), SortOrder.Asc, NullOrder.Default),
+      limitOpt,
+      offsetOpt,
+      distinctFlag
+    )
 
   def limit(n: Int): ProjectedQuery[P, PC] =
     if n < 0 then throw QueryBuilderException("limit must not be negative")
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, havingPredicate, orderEntries, Some(n), offsetOpt, distinctFlag)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs,
+      havingPredicate,
+      orderEntries,
+      Some(n),
+      offsetOpt,
+      distinctFlag
+    )
 
   def offset(n: Long): ProjectedQuery[P, PC] =
     if n < 0 then throw QueryBuilderException("offset must not be negative")
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, havingPredicate, orderEntries, limitOpt, Some(n), distinctFlag)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs,
+      havingPredicate,
+      orderEntries,
+      limitOpt,
+      Some(n),
+      distinctFlag
+    )
 
   def distinct: ProjectedQuery[P, PC] =
-    new ProjectedQuery(fromClause, fromParams, fromWriter, selectExprs, resultCodec, projCols, wherePredicate, groupByExprs, havingPredicate, orderEntries, limitOpt, offsetOpt, true)
+    new ProjectedQuery(
+      fromClause,
+      fromParams,
+      fromWriter,
+      selectExprs,
+      resultCodec,
+      projCols,
+      wherePredicate,
+      groupByExprs,
+      havingPredicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      true
+    )
 
   def build(using con: DbCon[?]): Frag =
     buildWith(con.databaseType)

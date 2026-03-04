@@ -28,6 +28,7 @@ trait RepoDefaults[EC, E, ID]:
   def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon[?]): Unit
   def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon[?]): Int
   def upsertByPk(entity: E)(using DbCon[?]): Unit
+end RepoDefaults
 
 object RepoDefaults:
 

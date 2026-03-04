@@ -4,6 +4,7 @@ import scala.NamedTuple
 import scala.deriving.Mirror
 import scala.quoted.*
 import scala.reflect.TypeTest
+import scala.util.Using
 
 sealed trait QBState
 sealed trait HasRoot extends QBState
@@ -41,10 +42,30 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     new QueryBuilder(meta, codec, cols, addOr(Predicate.Leaf(f(sq))), orderEntries, limitOpt, offsetOpt, distinctFlag, rawOrderFrags)
 
   def orderBy(f: C => ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): QueryBuilder[S, E, C] =
-    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), order, nullOrder), limitOpt, offsetOpt, distinctFlag, rawOrderFrags)
+    new QueryBuilder(
+      meta,
+      codec,
+      cols,
+      rootPredicate,
+      orderEntries :+ (f(cols), order, nullOrder),
+      limitOpt,
+      offsetOpt,
+      distinctFlag,
+      rawOrderFrags
+    )
 
   def orderBy(f: C => ColRef[?]): QueryBuilder[S, E, C] =
-    new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries :+ (f(cols), SortOrder.Asc, NullOrder.Default), limitOpt, offsetOpt, distinctFlag, rawOrderFrags)
+    new QueryBuilder(
+      meta,
+      codec,
+      cols,
+      rootPredicate,
+      orderEntries :+ (f(cols), SortOrder.Asc, NullOrder.Default),
+      limitOpt,
+      offsetOpt,
+      distinctFlag,
+      rawOrderFrags
+    )
 
   def orderBy(frag: OrderByFrag): QueryBuilder[S, E, C] =
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, distinctFlag, rawOrderFrags :+ frag)
@@ -84,9 +105,10 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val allParams = whereParams ++ orderParams
     val combinedWriter: FragWriter =
       if orderParams.isEmpty then whereWriter
-      else (ps, pos) =>
-        val next = whereWriter.write(ps, pos)
-        orderWriter.write(ps, next)
+      else
+        (ps, pos) =>
+          val next = whereWriter.write(ps, pos)
+          orderWriter.write(ps, next)
 
     Frag(baseSql + whereSql + orderBySql + limitOffsetSql, allParams, combinedWriter)
 
@@ -149,9 +171,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   private def mergeEagerFilter[T](userFilter: Option[Frag], targetMeta: TableMeta[T], scoped: Scoped[T]): Option[Frag] =
     val scopeFrag = ExistsBuilder.scopeConditions(scoped.scopes, targetMeta).map(f => f: Frag)
     (userFilter, scopeFrag) match
-      case (None, None)       => None
-      case (Some(u), None)    => Some(u)
-      case (None, Some(s))    => Some(s)
+      case (None, None)    => None
+      case (Some(u), None) => Some(u)
+      case (None, Some(s)) => Some(s)
       case (Some(u), Some(s)) =>
         val sql = s"${u.sqlString} AND ${s.sqlString}"
         val params = u.params ++ s.params
@@ -256,6 +278,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       mergeEagerFilter(Some(f(sq)), targetMeta, scoped)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
+  end withRelated
 
   def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
       targetMeta: TableMeta[T],
@@ -277,6 +300,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       mergeEagerFilter(Some(f(sq)), targetMeta, scoped)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
+  end withRelated
 
   // --- withRelated for PivotRelation (delegates to underlying BelongsToMany) ---
 
@@ -299,7 +323,15 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       pivotCodec: DbCodec[P],
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[(T, P)] *: EmptyTuple] =
-    val d = PivotWithDataEagerDef(meta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, mergeEagerFilter(None, targetMeta, scoped))
+    val d = PivotWithDataEagerDef(
+      meta,
+      rel.underlying,
+      targetMeta,
+      targetCodec,
+      pivotMeta,
+      pivotCodec,
+      mergeEagerFilter(None, targetMeta, scoped)
+    )
     EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelatedAndPivot[T, P, CT <: Selectable, PCT <: Selectable](
@@ -312,8 +344,17 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       pivotCodec: DbCodec[P],
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[(T, P)] *: EmptyTuple] =
-    val d = PivotWithDataEagerDef(meta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, mergeEagerFilter(Some(pivotFilter), targetMeta, scoped))
+    val d = PivotWithDataEagerDef(
+      meta,
+      rel.underlying,
+      targetMeta,
+      targetCodec,
+      pivotMeta,
+      pivotCodec,
+      mergeEagerFilter(Some(pivotFilter), targetMeta, scoped)
+    )
     EagerQuery(buildWith, codec, meta, Vector(d))
+  end withRelatedAndPivot
 
   // --- Composed (via) withRelated ---
 
@@ -325,8 +366,19 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       intermediateScoped: Scoped[I],
       scoped: Scoped[T]
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
-    val d = ComposedEagerDef(meta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, mergeEagerFilter(None, intermediateMeta, intermediateScoped), mergeEagerFilter(None, targetMeta, scoped))
+    val d = ComposedEagerDef(
+      meta,
+      rel.inner,
+      intermediateMeta,
+      intermediateCodec,
+      rel.outer,
+      targetMeta,
+      targetCodec,
+      mergeEagerFilter(None, intermediateMeta, intermediateScoped),
+      mergeEagerFilter(None, targetMeta, scoped)
+    )
     EagerQuery(buildWith, codec, meta, Vector(d))
+  end withRelated
 
   def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
       intermediateMeta: TableMeta[I],
@@ -338,8 +390,19 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   ): EagerQuery[E, Vector[T] *: EmptyTuple] =
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
     val sq = new SubQuery[T, CT](targetMeta, relCols)
-    val d = ComposedEagerDef(meta, rel.inner, intermediateMeta, intermediateCodec, rel.outer, targetMeta, targetCodec, mergeEagerFilter(None, intermediateMeta, intermediateScoped), mergeEagerFilter(Some(f(sq)), targetMeta, scoped))
+    val d = ComposedEagerDef(
+      meta,
+      rel.inner,
+      intermediateMeta,
+      intermediateCodec,
+      rel.outer,
+      targetMeta,
+      targetCodec,
+      mergeEagerFilter(None, intermediateMeta, intermediateScoped),
+      mergeEagerFilter(Some(f(sq)), targetMeta, scoped)
+    )
     EagerQuery(buildWith, codec, meta, Vector(d))
+  end withRelated
 
   // --- withCount for HasMany ---
 
@@ -348,7 +411,18 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       scoped: Scoped[T]
   ): CountQuery[E] =
     val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, scoped.scopes)
-    new CountQuery(meta, codec, countFrag.sqlString, None, rootPredicate, orderEntries, limitOpt, offsetOpt, countFrag.params, countFrag.writer)
+    new CountQuery(
+      meta,
+      codec,
+      countFrag.sqlString,
+      None,
+      rootPredicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      countFrag.params,
+      countFrag.writer
+    )
 
   def withCount[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
       relMeta: TableMeta[T],
@@ -357,7 +431,18 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, scoped.scopes)
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
     val sq = new SubQuery[T, CT](relMeta, relCols)
-    new CountQuery(meta, codec, countFrag.sqlString, Some(f(sq)), rootPredicate, orderEntries, limitOpt, offsetOpt, countFrag.params, countFrag.writer)
+    new CountQuery(
+      meta,
+      codec,
+      countFrag.sqlString,
+      Some(f(sq)),
+      rootPredicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      countFrag.params,
+      countFrag.writer
+    )
 
   // --- withCount for BelongsToMany ---
 
@@ -366,7 +451,18 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       scoped: Scoped[T]
   ): CountQuery[E] =
     val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, scoped.scopes)
-    new CountQuery(meta, codec, countFrag.sqlString, None, rootPredicate, orderEntries, limitOpt, offsetOpt, countFrag.params, countFrag.writer)
+    new CountQuery(
+      meta,
+      codec,
+      countFrag.sqlString,
+      None,
+      rootPredicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      countFrag.params,
+      countFrag.writer
+    )
 
   def withCount[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
       relMeta: TableMeta[T],
@@ -375,7 +471,18 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, scoped.scopes, hasUserCondition = true)
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
     val sq = new SubQuery[T, CT](relMeta, relCols)
-    new CountQuery(meta, codec, countFrag.sqlString, Some(f(sq)), rootPredicate, orderEntries, limitOpt, offsetOpt, countFrag.params, countFrag.writer)
+    new CountQuery(
+      meta,
+      codec,
+      countFrag.sqlString,
+      Some(f(sq)),
+      rootPredicate,
+      orderEntries,
+      limitOpt,
+      offsetOpt,
+      countFrag.params,
+      countFrag.writer
+    )
 
   def join[T](rel: Relationship[E, T])(using
       joinedMeta: TableMeta[T],
@@ -402,6 +509,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       limitOpt,
       offsetOpt
     )
+  end join
 
   def leftJoin[T](rel: Relationship[E, T])(using
       joinedMeta: TableMeta[T],
@@ -429,6 +537,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       limitOpt,
       offsetOpt
     )
+  end leftJoin
 
   // --- whereHas / doesntHave for Relationship ---
 
@@ -510,7 +619,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def orWhereHas[T](rel: HasMany[E, T, ?])(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
     orWhere(buildRelExistsFrag(rel, relMeta, None, negate = false, scoped))
 
-  def orWhereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
+  def orWhereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(
+      f: SubQuery[T, CT] => WhereFrag
+  )(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
     val sq = new SubQuery[T, CT](relMeta, relCols)
     orWhere(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, scoped))
@@ -526,7 +637,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def orWhereHas[T](rel: BelongsToMany[E, T, ?])(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
     orWhere(buildPivotExistsFrag(rel, None, negate = false, scoped, relMeta))
 
-  def orWhereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
+  def orWhereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(
+      f: SubQuery[T, CT] => WhereFrag
+  )(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
     val sq = new SubQuery[T, CT](relMeta, relCols)
     orWhere(buildPivotExistsFrag(rel, Some((f(sq), relMeta)), negate = false, scoped, relMeta))
@@ -716,10 +829,15 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def updateUnsafe(f: C => Frag)(using DbCon[?]): Int =
     updateUnsafe(f(cols))
 
-  def increment[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon[?]): Int =
+  def increment[A](f: C => ColRef[A], amount: A | None.type = None)(using
+      num: Numeric[A],
+      codec: DbCodec[A],
+      tt: TypeTest[A | None.type, A],
+      con: DbCon[?]
+  ): Int =
     val actual: A = amount match
-      case None    => num.one
-      case a: A    => a
+      case None => num.one
+      case a: A => a
     val col = f(cols)
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(actual, ps, pos)
@@ -734,15 +852,158 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       writer
     ).update.run()
 
-  def decrement[A](f: C => ColRef[A], amount: A | None.type = None)(using num: Numeric[A], codec: DbCodec[A], tt: TypeTest[A | None.type, A], con: DbCon[?]): Int =
+  def decrement[A](f: C => ColRef[A], amount: A | None.type = None)(using
+      num: Numeric[A],
+      codec: DbCodec[A],
+      tt: TypeTest[A | None.type, A],
+      con: DbCon[?]
+  ): Int =
     val actual: A = amount match
-      case None    => num.one
-      case a: A    => a
+      case None => num.one
+      case a: A => a
     val col = f(cols)
     val writer: FragWriter = (ps, pos) =>
       codec.writeSingle(actual, ps, pos)
       pos + codec.cols.length
     updateUnsafe(Frag(s"${col.queryRepr} = ${col.queryRepr} - ?", Seq(amount), writer))
+
+  // --- Entity-level mutations (ignore QB WHERE state) ---
+
+  private def pkIndex: Int =
+    val pkName = meta.primaryKey.scalaName
+    meta.columns.indexWhere(_.scalaName == pkName)
+
+  def updateEntity(entity: E)(using con: DbCon[?]): Unit =
+    val idx = pkIndex
+    val elemCodecs = meta.elementCodecs
+    val cols = meta.columns
+    val idCodec = elemCodecs(idx)
+    val updateKeys = cols.indices
+      .filter(_ != idx)
+      .map(i => cols(i).sqlName + " = " + elemCodecs(i).queryRepr)
+      .mkString(", ")
+    val sql = s"UPDATE ${meta.tableName} SET $updateKeys WHERE ${cols(idx).sqlName} = ${idCodec.queryRepr}"
+    handleQuery(sql, entity):
+      Using(con.connection.prepareStatement(sql)): ps =>
+        val product = entity.asInstanceOf[Product]
+        var pos = 1
+        for i <- cols.indices if i != idx do
+          val codec = elemCodecs(i).asInstanceOf[DbCodec[Any]]
+          codec.writeSingle(product.productElement(i), ps, pos)
+          pos += codec.cols.length
+        idCodec.asInstanceOf[DbCodec[Any]].writeSingle(product.productElement(idx), ps, pos)
+        timed(ps.executeUpdate())
+  end updateEntity
+
+  def updateAllEntities(entities: Iterable[E])(using con: DbCon[?]): BatchUpdateResult =
+    val idx = pkIndex
+    val elemCodecs = meta.elementCodecs
+    val cols = meta.columns
+    val idCodec = elemCodecs(idx)
+    val updateKeys = cols.indices
+      .filter(_ != idx)
+      .map(i => cols(i).sqlName + " = " + elemCodecs(i).queryRepr)
+      .mkString(", ")
+    val sql = s"UPDATE ${meta.tableName} SET $updateKeys WHERE ${cols(idx).sqlName} = ${idCodec.queryRepr}"
+    handleQuery(sql, entities):
+      Using(con.connection.prepareStatement(sql)): ps =>
+        for entity <- entities do
+          val product = entity.asInstanceOf[Product]
+          var pos = 1
+          for i <- cols.indices if i != idx do
+            val codec = elemCodecs(i).asInstanceOf[DbCodec[Any]]
+            codec.writeSingle(product.productElement(i), ps, pos)
+            pos += codec.cols.length
+          idCodec.asInstanceOf[DbCodec[Any]].writeSingle(product.productElement(idx), ps, pos)
+          ps.addBatch()
+        timed(batchUpdateResult(ps.executeBatch()))
+  end updateAllEntities
+
+  def updatePartial(original: E, current: E)(using con: DbCon[?]): Unit =
+    val idx = pkIndex
+    val elemCodecs = meta.elementCodecs
+    val cols = meta.columns
+    val origProduct = original.asInstanceOf[Product]
+    val currProduct = current.asInstanceOf[Product]
+    val origId = origProduct.productElement(idx)
+    val currId = currProduct.productElement(idx)
+    require(origId == currId, s"updatePartial requires same id, got $origId != $currId")
+
+    val arity = origProduct.productArity
+    val changed = Vector.newBuilder[Int]
+    var i = 0
+    while i < arity do
+      if i != idx && origProduct.productElement(i) != currProduct.productElement(i)
+      then changed += i
+      i += 1
+    val changedIndices = changed.result()
+    if changedIndices.isEmpty then return
+
+    val idCodec = elemCodecs(idx)
+    val setClauses = changedIndices
+      .map(ci => cols(ci).sqlName + " = " + elemCodecs(ci).queryRepr)
+      .mkString(", ")
+    val sql = s"UPDATE ${meta.tableName} SET $setClauses WHERE ${cols(idx).sqlName} = ${idCodec.queryRepr}"
+    handleQuery(sql, current):
+      Using(con.connection.prepareStatement(sql)): ps =>
+        var pos = 1
+        for ci <- changedIndices do
+          val codec = elemCodecs(ci).asInstanceOf[DbCodec[Any]]
+          codec.writeSingle(currProduct.productElement(ci), ps, pos)
+          pos += codec.cols.length
+        idCodec.asInstanceOf[DbCodec[Any]].writeSingle(currId, ps, pos)
+        timed(ps.executeUpdate())
+  end updatePartial
+
+  def deleteEntity(entity: E)(using con: DbCon[?]): Unit =
+    val idx = pkIndex
+    val idCodec = meta.elementCodecs(idx)
+    val idCol = meta.columns(idx)
+    val sql = s"DELETE FROM ${meta.tableName} WHERE ${idCol.sqlName} = ${idCodec.queryRepr}"
+    val id = entity.asInstanceOf[Product].productElement(idx)
+    val writer: FragWriter = (ps, pos) =>
+      idCodec.asInstanceOf[DbCodec[Any]].writeSingle(id, ps, pos)
+      pos + idCodec.cols.length
+    Frag(sql, Seq(id), writer).update.run()
+
+  def deleteAllEntities(entities: Iterable[E])(using con: DbCon[?]): BatchUpdateResult =
+    val idx = pkIndex
+    val idCodec = meta.elementCodecs(idx).asInstanceOf[DbCodec[Any]]
+    val idCol = meta.columns(idx)
+    val sql = s"DELETE FROM ${meta.tableName} WHERE ${idCol.sqlName} = ${idCodec.queryRepr}"
+    handleQuery(sql, entities):
+      Using(con.connection.prepareStatement(sql)): ps =>
+        for entity <- entities do
+          val id = entity.asInstanceOf[Product].productElement(idx)
+          idCodec.writeSingle(id, ps, 1)
+          ps.addBatch()
+        timed(batchUpdateResult(ps.executeBatch()))
+
+  def deleteAllById[ID](ids: Iterable[ID])(using idCodec: DbCodec[ID], con: DbCon[?]): BatchUpdateResult =
+    val idx = pkIndex
+    val idCol = meta.columns(idx)
+    val sql = s"DELETE FROM ${meta.tableName} WHERE ${idCol.sqlName} = ${idCodec.queryRepr}"
+    handleQuery(sql, ids):
+      Using(con.connection.prepareStatement(sql)): ps =>
+        idCodec.write(ids, ps)
+        timed(batchUpdateResult(ps.executeBatch()))
+
+  def truncate()(using con: DbCon[?]): Unit =
+    val sql = con.databaseType.renderTruncate(meta.tableName)
+    Frag(sql, Vector.empty, FragWriter.empty).update.run()
+
+  def upsertByPk(entity: E)(using con: DbCon[?]): Unit =
+    val allCols = meta.columns.map(_.sqlName)
+    val sql = con.databaseType.renderUpsertByPk(
+      meta.tableName,
+      allCols,
+      codec.queryRepr,
+      meta.primaryKey.sqlName
+    )
+    handleQuery(sql, entity):
+      Using(con.connection.prepareStatement(sql)): ps =>
+        codec.writeSingle(entity, ps)
+        timed(ps.executeUpdate())
 
   def debugPrintSql(using DbCon[?]): this.type =
     val frag = build
@@ -751,9 +1012,8 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 end QueryBuilder
 
 object QueryBuilder:
-  /** Intermediate object for the select() → ProjectedQuery transition.
-    * Created by QueryBuilder.select, holds the frozen WHERE + column proxy.
-    * The transparent inline apply method triggers the macro.
+  /** Intermediate object for the select() → ProjectedQuery transition. Created by QueryBuilder.select, holds the frozen WHERE + column
+    * proxy. The transparent inline apply method triggers the macro.
     */
   class SelectPhase[C](val tableName: String, val cols: C, val predicate: Option[Predicate]):
     transparent inline def apply[P](inline f: C => P): Any =
@@ -766,10 +1026,73 @@ object QueryBuilder:
   ): QueryBuilder[HasRoot, E, C] =
     new QueryBuilder(meta, codec, cols, None, Vector.empty, None, None)
 
+  inline def into[EC, E](using
+      inline meta: EntityMeta[E],
+      inline ecMirror: Mirror.ProductOf[EC],
+      ecCodec: DbCodec[EC]
+  ): InsertBuilder[EC, E] =
+    ${ intoImpl[EC, E]('meta, 'ecMirror, 'ecCodec) }
+
   transparent inline def from[E](using
       inline meta: TableMeta[E],
       codec: DbCodec[E]
   ): Any = ${ fromImpl[E]('meta, 'codec) }
+
+  private def intoImpl[EC: Type, E: Type](
+      metaExpr: Expr[EntityMeta[E]],
+      ecMirror: Expr[Mirror.ProductOf[EC]],
+      ecCodecExpr: Expr[DbCodec[EC]]
+  )(using Quotes): Expr[InsertBuilder[EC, E]] =
+    import quotes.reflect.*
+
+    // Get E's @Table annotation for name mapping
+    val tableAnnotExpr: Expr[Table] =
+      DerivingUtil.tableAnnot[E] match
+        case Some(t) => t
+        case None =>
+          report.errorAndAbort(
+            s"${TypeRepr.of[E].show} must have @Table annotation for QueryBuilder.into"
+          )
+
+    val nameMapper: Expr[SqlNameMapper] = '{ $tableAnnotExpr.nameMapper }
+
+    // Get EC field names from its mirror
+    ecMirror match
+      case '{
+            $m: Mirror.ProductOf[EC] {
+              type MirroredElemLabels = ecMels
+            }
+          } =>
+        val ecFieldNames = elemNames[ecMels]()
+        val ecFieldNamesSql: List[Expr[String]] = ecFieldNames.map { name =>
+          sqlNameAnnot[E](name) match
+            case Some(sqlName) => '{ $sqlName.name }
+            case None          => '{ $nameMapper.toColumnName(${ Expr(name) }) }
+        }
+
+        // Get the id index from E
+        val idIndex = idAnnotIndex[E]
+
+        val ecColNamesExpr = Expr.ofSeq(ecFieldNamesSql)
+
+        '{
+          new InsertBuilder[EC, E](
+            $metaExpr.tableName,
+            IArray.from($ecColNamesExpr),
+            $ecCodecExpr,
+            $metaExpr,
+            $metaExpr.columns.map(_.sqlName),
+            $metaExpr.elementCodecs,
+            $metaExpr.primaryKey.sqlName,
+            $idIndex
+          )
+        }
+      case _ =>
+        report.errorAndAbort(
+          s"A Mirror.ProductOf is required for QueryBuilder.into[${TypeRepr.of[EC].show}, ${TypeRepr.of[E].show}]"
+        )
+    end match
+  end intoImpl
 
   private def fromImpl[E: Type](
       meta: Expr[TableMeta[E]],
@@ -845,9 +1168,11 @@ object QueryBuilder:
               val cols = new Columns[E]($meta.columns).asInstanceOf[ct & Selectable]
               val qb = build0[E, ct & Selectable]($meta, $codec, cols)
               val m = $meta
-              val withWheres = $scopes.flatMap(_.conditions(m))
+              val withWheres = $scopes
+                .flatMap(_.conditions(m))
                 .foldLeft(qb)(_.where(_))
-              $scopes.flatMap(_.orderings(m))
+              $scopes
+                .flatMap(_.orderings(m))
                 .foldLeft(withWheres)(_.orderBy(_))
             }
 
@@ -900,8 +1225,7 @@ object QueryBuilder:
     val codecExprs: List[Expr[DbCodec[?]]] = elemInfos.map { case (name, innerTpe, isSE) =>
       innerTpe match
         case '[a] =>
-          if isSE then
-            '{ null.asInstanceOf[DbCodec[?]] } // placeholder; runtime uses SelectExpr.codec
+          if isSE then '{ null.asInstanceOf[DbCodec[?]] } // placeholder; runtime uses SelectExpr.codec
           else
             Expr.summon[DbCodec[a]] match
               case Some(c) => '{ $c.asInstanceOf[DbCodec[?]] }
@@ -960,6 +1284,7 @@ object QueryBuilder:
         }
       case _ =>
         report.errorAndAbort("select() failed to construct result types. This is a bug in magnum.")
+    end match
   end selectImpl
 
   // --- select() macro helper: extract field names from a tuple of string literal types ---
@@ -984,8 +1309,8 @@ object QueryBuilder:
           val name = remainingNames.head
           val (innerType, isSE) = Type.of[v] match
             case '[SelectExpr[a]] => (Type.of[a], true)
-            case '[Col[a]]       => (Type.of[a], false)
-            case '[ColRef[a]]    => (Type.of[a], false)
+            case '[Col[a]]        => (Type.of[a], false)
+            case '[ColRef[a]]     => (Type.of[a], false)
             case _ =>
               report.errorAndAbort(
                 s"select() element '$name' must be Col[A] or SelectExpr[A], got ${TypeRepr.of[v].show}"
@@ -998,7 +1323,11 @@ object QueryBuilder:
   private[magnum] def selectListToTupleType(ts: List[Type[?]])(using Quotes): Type[?] =
     ts.foldRight(Type.of[EmptyTuple]: Type[?]) { (t, acc) =>
       (t, acc) match
-        case ('[ft], '[type acc <: Tuple; `acc`]) =>
+        case (
+              '[ft],
+              '[
+              type acc <: Tuple; `acc`]
+            ) =>
           Type.of[ft *: acc]
         case _ =>
           quotes.reflect.report.errorAndAbort("Failed to build tuple type from select() elements. This is a bug in magnum.")
@@ -1015,7 +1344,12 @@ object QueryBuilder:
     val nmesTpe = selectStringsToTupleType(names)
     val valsTpe = selectListToTupleType(types)
     (nmesTpe, valsTpe) match
-      case ('[type nmes <: Tuple; `nmes`], '[type tps <: Tuple; `tps`]) =>
+      case (
+            '[
+            type nmes <: Tuple; `nmes`],
+            '[
+            type tps <: Tuple; `tps`]
+          ) =>
         Type.of[NamedTuple.NamedTuple[nmes, tps]]
       case _ =>
         report.errorAndAbort("Failed to construct NamedTuple type for select(). This is a bug in magnum.")

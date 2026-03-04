@@ -1,17 +1,15 @@
 import com.augustnagro.magnum.*
 
-/** Tests that scopes on related entities are transitively applied
-  * through whereHas, doesntHave, has, withCount, withRelated, and join.
+/** Tests that scopes on related entities are transitively applied through whereHas, doesntHave, has, withCount, withRelated, and join.
   *
-  * Uses the existing el_author/el_book schema from qb-where-has.sql.
-  * Data:
+  * Uses the existing el_author/el_book schema from qb-where-has.sql. Data:
   *   - Tolkien: "The Hobbit", "The Silmarillion"
   *   - Asimov: "Foundation", "I, Robot"
   *   - Herbert: "Dune"
   *   - Rowling: (no books)
   *
-  * The "published books" scope filters books whose title starts with "The" or is "Dune" or "Foundation"
-  * — we use a simple scope that excludes "I, Robot" (id=4) to test transitivity.
+  * The "published books" scope filters books whose title starts with "The" or is "Dune" or "Foundation" — we use a simple scope that
+  * excludes "I, Robot" (id=4) to test transitivity.
   *
   * Also uses pv_user/pv_role/pv_user_role from the same DDL.
   *   - Alice: admin+editor, Bob: editor, Charlie: no roles, Dave: admin+editor+viewer
@@ -188,9 +186,9 @@ class TransitiveScopeTests extends QbTestBase:
       assertEquals(results.size, 4)
       val byName = results.map((u, c) => (u.name, c)).toMap
       assertEquals(byName("Alice"), 1L) // only admin
-      assertEquals(byName("Bob"), 0L)   // no admin
+      assertEquals(byName("Bob"), 0L) // no admin
       assertEquals(byName("Charlie"), 0L)
-      assertEquals(byName("Dave"), 1L)  // only admin
+      assertEquals(byName("Dave"), 1L) // only admin
 
   // --- has: HasMany with transitive scope ---
 
@@ -258,3 +256,4 @@ class TransitiveScopeTests extends QbTestBase:
       sql.contains("el_book.id <> 4"),
       s"SQL should contain scope condition: $sql"
     )
+end TransitiveScopeTests

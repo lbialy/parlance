@@ -14,9 +14,7 @@ case class ColumnDef[T](
     copy(modifiers = modifiers.copy(default = Some(DefaultValue.Literal(value))))
 
   def defaultExpression(sql: String): ColumnDef[T] =
-    copy(modifiers =
-      modifiers.copy(default = Some(DefaultValue.Expression(sql)))
-    )
+    copy(modifiers = modifiers.copy(default = Some(DefaultValue.Expression(sql))))
 
   def primaryKey: ColumnDef[T] =
     copy(modifiers = modifiers.copy(primaryKey = true))
@@ -40,9 +38,7 @@ case class ColumnDef[T](
     copy(modifiers = modifiers.copy(generatedAs = Some(expression)))
 
   def references(table: String, col: String): ColumnDef[T] =
-    copy(modifiers =
-      modifiers.copy(references = Some(InlineReference(table, col)))
-    )
+    copy(modifiers = modifiers.copy(references = Some(InlineReference(table, col))))
 
   def references(
       table: String,
@@ -50,11 +46,7 @@ case class ColumnDef[T](
       onDelete: FkAction,
       onUpdate: FkAction
   ): ColumnDef[T] =
-    copy(modifiers =
-      modifiers.copy(references =
-        Some(InlineReference(table, col, onDelete, onUpdate))
-      )
-    )
+    copy(modifiers = modifiers.copy(references = Some(InlineReference(table, col, onDelete, onUpdate))))
 
   // Type override methods
   def varchar(length: Int): ColumnDef[T] =
@@ -73,3 +65,4 @@ case class ColumnDef[T](
     copy(columnType = ColumnType.TimeTz(precision))
   def customType(sqlTypeName: String): ColumnDef[T] =
     copy(columnType = ColumnType.Custom(sqlTypeName))
+end ColumnDef

@@ -259,7 +259,7 @@ object MySqlDbType extends DbType:
           case ConflictAction.DoUpdate(frag) =>
             s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) ON DUPLICATE KEY UPDATE ${frag.sqlString}"
         val fragWriter: FragWriter = action match
-          case ConflictAction.DoNothing => FragWriter.empty
+          case ConflictAction.DoNothing      => FragWriter.empty
           case ConflictAction.DoUpdate(frag) => frag.writer
         handleQuery(sql, entityCreator):
           Using(con.connection.prepareStatement(sql)): ps =>

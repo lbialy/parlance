@@ -9,12 +9,10 @@ import java.nio.file.Files
 // --- Entity definitions at top level (macro requirement) ---
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class VerifyUser(@Id id: Long, email: String, name: String)
-    derives EntityMeta
+case class VerifyUser(@Id id: Long, email: String, name: String) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class VerifyPost(@Id id: Long, title: String, body: String, userId: Int)
-    derives EntityMeta
+case class VerifyPost(@Id id: Long, title: String, body: String, userId: Int) derives EntityMeta
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
 @SqlName("verify_user")
@@ -30,8 +28,7 @@ case class WrongTypes(@Id id: Long, email: Int) derives EntityMeta
 
 // has a field that doesn't exist in DB
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class MissingCol(@Id id: Long, email: String, nonExistent: String)
-    derives EntityMeta
+case class MissingCol(@Id id: Long, email: String, nonExistent: String) derives EntityMeta
 
 // references a table that doesn't exist
 @Table(H2DbType, SqlNameMapper.SameCase)
@@ -40,13 +37,11 @@ case class NoTable(@Id id: Long) derives EntityMeta
 
 // non-Option field maps to nullable DB column — nullability mismatch
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class NullMismatchUser(@Id id: Long, email: String, bio: String)
-    derives EntityMeta
+case class NullMismatchUser(@Id id: Long, email: String, bio: String) derives EntityMeta
 
 // Option field maps to NOT NULL DB column — nullability mismatch the other way
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class OptionNotNullUser(@Id id: Long, email: Option[String])
-    derives EntityMeta
+case class OptionNotNullUser(@Id id: Long, email: Option[String]) derives EntityMeta
 
 // For PK mismatch: entity marks `id` as PK but table has `email` as PK
 @Table(H2DbType, SqlNameMapper.SameCase)

@@ -19,7 +19,8 @@ class LockingTests extends QbTestBase:
   test("lockForUpdate with where + orderBy + limit produces well-formed SQL"):
     val t = xa()
     t.transact:
-      val frag = QueryBuilder.from[QbUser]
+      val frag = QueryBuilder
+        .from[QbUser]
         .where(_.age > 18)
         .orderBy(_.age)
         .limit(2)
@@ -40,7 +41,8 @@ class LockingTests extends QbTestBase:
   test("lockForUpdate.first() works inside transact"):
     val t = xa()
     t.transact:
-      val result = QueryBuilder.from[QbUser]
+      val result = QueryBuilder
+        .from[QbUser]
         .where(_.firstName === Some("Alice"))
         .lockForUpdate
         .first()
@@ -50,7 +52,8 @@ class LockingTests extends QbTestBase:
   test("lockForUpdate.first() returns None when no rows match"):
     val t = xa()
     t.transact:
-      val result = QueryBuilder.from[QbUser]
+      val result = QueryBuilder
+        .from[QbUser]
         .where(_.age > 100)
         .lockForUpdate
         .first()
@@ -59,7 +62,8 @@ class LockingTests extends QbTestBase:
   test("lockForUpdate.firstOrFail() returns entity"):
     val t = xa()
     t.transact:
-      val result = QueryBuilder.from[QbUser]
+      val result = QueryBuilder
+        .from[QbUser]
         .where(_.firstName === Some("Bob"))
         .lockForUpdate
         .firstOrFail()
@@ -69,7 +73,8 @@ class LockingTests extends QbTestBase:
     val t = xa()
     t.transact:
       intercept[QueryBuilderException]:
-        QueryBuilder.from[QbUser]
+        QueryBuilder
+          .from[QbUser]
           .where(_.age > 100)
           .lockForUpdate
           .firstOrFail()

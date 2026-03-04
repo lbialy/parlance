@@ -146,3 +146,4 @@ class H2CompilerTests extends FunSuite:
   test("H2 supports COMMENT ON COLUMN"):
     val m = Migration.AlterTable("users", List(AlterOp.SetColumnComment("email", "Primary email")))
     assertEquals(compile(m), List("COMMENT ON COLUMN users.email IS 'Primary email'"))
+end H2CompilerTests

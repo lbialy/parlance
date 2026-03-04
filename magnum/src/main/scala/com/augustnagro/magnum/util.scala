@@ -201,7 +201,7 @@ private def parseParams(params: Any): Iterator[Iterator[Any]] =
 private def paramsString(params: Iterator[Iterator[Any]]): String =
   params.map(_.mkString("(", ", ", ")")).mkString("", ",\n", "\n")
 
-private def timed[T](f: => T): (T, FiniteDuration) =
+private[magnum] def timed[T](f: => T): (T, FiniteDuration) =
   val start = System.currentTimeMillis()
   val res = f
   val execTime = FiniteDuration(
@@ -210,7 +210,7 @@ private def timed[T](f: => T): (T, FiniteDuration) =
   )
   (res, execTime)
 
-private def batchUpdateResult(updateCounts: Array[Int]): BatchUpdateResult =
+private[magnum] def batchUpdateResult(updateCounts: Array[Int]): BatchUpdateResult =
   boundary:
     val updatedRows = updateCounts.foldLeft(0L)((res, c) =>
       c match
@@ -311,7 +311,7 @@ private def tableExprs[EC: Type, E: Type, ID: Type](using
   end match
 end tableExprs
 
-private def idAnnotIndex[E: Type](using q: Quotes): Expr[Int] =
+private[magnum] def idAnnotIndex[E: Type](using q: Quotes): Expr[Int] =
   import q.reflect.*
   val idAnnot = TypeRepr.of[Id].typeSymbol
   val index = TypeRepr
@@ -346,7 +346,7 @@ private[magnum] def elemTypes[Mets: Type](res: List[Type[?]] = Nil)(using
     case '[EmptyTuple] =>
       res.reverse
 
-private def sqlNameAnnot[T: Type](elemName: String)(using
+private[magnum] def sqlNameAnnot[T: Type](elemName: String)(using
     Quotes
 ): Option[Expr[SqlName]] =
   import quotes.reflect.*
@@ -361,7 +361,7 @@ private def sqlNameAnnot[T: Type](elemName: String)(using
     .flatMap(sym => sym.getAnnotation(annot))
     .map(term => term.asExprOf[SqlName])
 
-private def handleQuery[A](sql: String, params: Any)(
+private[magnum] def handleQuery[A](sql: String, params: Any)(
     attempt: Try[(A, FiniteDuration)]
 )(using con: DbCon[?]): A =
   attempt match

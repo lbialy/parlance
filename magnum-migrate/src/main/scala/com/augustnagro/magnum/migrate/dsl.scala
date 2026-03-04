@@ -9,24 +9,23 @@ private def inferColumnType(jdbcTypes: IArray[Int]): ColumnType =
     "Only single-column types supported in migrations"
   )
   jdbcTypes(0) match
-    case Types.BOOLEAN                 => ColumnType.Boolean
-    case Types.TINYINT | Types.SMALLINT => ColumnType.SmallInt
-    case Types.INTEGER                 => ColumnType.Integer
-    case Types.BIGINT                  => ColumnType.BigInt
-    case Types.REAL                    => ColumnType.Real
-    case Types.DOUBLE                  => ColumnType.DoublePrecision
-    case Types.NUMERIC | Types.DECIMAL => ColumnType.Numeric(18, 2)
-    case Types.VARCHAR | Types.LONGVARCHAR | Types.NVARCHAR |
-        Types.CLOB                     => ColumnType.Text
-    case Types.CHAR                    => ColumnType.Text
-    case Types.BINARY | Types.VARBINARY | Types.LONGVARBINARY |
-        Types.BLOB                     => ColumnType.Bytea
-    case Types.DATE                    => ColumnType.Date
-    case Types.TIME                    => ColumnType.Time()
-    case Types.TIMESTAMP               => ColumnType.Timestamp()
-    case Types.TIMESTAMP_WITH_TIMEZONE => ColumnType.TimestampTz()
-    case Types.OTHER                   => ColumnType.Uuid
-    case _                             => ColumnType.Text
+    case Types.BOOLEAN                                                     => ColumnType.Boolean
+    case Types.TINYINT | Types.SMALLINT                                    => ColumnType.SmallInt
+    case Types.INTEGER                                                     => ColumnType.Integer
+    case Types.BIGINT                                                      => ColumnType.BigInt
+    case Types.REAL                                                        => ColumnType.Real
+    case Types.DOUBLE                                                      => ColumnType.DoublePrecision
+    case Types.NUMERIC | Types.DECIMAL                                     => ColumnType.Numeric(18, 2)
+    case Types.VARCHAR | Types.LONGVARCHAR | Types.NVARCHAR | Types.CLOB   => ColumnType.Text
+    case Types.CHAR                                                        => ColumnType.Text
+    case Types.BINARY | Types.VARBINARY | Types.LONGVARBINARY | Types.BLOB => ColumnType.Bytea
+    case Types.DATE                                                        => ColumnType.Date
+    case Types.TIME                                                        => ColumnType.Time()
+    case Types.TIMESTAMP                                                   => ColumnType.Timestamp()
+    case Types.TIMESTAMP_WITH_TIMEZONE                                     => ColumnType.TimestampTz()
+    case Types.OTHER                                                       => ColumnType.Uuid
+    case _                                                                 => ColumnType.Text
+end inferColumnType
 
 // ---- Column builder ----
 

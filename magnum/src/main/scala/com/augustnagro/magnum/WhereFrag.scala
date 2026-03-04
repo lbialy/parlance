@@ -4,8 +4,7 @@ object WhereFrag:
   opaque type WhereFrag <: Frag = Frag
   private[magnum] inline def apply(f: Frag): WhereFrag = f
   val empty: WhereFrag = Frag("", Seq.empty, FragWriter.empty)
-  extension (f: Frag)
-    def unsafeAsWhere: WhereFrag = f
+  extension (f: Frag) def unsafeAsWhere: WhereFrag = f
 
   private def combine(lhs: WhereFrag, rhs: WhereFrag, op: String): WhereFrag =
     val lEmpty = lhs.sqlString.isEmpty
@@ -24,6 +23,7 @@ object WhereFrag:
   extension (lhs: WhereFrag)
     def &&(rhs: WhereFrag): WhereFrag = combine(lhs, rhs, "AND")
     def ||(rhs: WhereFrag): WhereFrag = combine(lhs, rhs, "OR")
+end WhereFrag
 
 export WhereFrag.WhereFrag
 export WhereFrag.unsafeAsWhere

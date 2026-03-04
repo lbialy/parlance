@@ -51,7 +51,18 @@ class CountQuery[E] private[magnum] (
 
   def first()(using DbCon[?]): Option[(E, Long)] =
     given DbCodec[E] = rootCodec
-    val q = new CountQuery(meta, rootCodec, countSubquerySql, countCondition, rootPredicate, orderEntries, Some(1), offsetOpt, countBaseParams, countBaseWriter)
+    val q = new CountQuery(
+      meta,
+      rootCodec,
+      countSubquerySql,
+      countCondition,
+      rootPredicate,
+      orderEntries,
+      Some(1),
+      offsetOpt,
+      countBaseParams,
+      countBaseWriter
+    )
     q.build.query[(E, Long)].run().headOption
 
   def firstOrFail()(using DbCon[?]): (E, Long) =

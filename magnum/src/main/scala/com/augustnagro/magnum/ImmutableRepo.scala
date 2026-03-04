@@ -48,21 +48,25 @@ open class ImmutableRepo[E, ID](
 
   /** Build a WhereFrag for `pk = ?` */
   private def pkEqualsFrag(id: ID): WhereFrag =
-    WhereFrag(Frag(
-      s"${meta.primaryKey.sqlName} = ?",
-      Seq(id),
-      FragWriter.fromKeys(Vector(id.asInstanceOf[Any]))
-    ))
+    WhereFrag(
+      Frag(
+        s"${meta.primaryKey.sqlName} = ?",
+        Seq(id),
+        FragWriter.fromKeys(Vector(id.asInstanceOf[Any]))
+      )
+    )
 
   /** Build a WhereFrag for `pk IN (?, ?, ...)` */
   private def pkInFrag(ids: Iterable[ID]): WhereFrag =
     val keys = ids.toVector
     val placeholders = keys.map(_ => "?").mkString(", ")
-    WhereFrag(Frag(
-      s"${meta.primaryKey.sqlName} IN ($placeholders)",
-      keys,
-      FragWriter.fromKeys(keys.asInstanceOf[Vector[Any]])
-    ))
+    WhereFrag(
+      Frag(
+        s"${meta.primaryKey.sqlName} IN ($placeholders)",
+        keys,
+        FragWriter.fromKeys(keys.asInstanceOf[Vector[Any]])
+      )
+    )
 
   /** Count of all entities */
   def count(using DbCon[?]): Long =
@@ -114,9 +118,11 @@ open class ImmutableRepo[E, ID](
       qb: QueryBuilder[HasRoot, E, C]
   ): QueryBuilder[HasRoot, E, C] =
     val m = entityMeta
-    val withWheres = finalScopes.flatMap(_.conditions(m))
+    val withWheres = finalScopes
+      .flatMap(_.conditions(m))
       .foldLeft(qb)(_.where(_))
-    finalScopes.flatMap(_.orderings(m))
+    finalScopes
+      .flatMap(_.orderings(m))
       .foldLeft(withWheres)(_.orderBy(_))
 
   /** Create a QueryBuilder with all scopes applied. */

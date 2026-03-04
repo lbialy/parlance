@@ -244,17 +244,18 @@ object SqliteDbType extends DbType:
             throw UnsupportedOperationException("SQLite does not support ON CONFLICT ON CONSTRAINT")
           case ConflictTarget.AnyConflict => "ON CONFLICT"
         val actionClause = action match
-          case ConflictAction.DoNothing => "DO NOTHING"
+          case ConflictAction.DoNothing      => "DO NOTHING"
           case ConflictAction.DoUpdate(frag) => s"DO UPDATE SET ${frag.sqlString}"
         val sql = s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) $conflictClause $actionClause"
         val fragWriter: FragWriter = action match
-          case ConflictAction.DoNothing => FragWriter.empty
+          case ConflictAction.DoNothing      => FragWriter.empty
           case ConflictAction.DoUpdate(frag) => frag.writer
         handleQuery(sql, entityCreator):
           Using(con.connection.prepareStatement(sql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)
             fragWriter.write(ps, 1 + ecCodec.cols.length)
             timed(ps.executeUpdate())
+      end insertOnConflict
 
       def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using con: DbCon[?]): Unit =
         val conflictClause = target match
@@ -264,7 +265,8 @@ object SqliteDbType extends DbType:
           case ConflictTarget.Constraint(name) =>
             throw UnsupportedOperationException("SQLite does not support ON CONFLICT ON CONSTRAINT")
           case ConflictTarget.AnyConflict => "ON CONFLICT"
-        val sql = s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) $conflictClause DO UPDATE SET $ecUpdateAllSetClause"
+        val sql =
+          s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) $conflictClause DO UPDATE SET $ecUpdateAllSetClause"
         handleQuery(sql, entityCreator):
           Using(con.connection.prepareStatement(sql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)

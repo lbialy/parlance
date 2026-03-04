@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
 @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
-case class QbCounter(@Id id: Long, name: String, status: String, viewCount: Long, score: Int)
-  derives EntityMeta
+case class QbCounter(@Id id: Long, name: String, status: String, viewCount: Long, score: Int) derives EntityMeta
 
 class QueryBuilderMutationTests extends QbTestBase:
 

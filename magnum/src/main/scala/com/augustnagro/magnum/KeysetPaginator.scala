@@ -62,3 +62,4 @@ class KeysetPaginator[E, K] private[magnum] (
         for w <- allWriters do currentPos = w.write(ps, currentPos)
         currentPos
       Frag(sql, allParams, writer)
+end KeysetPaginator

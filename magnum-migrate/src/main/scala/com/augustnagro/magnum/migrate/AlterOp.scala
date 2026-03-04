@@ -57,3 +57,4 @@ enum AlterOp:
   // Comments (compiled as separate statements)
   case SetTableComment(comment: String)
   case SetColumnComment(column: String, comment: String)
+end AlterOp

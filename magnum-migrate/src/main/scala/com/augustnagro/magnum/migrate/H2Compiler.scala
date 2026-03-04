@@ -2,25 +2,24 @@ package com.augustnagro.magnum.migrate
 
 import java.util.UUID
 
-/** H2-dialect compiler. Pragmatic — supports common cases for testing, not full
-  * fidelity with PostgreSQL.
+/** H2-dialect compiler. Pragmatic — supports common cases for testing, not full fidelity with PostgreSQL.
   */
 object H2Compiler extends MigrationCompiler:
 
   def compile(migration: Migration): List[String] =
     migration match
-      case ct: Migration.CreateTable      => compileCreateTable(ct)
-      case Migration.DropTable(name)      => List(s"DROP TABLE $name")
-      case Migration.DropTableIfExists(n) => List(s"DROP TABLE IF EXISTS $n")
-      case Migration.RenameTable(f, t)    => List(s"ALTER TABLE $f RENAME TO $t")
-      case at: Migration.AlterTable       => compileAlterTable(at)
-      case _: Migration.CreateEnumType    => Nil // H2 doesn't have enum types
-      case _: Migration.DropEnumType      => Nil
-      case _: Migration.AddEnumValue      => Nil
-      case _: Migration.RenameEnumValue   => Nil
-      case _: Migration.CreateExtension   => Nil // H2 doesn't have extensions
-      case _: Migration.DropExtension     => Nil
-      case Migration.Raw(sql)             => List(sql)
+      case ct: Migration.CreateTable          => compileCreateTable(ct)
+      case Migration.DropTable(name)          => List(s"DROP TABLE $name")
+      case Migration.DropTableIfExists(n)     => List(s"DROP TABLE IF EXISTS $n")
+      case Migration.RenameTable(f, t)        => List(s"ALTER TABLE $f RENAME TO $t")
+      case at: Migration.AlterTable           => compileAlterTable(at)
+      case _: Migration.CreateEnumType        => Nil // H2 doesn't have enum types
+      case _: Migration.DropEnumType          => Nil
+      case _: Migration.AddEnumValue          => Nil
+      case _: Migration.RenameEnumValue       => Nil
+      case _: Migration.CreateExtension       => Nil // H2 doesn't have extensions
+      case _: Migration.DropExtension         => Nil
+      case Migration.Raw(sql)                 => List(sql)
       case Migration.RawParameterized(sql, _) => List(sql)
 
   def compileType(ct: ColumnType): String = ct match
@@ -72,16 +71,13 @@ object H2Compiler extends MigrationCompiler:
     if mods.unique then sb.append(" UNIQUE")
     mods.check.foreach(expr => sb.append(s" CHECK ($expr)"))
     mods.collation.foreach(c => sb.append(s""" COLLATE "$c""""))
-    mods.generatedAs.foreach(expr =>
-      sb.append(s" GENERATED ALWAYS AS ($expr) STORED")
-    )
+    mods.generatedAs.foreach(expr => sb.append(s" GENERATED ALWAYS AS ($expr) STORED"))
     mods.references.foreach: ref =>
       sb.append(s" REFERENCES ${ref.table}(${ref.column})")
-      if ref.onDelete != FkAction.NoAction then
-        sb.append(s" ON DELETE ${compileFkAction(ref.onDelete)}")
-      if ref.onUpdate != FkAction.NoAction then
-        sb.append(s" ON UPDATE ${compileFkAction(ref.onUpdate)}")
+      if ref.onDelete != FkAction.NoAction then sb.append(s" ON DELETE ${compileFkAction(ref.onDelete)}")
+      if ref.onUpdate != FkAction.NoAction then sb.append(s" ON UPDATE ${compileFkAction(ref.onUpdate)}")
     sb.toString
+  end compileColumnDef
 
   private def compileCreateTable(ct: Migration.CreateTable): List[String] =
     val sb = StringBuilder()
@@ -103,6 +99,7 @@ object H2Compiler extends MigrationCompiler:
       col.modifiers.comment.foreach: c =>
         stmts += s"COMMENT ON COLUMN ${ct.name}.${col.name} IS '${escapeStr(c)}'"
     stmts.result()
+  end compileCreateTable
 
   private def compileAlterTable(at: Migration.AlterTable): List[String] =
     val stmts = List.newBuilder[String]
@@ -186,10 +183,8 @@ object H2Compiler extends MigrationCompiler:
       sb.append(
         s" REFERENCES ${fk.refTable}(${fk.refColumns.mkString(", ")})"
       )
-      if fk.onDelete != FkAction.NoAction then
-        sb.append(s" ON DELETE ${compileFkAction(fk.onDelete)}")
-      if fk.onUpdate != FkAction.NoAction then
-        sb.append(s" ON UPDATE ${compileFkAction(fk.onUpdate)}")
+      if fk.onDelete != FkAction.NoAction then sb.append(s" ON DELETE ${compileFkAction(fk.onDelete)}")
+      if fk.onUpdate != FkAction.NoAction then sb.append(s" ON UPDATE ${compileFkAction(fk.onUpdate)}")
       List(sb.toString)
     case AlterOp.DropForeignKey(name) =>
       List(s"ALTER TABLE $table DROP CONSTRAINT $name")
@@ -223,3 +218,4 @@ object H2Compiler extends MigrationCompiler:
 
   private def escapeStr(s: String): String =
     s.replace("'", "''")
+end H2Compiler

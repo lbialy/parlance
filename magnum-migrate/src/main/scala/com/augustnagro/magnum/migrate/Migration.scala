@@ -22,3 +22,4 @@ enum Migration:
   case DropExtension(name: String)
   case Raw(sql: String)
   case RawParameterized(sql: String, params: List[Any])
+end Migration

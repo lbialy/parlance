@@ -317,9 +317,7 @@ class WhereHasTests extends QbTestBase:
       // The Silmarillion has score 3 -> doesn't qualify
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(sq =>
-          sq.title.like("The%") && sq.whereHas(bookReviews)(_.score >= 4)
-        )
+        .whereHas(authorBooks)(sq => sq.title.like("The%") && sq.whereHas(bookReviews)(_.score >= 4))
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 1)
@@ -332,9 +330,7 @@ class WhereHasTests extends QbTestBase:
       // Herbert: Dune (also score 5), Tolkien: The Hobbit score 5
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(sq =>
-          (sq.title === "Dune") || sq.whereHas(bookReviews)(_.score >= 5)
-        )
+        .whereHas(authorBooks)(sq => (sq.title === "Dune") || sq.whereHas(bookReviews)(_.score >= 5))
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -386,12 +382,11 @@ class WhereHasTests extends QbTestBase:
       //                 AND is user of Tokyo trip -> checklist 2 -> item 3 (form 100)
 
       def hasAccessViaChecklist(userId: Long): Boolean =
-        QueryBuilder.from[ClChecklistItem]
+        QueryBuilder
+          .from[ClChecklistItem]
           .where(_.formId === formId)
           .whereHas(itemChecklist)(sq =>
-            sq.whereHas(checklistTrip)(sq2 =>
-              sq2.whereHas(tripOwners)(_.id === userId) || sq2.whereHas(tripUsers)(_.id === userId)
-            )
+            sq.whereHas(checklistTrip)(sq2 => sq2.whereHas(tripOwners)(_.id === userId) || sq2.whereHas(tripUsers)(_.id === userId))
           )
           .exists()
 
@@ -412,7 +407,8 @@ class WhereHasTests extends QbTestBase:
       val formId = 100L
       val nonExistentUserId = 999L
 
-      val hasAccess = QueryBuilder.from[ClChecklistItem]
+      val hasAccess = QueryBuilder
+        .from[ClChecklistItem]
         .where(_.formId === formId)
         .whereHas(itemChecklist)(sq =>
           sq.whereHas(checklistTrip)(sq2 =>
@@ -428,12 +424,11 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val nonExistentFormId = 999L
 
-      val hasAccess = QueryBuilder.from[ClChecklistItem]
+      val hasAccess = QueryBuilder
+        .from[ClChecklistItem]
         .where(_.formId === nonExistentFormId)
         .whereHas(itemChecklist)(sq =>
-          sq.whereHas(checklistTrip)(sq2 =>
-            sq2.whereHas(tripOwners)(_.id === 1L) || sq2.whereHas(tripUsers)(_.id === 1L)
-          )
+          sq.whereHas(checklistTrip)(sq2 => sq2.whereHas(tripOwners)(_.id === 1L) || sq2.whereHas(tripUsers)(_.id === 1L))
         )
         .exists()
 
@@ -443,12 +438,11 @@ class WhereHasTests extends QbTestBase:
     val formId = 100L
     val userId = 1L
 
-    val frag = QueryBuilder.from[ClChecklistItem]
+    val frag = QueryBuilder
+      .from[ClChecklistItem]
       .where(_.formId === formId)
       .whereHas(itemChecklist)(sq =>
-        sq.whereHas(checklistTrip)(sq2 =>
-          sq2.whereHas(tripOwners)(_.id === userId) || sq2.whereHas(tripUsers)(_.id === userId)
-        )
+        sq.whereHas(checklistTrip)(sq2 => sq2.whereHas(tripOwners)(_.id === userId) || sq2.whereHas(tripUsers)(_.id === userId))
       )
       .buildWith(H2)
 

@@ -16,7 +16,7 @@ import scala.reflect.{ClassTag, classTag}
   *   val repo = new Repo[SdUser, SdUser, Long] with SoftDeletes[SdUser, SdUser, Long]
   * }}}
   *
-  * The entity must have an `Option`-typed field annotated with `@deletedAt` and must derive `HasDeletedAt`.
+  * The entity must have an `Option` -typed field annotated with `@deletedAt` and must derive `HasDeletedAt`.
   */
 trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
   self: Repo[EC, E, ID] =>

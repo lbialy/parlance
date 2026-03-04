@@ -220,7 +220,8 @@ class PivotTests extends QbTestBase:
       val result = userRoles.attach(alice, viewer)
       assertEquals(result, 1)
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Alice")
         .withRelated(userRoles)
         .run()
@@ -235,7 +236,8 @@ class PivotTests extends QbTestBase:
       val result = userRoles.detach(alice, admin)
       assertEquals(result, 1)
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Alice")
         .withRelated(userRoles)
         .run()
@@ -250,7 +252,8 @@ class PivotTests extends QbTestBase:
       val result = userRoles.detachAll(dave)
       assertEquals(result, 3) // Dave had 3 roles
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Dave")
         .withRelated(userRoles)
         .run()
@@ -268,7 +271,8 @@ class PivotTests extends QbTestBase:
       assertEquals(result.detached, 1) // editor
       assertEquals(result.unchanged, 1) // admin
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Alice")
         .withRelated(userRoles)
         .run()
@@ -299,7 +303,8 @@ class PivotTests extends QbTestBase:
       // Charlie (id=3) has no roles, attach viewer
       userRolesExt.attach(PvUserRoleExtCreator(3, 3, "test", now))
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Charlie")
         .withRelatedAndPivot(userRolesExt)
         .run()
@@ -317,12 +322,15 @@ class PivotTests extends QbTestBase:
     val now = LocalDateTime.of(2025, 7, 1, 12, 0)
     t.transact:
       // Charlie has no roles in ext table yet
-      userRolesExt.attachAll(List(
-        PvUserRoleExtCreator(3, 1, "batch", now),
-        PvUserRoleExtCreator(3, 2, "batch", now)
-      ))
+      userRolesExt.attachAll(
+        List(
+          PvUserRoleExtCreator(3, 1, "batch", now),
+          PvUserRoleExtCreator(3, 2, "batch", now)
+        )
+      )
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Charlie")
         .withRelatedAndPivot(userRolesExt)
         .run()
@@ -336,9 +344,7 @@ class PivotTests extends QbTestBase:
       val admin = PvRole(1, "admin")
       val viewer = PvRole(3, "viewer")
       // Alice has admin+editor in ext table, sync to admin+viewer
-      val result = userRolesExt.sync(alice, List(admin, viewer), role =>
-        PvUserRoleExtCreator(alice.id, role.id, "sync-test", now)
-      )
+      val result = userRolesExt.sync(alice, List(admin, viewer), role => PvUserRoleExtCreator(alice.id, role.id, "sync-test", now))
       assertEquals(result.attached, 1) // viewer
       assertEquals(result.detached, 1) // editor
       assertEquals(result.unchanged, 1) // admin
@@ -348,7 +354,8 @@ class PivotTests extends QbTestBase:
   test("withRelatedAndPivot loads (target, pivot) pairs"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .orderBy(_.name)
         .withRelatedAndPivot(userRolesExt)
         .run()
@@ -366,7 +373,8 @@ class PivotTests extends QbTestBase:
   test("withRelatedAndPivot with Frag filter on pivot columns"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .withRelatedAndPivot(userRolesExt, Frag("assigned_by = ?", Seq("system"), FragWriter.fromKeys(Vector("system"))))
         .run()
       // Only Alice (admin by system, editor NOT by system -> only admin) and Bob (editor by system)
@@ -383,7 +391,8 @@ class PivotTests extends QbTestBase:
   test("withRelatedAndPivot empty result for user with no roles"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Charlie")
         .withRelatedAndPivot(userRolesExt)
         .run()
@@ -393,7 +402,8 @@ class PivotTests extends QbTestBase:
   test("withRelated on PivotRelation returns just targets (no pivot data)"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Alice")
         .withRelated(userRolesExt)
         .run()
@@ -407,7 +417,8 @@ class PivotTests extends QbTestBase:
   test("withRelatedAndPivot chained with withRelated"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .withRelatedAndPivot(userRolesExt)
         .withRelated(userRoles)
         .run()
@@ -428,7 +439,8 @@ class PivotTests extends QbTestBase:
       val result = userRolesExt.detach(alice, admin)
       assertEquals(result, 1)
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Alice")
         .withRelatedAndPivot(userRolesExt)
         .run()
@@ -442,7 +454,8 @@ class PivotTests extends QbTestBase:
       val result = userRolesExt.detachAll(dave)
       assertEquals(result, 3)
     t.connect:
-      val results = QueryBuilder.from[PvUser]
+      val results = QueryBuilder
+        .from[PvUser]
         .where(_.name === "Dave")
         .withRelatedAndPivot(userRolesExt)
         .run()

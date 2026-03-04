@@ -6,14 +6,14 @@ object PostgresCompiler extends MigrationCompiler:
 
   def compile(migration: Migration): List[String] =
     migration match
-      case ct: Migration.CreateTable       => compileCreateTable(ct)
-      case Migration.DropTable(name)       => List(s"DROP TABLE $name")
-      case Migration.DropTableIfExists(n)  => List(s"DROP TABLE IF EXISTS $n")
-      case Migration.RenameTable(f, t)     => List(s"ALTER TABLE $f RENAME TO $t")
-      case at: Migration.AlterTable        => compileAlterTable(at)
-      case ct: Migration.CreateEnumType    => List(compileCreateEnum(ct))
-      case Migration.DropEnumType(n)       => List(s"DROP TYPE $n")
-      case av: Migration.AddEnumValue      => List(compileAddEnumValue(av))
+      case ct: Migration.CreateTable      => compileCreateTable(ct)
+      case Migration.DropTable(name)      => List(s"DROP TABLE $name")
+      case Migration.DropTableIfExists(n) => List(s"DROP TABLE IF EXISTS $n")
+      case Migration.RenameTable(f, t)    => List(s"ALTER TABLE $f RENAME TO $t")
+      case at: Migration.AlterTable       => compileAlterTable(at)
+      case ct: Migration.CreateEnumType   => List(compileCreateEnum(ct))
+      case Migration.DropEnumType(n)      => List(s"DROP TYPE $n")
+      case av: Migration.AddEnumValue     => List(compileAddEnumValue(av))
       case rv: Migration.RenameEnumValue =>
         List(
           s"ALTER TYPE ${rv.typeName} RENAME VALUE '${escapeStr(rv.from)}' TO '${escapeStr(rv.to)}'"
@@ -22,7 +22,7 @@ object PostgresCompiler extends MigrationCompiler:
         List(s"CREATE EXTENSION IF NOT EXISTS $n")
       case Migration.DropExtension(n) =>
         List(s"DROP EXTENSION IF EXISTS $n")
-      case Migration.Raw(sql)              => List(sql)
+      case Migration.Raw(sql)                 => List(sql)
       case Migration.RawParameterized(sql, _) => List(sql)
 
   override def requiresNonTx(migration: Migration): Boolean =
@@ -35,36 +35,36 @@ object PostgresCompiler extends MigrationCompiler:
       case _ => false
 
   def compileType(ct: ColumnType): String = ct match
-    case ColumnType.SmallInt       => "SMALLINT"
-    case ColumnType.Integer        => "INTEGER"
-    case ColumnType.BigInt         => "BIGINT"
-    case ColumnType.SmallSerial    => "SMALLSERIAL"
-    case ColumnType.Serial         => "SERIAL"
-    case ColumnType.BigSerial      => "BIGSERIAL"
-    case ColumnType.Numeric(p, s)  => s"NUMERIC($p, $s)"
+    case ColumnType.SmallInt        => "SMALLINT"
+    case ColumnType.Integer         => "INTEGER"
+    case ColumnType.BigInt          => "BIGINT"
+    case ColumnType.SmallSerial     => "SMALLSERIAL"
+    case ColumnType.Serial          => "SERIAL"
+    case ColumnType.BigSerial       => "BIGSERIAL"
+    case ColumnType.Numeric(p, s)   => s"NUMERIC($p, $s)"
     case ColumnType.DoublePrecision => "DOUBLE PRECISION"
-    case ColumnType.Real           => "REAL"
-    case ColumnType.Boolean        => "BOOLEAN"
-    case ColumnType.Char(n)        => s"CHAR($n)"
-    case ColumnType.Varchar(n)     => s"VARCHAR($n)"
-    case ColumnType.Text           => "TEXT"
-    case ColumnType.Bytea          => "BYTEA"
-    case ColumnType.Date           => "DATE"
-    case ColumnType.Time(p)        => s"TIME($p)"
-    case ColumnType.TimeTz(p)      => s"TIMETZ($p)"
-    case ColumnType.Timestamp(p)   => s"TIMESTAMP($p)"
-    case ColumnType.TimestampTz(p) => s"TIMESTAMPTZ($p)"
-    case ColumnType.Interval       => "INTERVAL"
-    case ColumnType.Json           => "JSON"
-    case ColumnType.Jsonb          => "JSONB"
-    case ColumnType.Uuid           => "UUID"
-    case ColumnType.PgEnum(name)   => name
-    case ColumnType.ArrayOf(el)    => s"${compileType(el)}[]"
-    case ColumnType.Inet           => "INET"
-    case ColumnType.Cidr           => "CIDR"
-    case ColumnType.MacAddr        => "MACADDR"
-    case ColumnType.Money          => "MONEY"
-    case ColumnType.Custom(sql)    => sql
+    case ColumnType.Real            => "REAL"
+    case ColumnType.Boolean         => "BOOLEAN"
+    case ColumnType.Char(n)         => s"CHAR($n)"
+    case ColumnType.Varchar(n)      => s"VARCHAR($n)"
+    case ColumnType.Text            => "TEXT"
+    case ColumnType.Bytea           => "BYTEA"
+    case ColumnType.Date            => "DATE"
+    case ColumnType.Time(p)         => s"TIME($p)"
+    case ColumnType.TimeTz(p)       => s"TIMETZ($p)"
+    case ColumnType.Timestamp(p)    => s"TIMESTAMP($p)"
+    case ColumnType.TimestampTz(p)  => s"TIMESTAMPTZ($p)"
+    case ColumnType.Interval        => "INTERVAL"
+    case ColumnType.Json            => "JSON"
+    case ColumnType.Jsonb           => "JSONB"
+    case ColumnType.Uuid            => "UUID"
+    case ColumnType.PgEnum(name)    => name
+    case ColumnType.ArrayOf(el)     => s"${compileType(el)}[]"
+    case ColumnType.Inet            => "INET"
+    case ColumnType.Cidr            => "CIDR"
+    case ColumnType.MacAddr         => "MACADDR"
+    case ColumnType.Money           => "MONEY"
+    case ColumnType.Custom(sql)     => sql
 
   def compileColumnDef(col: ColumnDef[?]): String =
     val sb = StringBuilder()
@@ -77,22 +77,19 @@ object PostgresCompiler extends MigrationCompiler:
     sb.append(compileType(colType))
     if !mods.nullable then sb.append(" NOT NULL")
     mods.default.foreach:
-      case DefaultValue.Literal(v)   => sb.append(s" DEFAULT ${renderLiteral(v)}")
+      case DefaultValue.Literal(v)    => sb.append(s" DEFAULT ${renderLiteral(v)}")
       case DefaultValue.Expression(e) => sb.append(s" DEFAULT $e")
     if mods.primaryKey then sb.append(" PRIMARY KEY")
     if mods.unique then sb.append(" UNIQUE")
     mods.check.foreach(expr => sb.append(s" CHECK ($expr)"))
     mods.collation.foreach(c => sb.append(s""" COLLATE "$c""""))
-    mods.generatedAs.foreach(expr =>
-      sb.append(s" GENERATED ALWAYS AS ($expr) STORED")
-    )
+    mods.generatedAs.foreach(expr => sb.append(s" GENERATED ALWAYS AS ($expr) STORED"))
     mods.references.foreach: ref =>
       sb.append(s" REFERENCES ${ref.table}(${ref.column})")
-      if ref.onDelete != FkAction.NoAction then
-        sb.append(s" ON DELETE ${compileFkAction(ref.onDelete)}")
-      if ref.onUpdate != FkAction.NoAction then
-        sb.append(s" ON UPDATE ${compileFkAction(ref.onUpdate)}")
+      if ref.onDelete != FkAction.NoAction then sb.append(s" ON DELETE ${compileFkAction(ref.onDelete)}")
+      if ref.onUpdate != FkAction.NoAction then sb.append(s" ON UPDATE ${compileFkAction(ref.onUpdate)}")
     sb.toString
+  end compileColumnDef
 
   private def compileCreateTable(ct: Migration.CreateTable): List[String] =
     val sb = StringBuilder()
@@ -114,6 +111,7 @@ object PostgresCompiler extends MigrationCompiler:
       col.modifiers.comment.foreach: c =>
         stmts += s"COMMENT ON COLUMN ${ct.name}.${col.name} IS '${escapeStr(c)}'"
     stmts.result()
+  end compileCreateTable
 
   private def compileAlterTable(at: Migration.AlterTable): List[String] =
     val stmts = List.newBuilder[String]
@@ -203,10 +201,8 @@ object PostgresCompiler extends MigrationCompiler:
       sb.append(
         s" REFERENCES ${fk.refTable}(${fk.refColumns.mkString(", ")})"
       )
-      if fk.onDelete != FkAction.NoAction then
-        sb.append(s" ON DELETE ${compileFkAction(fk.onDelete)}")
-      if fk.onUpdate != FkAction.NoAction then
-        sb.append(s" ON UPDATE ${compileFkAction(fk.onUpdate)}")
+      if fk.onDelete != FkAction.NoAction then sb.append(s" ON DELETE ${compileFkAction(fk.onDelete)}")
+      if fk.onUpdate != FkAction.NoAction then sb.append(s" ON UPDATE ${compileFkAction(fk.onUpdate)}")
       List(sb.toString)
     case AlterOp.DropForeignKey(name) =>
       List(s"ALTER TABLE $table DROP CONSTRAINT $name")
@@ -227,10 +223,10 @@ object PostgresCompiler extends MigrationCompiler:
       case EnumValuePosition.After(ex)  => s"$base AFTER '${escapeStr(ex)}'"
 
   private def compileFkAction(action: FkAction): String = action match
-    case FkAction.NoAction  => "NO ACTION"
-    case FkAction.Restrict  => "RESTRICT"
-    case FkAction.Cascade   => "CASCADE"
-    case FkAction.SetNull   => "SET NULL"
+    case FkAction.NoAction   => "NO ACTION"
+    case FkAction.Restrict   => "RESTRICT"
+    case FkAction.Cascade    => "CASCADE"
+    case FkAction.SetNull    => "SET NULL"
     case FkAction.SetDefault => "SET DEFAULT"
 
   private def compileIndexMethod(m: IndexMethod): String = m match
@@ -255,13 +251,14 @@ object PostgresCompiler extends MigrationCompiler:
     s"${table}_${columns.mkString("_")}_$suffix"
 
   private[migrate] def renderLiteral(value: Any): String = value match
-    case s: String     => s"'${escapeStr(s)}'"
-    case b: Boolean    => if b then "TRUE" else "FALSE"
+    case s: String  => s"'${escapeStr(s)}'"
+    case b: Boolean => if b then "TRUE" else "FALSE"
     case _: (Int | Long | Short | Byte | Float | Double | BigDecimal) =>
       value.toString
-    case u: UUID       => s"'$u'"
-    case null          => "NULL"
-    case other         => s"'${escapeStr(other.toString)}'"
+    case u: UUID => s"'$u'"
+    case null    => "NULL"
+    case other   => s"'${escapeStr(other.toString)}'"
 
   private def escapeStr(s: String): String =
     s.replace("'", "''")
+end PostgresCompiler

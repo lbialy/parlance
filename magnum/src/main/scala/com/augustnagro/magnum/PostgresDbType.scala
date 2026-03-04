@@ -276,20 +276,21 @@ object PostgresDbType extends DbType:
             s"ON CONFLICT ON CONSTRAINT $name"
           case ConflictTarget.AnyConflict => "ON CONFLICT"
         val actionClause = action match
-          case ConflictAction.DoNothing => "DO NOTHING"
+          case ConflictAction.DoNothing      => "DO NOTHING"
           case ConflictAction.DoUpdate(frag) => s"DO UPDATE SET ${frag.sqlString}"
         val sql = s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) $conflictClause $actionClause"
         val fragParams = action match
-          case ConflictAction.DoNothing => Vector.empty
+          case ConflictAction.DoNothing      => Vector.empty
           case ConflictAction.DoUpdate(frag) => frag.params
         val fragWriter: FragWriter = action match
-          case ConflictAction.DoNothing => FragWriter.empty
+          case ConflictAction.DoNothing      => FragWriter.empty
           case ConflictAction.DoUpdate(frag) => frag.writer
         handleQuery(sql, entityCreator):
           Using(con.connection.prepareStatement(sql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)
             fragWriter.write(ps, 1 + ecCodec.cols.length)
             timed(ps.executeUpdate())
+      end insertOnConflict
 
       def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using con: DbCon[?]): Unit =
         val conflictClause = target match
@@ -299,7 +300,8 @@ object PostgresDbType extends DbType:
           case ConflictTarget.Constraint(name) =>
             s"ON CONFLICT ON CONSTRAINT $name"
           case ConflictTarget.AnyConflict => "ON CONFLICT"
-        val sql = s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) $conflictClause DO UPDATE SET $ecUpdateAllSetClause"
+        val sql =
+          s"INSERT INTO $tableNameSql $ecInsertKeys VALUES (${ecCodec.queryRepr}) $conflictClause DO UPDATE SET $ecUpdateAllSetClause"
         handleQuery(sql, entityCreator):
           Using(con.connection.prepareStatement(sql)): ps =>
             ecCodec.writeSingle(entityCreator, ps)

@@ -6,7 +6,10 @@ import java.sql.{Connection, Types}
 import scala.deriving.Mirror
 import scala.quoted.*
 
-inline def verify[E](using con: DbCon[?], em: EntityMeta[E])(using
+inline def verify[E](using
+    con: DbCon[?],
+    em: EntityMeta[E]
+)(using
     Mirror.ProductOf[E]
 ): VerifyResult =
   ${ Verify.verifyImpl[E]('con, 'em) }
@@ -18,11 +21,13 @@ object Verify:
   ): Expr[VerifyResult] =
     import quotes.reflect.*
 
-    val mirror = Expr.summon[Mirror.ProductOf[E]].getOrElse(
-      report.errorAndAbort(
-        s"Cannot summon Mirror.ProductOf for ${TypeRepr.of[E].show}"
+    val mirror = Expr
+      .summon[Mirror.ProductOf[E]]
+      .getOrElse(
+        report.errorAndAbort(
+          s"Cannot summon Mirror.ProductOf for ${TypeRepr.of[E].show}"
+        )
       )
-    )
 
     mirror match
       case '{
@@ -42,6 +47,7 @@ object Verify:
             $con
           )
         }
+  end verifyImpl
 
   private def buildFieldMetas[Mets: Type](
       res: Vector[Expr[FieldMeta]] = Vector.empty
@@ -171,14 +177,14 @@ object Verify:
                 dbInfo,
                 None
               )
+            end if
+          end if
       end match
       fieldIdx += 1
     end while
 
     // Extra columns in DB
-    for dbCol <- dbColumns do
-      if !matchedDbCols.contains(dbCol.name.toLowerCase) then
-        issues += VerifyIssue.ExtraColumnInDb(dbCol.name)
+    for dbCol <- dbColumns do if !matchedDbCols.contains(dbCol.name.toLowerCase) then issues += VerifyIssue.ExtraColumnInDb(dbCol.name)
 
     // Primary key check
     val expectedPk = List(em.primaryKey.sqlName)
@@ -187,8 +193,7 @@ object Verify:
         .map(_.toLowerCase)
         .zip(actualPk)
         .forall((e, a) => e == a) || expectedPk.size != actualPk.size
-    then
-      issues += VerifyIssue.PrimaryKeyMismatch(expectedPk, pkColumns)
+    then issues += VerifyIssue.PrimaryKeyMismatch(expectedPk, pkColumns)
 
     VerifyResult(tableName, entityName, issues.result(), details.result())
   end check
@@ -235,12 +240,12 @@ object Verify:
           .filterNot(_ => rs.wasNull()),
         numPrecision = Option(rs.getInt("numeric_precision"))
           .filterNot(_ => rs.wasNull()),
-        numScale =
-          Option(rs.getInt("numeric_scale")).filterNot(_ => rs.wasNull())
+        numScale = Option(rs.getInt("numeric_scale")).filterNot(_ => rs.wasNull())
       )
     rs.close()
     ps.close()
     buf.result()
+  end loadColumns
 
   private def loadPrimaryKey(
       conn: Connection,
@@ -265,6 +270,7 @@ object Verify:
     rs.close()
     ps.close()
     buf.result()
+  end loadPrimaryKey
 
   private def formatDbInfo(
       dbCol: DbColumn,
@@ -299,8 +305,7 @@ object Verify:
         dt == "double precision" || dt == "double" || dt == "float8"
       case Types.NUMERIC | Types.DECIMAL =>
         dt == "numeric" || dt == "decimal"
-      case Types.VARCHAR | Types.LONGVARCHAR | Types.NVARCHAR | Types.CLOB |
-          Types.CHAR | Types.NCHAR | Types.LONGNVARCHAR | Types.NCLOB =>
+      case Types.VARCHAR | Types.LONGVARCHAR | Types.NVARCHAR | Types.CLOB | Types.CHAR | Types.NCHAR | Types.LONGNVARCHAR | Types.NCLOB =>
         dt == "character varying" || dt == "varchar" || dt == "text" ||
         dt == "character" || dt == "char" ||
         dt == "character large object" || dt == "clob" || dt == "nvarchar" ||
@@ -322,5 +327,7 @@ object Verify:
         dt == "json" || dt == "jsonb"
       case _ =>
         false
+    end match
+  end isTypeCompatible
 
 end Verify

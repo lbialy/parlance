@@ -74,17 +74,23 @@ object EntityMeta:
         val jdbcColsExpr = DbCodec.buildColsExpr[mets]()
         val queryReprExpr = DbCodec.productQueryRepr[mets]()
 
+        // --- element codecs (per-field DbCodec instances) ---
+        val elemCodecExprs: List[Expr[DbCodec[?]]] = summonElemCodecs[mets]()
+        val elemCodecsSeqExpr = Expr.ofSeq(elemCodecExprs)
+
         '{
           val metaCols = IArray.from($metaColsExpr)
           val pkIndices = $idIndicesExpr
           val pks = IArray.from(pkIndices.map(metaCols(_)))
           val pk = pks(0)
+          val elemCodecsArr = IArray.from($elemCodecsSeqExpr)
           new EntityMeta[E]:
             // TableMeta
             def tableName: String = $tableNameSql
             def columns: IArray[Col[?]] = metaCols
             def primaryKey: Col[?] = pk
             def primaryKeys: IArray[Col[?]] = pks
+            def elementCodecs: IArray[DbCodec[?]] = elemCodecsArr
             // DbCodec
             val cols: IArray[Int] = $jdbcColsExpr
             def readSingle(rs: ResultSet, pos: Int): E =
@@ -100,6 +106,7 @@ object EntityMeta:
                 DbCodec.productWriteSingle[E, mets]('{ e }, '{ ps }, '{ pos }, '{ 0 })
               }
             val queryRepr: String = $queryReprExpr
+          end new
         }
 
       case _ =>
@@ -136,5 +143,17 @@ object EntityMeta:
     val indices = params.zipWithIndex.collect:
       case (sym, idx) if sym.hasAnnotation(idAnnot) => idx
     if indices.isEmpty then List(0) else indices
+
+  private def summonElemCodecs[Mets: Type](
+      res: List[Expr[DbCodec[?]]] = Nil
+  )(using Quotes): List[Expr[DbCodec[?]]] =
+    import quotes.reflect.*
+    Type.of[Mets] match
+      case '[met *: metTail] =>
+        val codec = Expr.summon[DbCodec[met]].getOrElse {
+          '{ DbCodec.AnyCodec.asInstanceOf[DbCodec[met]] }
+        }
+        summonElemCodecs[metTail](res :+ '{ $codec.asInstanceOf[DbCodec[?]] })
+      case '[EmptyTuple] => res
 
 end EntityMeta

@@ -32,8 +32,7 @@ class Migrator(
     Migration.CreateTable(
       name = tableName,
       columns = List(
-        ColumnDef[Int]("id", ColumnType.Serial)
-          .primaryKey,
+        ColumnDef[Int]("id", ColumnType.Serial).primaryKey,
         ColumnDef[String]("migration", ColumnType.Varchar(512)),
         ColumnDef[Int]("batch", ColumnType.Integer),
         ColumnDef[Instant]("applied_at", ColumnType.TimestampTz())
@@ -99,6 +98,7 @@ class Migrator(
               val am = insertApplied(migrationKey(m), batch)
               newlyApplied += am
       MigrateResult(pending.size, Some(batch), newlyApplied.result())
+  end migrateWithTxControl
 
   /** Roll back the latest batch. */
   def rollback(): RollbackResult =
@@ -132,15 +132,12 @@ class Migrator(
   /** Show applied and pending migrations. Read-only. */
   def status(): MigrationStatus =
     xa.connect:
-      if !trackingTableExists() then
-        MigrationStatus(Nil, sortedMigrations)
+      if !trackingTableExists() then MigrationStatus(Nil, sortedMigrations)
       else
         val applied = loadApplied()
         val appliedKeys = applied.map(_.migration).toSet
         val pending =
-          sortedMigrations.filterNot(m =>
-            appliedKeys.contains(migrationKey(m))
-          )
+          sortedMigrations.filterNot(m => appliedKeys.contains(migrationKey(m)))
         MigrationStatus(applied, pending)
 
   /** Dry-run: compile pending migrations without executing. Read-only. */
@@ -151,9 +148,7 @@ class Migrator(
         else
           val applied = loadApplied()
           val appliedKeys = applied.map(_.migration).toSet
-          sortedMigrations.filterNot(m =>
-            appliedKeys.contains(migrationKey(m))
-          )
+          sortedMigrations.filterNot(m => appliedKeys.contains(migrationKey(m)))
       pending.map: m =>
         val sqls = m.up.flatMap:
           case Migration.RawParameterized(sql, _) => List(sql)
@@ -244,6 +239,7 @@ class Migrator(
           batch = batch,
           appliedAt = now
         )
+  end insertApplied
 
   private def deleteApplied(id: Int)(using con: DbCon[?]): Unit =
     val conn = con.connection

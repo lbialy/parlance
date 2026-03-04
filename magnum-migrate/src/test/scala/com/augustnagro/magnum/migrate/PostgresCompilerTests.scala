@@ -117,7 +117,11 @@ class PostgresCompilerTests extends FunSuite:
     val m = Migration.CreateTable(
       "events",
       List(
-        ColumnDef[java.util.UUID]("id", ColumnType.Uuid, ColumnModifiers(default = Some(DefaultValue.Expression("gen_random_uuid()")), primaryKey = true))
+        ColumnDef[java.util.UUID](
+          "id",
+          ColumnType.Uuid,
+          ColumnModifiers(default = Some(DefaultValue.Expression("gen_random_uuid()")), primaryKey = true)
+        )
       )
     )
     val sql = compile(m).head
@@ -291,7 +295,10 @@ class PostgresCompilerTests extends FunSuite:
       List(AlterOp.AddForeignKey(List("author_id"), "users", List("id"), FkAction.Cascade, FkAction.NoAction))
     )
     val sql = compile(m).head
-    assertEquals(sql, "ALTER TABLE posts ADD CONSTRAINT posts_author_id_fkey FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE")
+    assertEquals(
+      sql,
+      "ALTER TABLE posts ADD CONSTRAINT posts_author_id_fkey FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE"
+    )
 
   test("ADD FOREIGN KEY with custom name"):
     val m = Migration.AlterTable(
@@ -426,3 +433,4 @@ class PostgresCompilerTests extends FunSuite:
     assertEquals(sqls.size, 2)
     assert(sqls(0).contains("ADD COLUMN bio TEXT"), sqls(0))
     assert(sqls(1).contains("CREATE INDEX users_email_idx"), sqls(1))
+end PostgresCompilerTests

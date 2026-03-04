@@ -33,6 +33,7 @@ object KeysetSql:
       allParams += keyValues(i)
       writers += ((entry.codec.asInstanceOf[DbCodec[Any]], keyValues(i)))
       sb.append(")")
+    end for
 
     sb.append(")")
 
@@ -46,3 +47,4 @@ object KeysetSql:
 
     WhereFrag(Frag(sb.result(), allParams.result(), writer))
   end buildKeysetFrag
+end KeysetSql

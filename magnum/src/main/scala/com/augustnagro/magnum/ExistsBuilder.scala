@@ -57,7 +57,8 @@ private[magnum] object ExistsBuilder:
     val correlation = s"${rel.pivotTable}.${rel.sourceFk} = ${sourceMeta.tableName}.${rel.sourcePk.sqlName}"
     // When we have scopes, we need to JOIN the target table to apply scope conditions
     val targetMeta = conditionWithMeta.map(_._2)
-    val scopeCond = targetMeta.flatMap(tm => scopeConditions(scopes, tm))
+    val scopeCond = targetMeta
+      .flatMap(tm => scopeConditions(scopes, tm))
       .orElse:
         // If no conditionWithMeta but scopes exist, we can't apply scope conditions
         // without the target meta — scopes require the table meta to produce conditions.
@@ -65,7 +66,7 @@ private[magnum] object ExistsBuilder:
         None
     val fromClause = conditionWithMeta match
       case None if scopes.isEmpty => rel.pivotTable
-      case None =>
+      case None                   =>
         // scopes exist but no user condition — still just pivot table
         // (scope conditions can't be applied without target meta)
         rel.pivotTable
@@ -73,6 +74,7 @@ private[magnum] object ExistsBuilder:
         s"${rel.pivotTable} JOIN ${tMeta.tableName} ON ${rel.pivotTable}.${rel.targetFk} = ${tMeta.tableName}.${rel.targetPk.sqlName}"
     val merged = mergeConditions(conditionWithMeta.map(_._1), scopeCond)
     buildExistsFrag(fromClause, correlation, merged, negate)
+  end buildPivotExistsFrag
 
   /** Build a scope-aware pivot EXISTS fragment that can apply scopes even without a user condition. */
   def buildPivotExistsFragScoped[S, T](
@@ -114,7 +116,7 @@ private[magnum] object ExistsBuilder:
     val correlation = s"${relMeta.tableName}.${rel.pk.sqlName} = ${sourceMeta.tableName}.${rel.fk.sqlName}"
     val baseSql = buildCountSql(relMeta.tableName, correlation)
     scopeConditions(scopes, relMeta) match
-      case None => Frag(baseSql, Seq.empty, FragWriter.empty)
+      case None     => Frag(baseSql, Seq.empty, FragWriter.empty)
       case Some(sc) => Frag(s"$baseSql AND ${sc.sqlString}", sc.params, sc.writer)
 
   def buildPivotCountSql[S, T](
@@ -146,7 +148,7 @@ private[magnum] object ExistsBuilder:
       else rel.pivotTable
     val baseSql = buildCountSql(fromClause, correlation)
     scopeCond match
-      case None => Frag(baseSql, Seq.empty, FragWriter.empty)
+      case None     => Frag(baseSql, Seq.empty, FragWriter.empty)
       case Some(sc) => Frag(s"$baseSql AND ${sc.sqlString}", sc.params, sc.writer)
 
 end ExistsBuilder

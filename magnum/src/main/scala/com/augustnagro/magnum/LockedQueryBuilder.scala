@@ -26,9 +26,10 @@ class LockedQueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val allParams = whereParams ++ orderParams
     val combinedWriter: FragWriter =
       if orderParams.isEmpty then whereWriter
-      else (ps, pos) =>
-        val next = whereWriter.write(ps, pos)
-        orderWriter.write(ps, next)
+      else
+        (ps, pos) =>
+          val next = whereWriter.write(ps, pos)
+          orderWriter.write(ps, next)
     Frag(baseSql + whereSql + orderBySql + limitOffsetSql + " " + lockMode.sql, allParams, combinedWriter)
 
   def run()(using DbTx[? <: SupportsRowLocks]): Vector[E] =
@@ -36,7 +37,8 @@ class LockedQueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 
   def first()(using DbTx[? <: SupportsRowLocks]): Option[E] =
     LockedQueryBuilder(meta, codec, cols, rootPredicate, orderEntries, Some(1), offsetOpt, distinctFlag, lockMode, rawOrderFrags)
-      .run().headOption
+      .run()
+      .headOption
 
   def firstOrFail()(using DbTx[? <: SupportsRowLocks]): E =
     first().getOrElse(
