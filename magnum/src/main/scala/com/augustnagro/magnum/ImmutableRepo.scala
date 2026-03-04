@@ -14,7 +14,6 @@ import scala.util.{Try, Using}
 open class ImmutableRepo[E, ID](
     val injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]]
 )(using
-    defaults: RepoDefaults[?, E, ID],
     meta: EntityMeta[E]
 ) extends Scoped[E]:
 
@@ -41,13 +40,13 @@ open class ImmutableRepo[E, ID](
     entities
 
   /** Internal scoped query builder using build0 (no structural typing needed). */
-  private def scopedQb: QueryBuilder[HasRoot, E, Columns[E]] =
+  protected def scopedQb: QueryBuilder[HasRoot, E, Columns[E]] =
     val cols = new Columns[E](meta.columns)
     val qb = QueryBuilder.build0[E, Columns[E]](meta, meta, cols)
     applyScopes(qb)
 
   /** Build a WhereFrag for `pk = ?` */
-  private def pkEqualsFrag(id: ID): WhereFrag =
+  protected def pkEqualsFrag(id: ID): WhereFrag =
     WhereFrag(
       Frag(
         s"${meta.primaryKey.sqlName} = ?",
@@ -57,7 +56,7 @@ open class ImmutableRepo[E, ID](
     )
 
   /** Build a WhereFrag for `pk IN (?, ?, ...)` */
-  private def pkInFrag(ids: Iterable[ID]): WhereFrag =
+  protected def pkInFrag(ids: Iterable[ID]): WhereFrag =
     val keys = ids.toVector
     val placeholders = keys.map(_ => "?").mkString(", ")
     WhereFrag(
@@ -70,41 +69,25 @@ open class ImmutableRepo[E, ID](
 
   /** Count of all entities */
   def count(using DbCon[?]): Long =
-    if finalScopes.isEmpty then defaults.count
-    else scopedQb.count()
+    scopedQb.count()
 
   /** Returns true if an E exists with the given id */
   def existsById(id: ID)(using DbCon[?]): Boolean =
-    if finalScopes.isEmpty then defaults.existsById(id)
-    else scopedQb.where(pkEqualsFrag(id)).exists()
+    scopedQb.where(pkEqualsFrag(id)).exists()
 
   /** Returns all entity values */
   def findAll(using con: DbCon[?]): Vector[E] =
-    val results =
-      if finalScopes.isEmpty then defaults.findAll
-      else scopedQb.run()
-    trackAll(results)
-
-  /** Find all entities matching the specification. See the scaladoc of [[Spec]] for more details
-    */
-  def findAll(spec: Spec[E])(using con: DbCon[?]): Vector[E] =
-    trackAll(defaults.findAll(spec))
+    trackAll(scopedQb.run())
 
   /** Returns Some(entity) if a matching E is found */
   def findById(id: ID)(using con: DbCon[?]): Option[E] =
-    val result =
-      if finalScopes.isEmpty then defaults.findById(id)
-      else scopedQb.where(pkEqualsFrag(id)).first()
-    result.map(track)
+    scopedQb.where(pkEqualsFrag(id)).first().map(track)
 
   /** Find all entities having ids in the Iterable. If an Id is not found, no error is thrown.
     */
   def findAllById(ids: Iterable[ID])(using con: DbCon[?]): Vector[E] =
-    val results =
-      if finalScopes.isEmpty then defaults.findAllById(ids)
-      else if ids.isEmpty then Vector.empty
-      else scopedQb.where(pkInFrag(ids)).run()
-    trackAll(results)
+    if ids.isEmpty then Vector.empty
+    else trackAll(scopedQb.where(pkInFrag(ids)).run())
 
   /** All scopes that will be applied to queries created via `query`. Override to add local scopes in subclasses.
     */

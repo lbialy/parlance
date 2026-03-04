@@ -4,8 +4,8 @@ import scala.reflect.{ClassTag, classTag}
 
 /** Mixin trait for soft-delete behavior on a [[Repo]].
   *
-  * Adds a scope that filters rows where the deleted-at column is NULL (i.e. not deleted), and overrides write methods to SET the timestamp
-  * instead of issuing a real DELETE.
+  * Adds a scope that filters rows where the deleted-at column is NULL (i.e. not deleted), and uses the `rewriteDelete` mutation hook to SET
+  * the timestamp instead of issuing a real DELETE.
   *
   * Usage:
   * {{{
@@ -33,41 +33,17 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
     )
     entity.asInstanceOf[Product].productElement(pkIdx).asInstanceOf[ID]
 
-  // --- scope: the only thing needed for reads ---
+  // --- scope with mutation hooks ---
 
   private val softDeleteScope: Scope[E] = new Scope[E]:
     override def conditions(meta: TableMeta[E]): Vector[WhereFrag] =
       Vector(WhereFrag(Frag(s"$sdColSql IS NULL", Seq.empty, FragWriter.empty)))
+    override def rewriteDelete(meta: TableMeta[E]): Vector[SetClause] =
+      Vector(SetClause.literal(hasDeletedAt.column, "CURRENT_TIMESTAMP"))
     override def key: ClassTag[?] = classTag[SoftDeletes[?, ?, ?]]
 
   override def finalScopes: Vector[Scope[E]] =
     self.injectedScopes :+ softDeleteScope
-
-  // --- write overrides: soft-delete instead of hard-delete ---
-
-  override def delete(entity: E)(using DbCon[?]): Unit =
-    deleteById(extractId(entity))
-
-  override def deleteById(id: ID)(using DbCon[?]): Unit =
-    Frag(
-      s"UPDATE $tbl SET $sdColSql = CURRENT_TIMESTAMP WHERE $pkSql = ?",
-      Seq(id),
-      FragWriter.fromKeys(Vector(id.asInstanceOf[Any]))
-    ).update.run()
-
-  override def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
-    var count = 0L
-    entities.foreach { e =>
-      delete(e); count += 1
-    }
-    BatchUpdateResult.Success(count)
-
-  override def deleteAllById(ids: Iterable[ID])(using DbCon[?]): BatchUpdateResult =
-    var count = 0L
-    ids.foreach { id =>
-      deleteById(id); count += 1
-    }
-    BatchUpdateResult.Success(count)
 
   // --- new methods: force delete, restore, inspection ---
 

@@ -26,6 +26,19 @@ trait DatabaseType:
 
   /** Whether this database supports ON CONFLICT / ON DUPLICATE KEY handling. */
   def supportsConflictHandling: Boolean = false
+
+  /** SQL for upsert by PK with extra SET clauses and WHERE conditions from mutation hooks. */
+  def renderUpsertByPkWithHooks(
+      tableName: String,
+      allCols: IArray[String],
+      allColsQueryRepr: String,
+      pkCol: String,
+      extraSetClauses: Vector[SetClause],
+      conditions: Vector[WhereFrag]
+  ): String =
+    throw UnsupportedOperationException(
+      s"upsertByPkWithHooks is not supported for ${getClass.getSimpleName}"
+    )
 end DatabaseType
 
 trait SupportsRowLocks extends DatabaseType
@@ -50,9 +63,24 @@ object Postgres extends DatabaseType, SupportsForShare, SupportsILike, SupportsR
     val updateSet = allCols.filter(_ != pkCol).map(c => s"$c = EXCLUDED.$c").mkString(", ")
     s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet"
 
+  override def renderUpsertByPkWithHooks(
+      tableName: String,
+      allCols: IArray[String],
+      allColsQueryRepr: String,
+      pkCol: String,
+      extraSetClauses: Vector[SetClause],
+      conditions: Vector[WhereFrag]
+  ): String =
+    val colsList = allCols.mkString("(", ", ", ")")
+    val updateSet = allCols.filter(_ != pkCol).map(c => s"$c = EXCLUDED.$c").mkString(", ")
+    val extraSetSql = if extraSetClauses.isEmpty then "" else extraSetClauses.map(_.sqlString).mkString(", ", ", ", "")
+    val wherePart = if conditions.isEmpty then "" else s" WHERE ${conditions.map(_.sqlString).mkString(" AND ")}"
+    s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet$extraSetSql$wherePart"
+
   override val supportsInsertReturning: Boolean = true
   override val supportsUpsert: Boolean = true
   override val supportsConflictHandling: Boolean = true
+end Postgres
 
 object MySQL extends DatabaseType, SupportsRowLocks:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
@@ -71,6 +99,20 @@ object MySQL extends DatabaseType, SupportsRowLocks:
     val colsList = allCols.mkString("(", ", ", ")")
     val updateSet = allCols.filter(_ != pkCol).map(c => s"$c = VALUES($c)").mkString(", ")
     s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON DUPLICATE KEY UPDATE $updateSet"
+
+  override def renderUpsertByPkWithHooks(
+      tableName: String,
+      allCols: IArray[String],
+      allColsQueryRepr: String,
+      pkCol: String,
+      extraSetClauses: Vector[SetClause],
+      conditions: Vector[WhereFrag]
+  ): String =
+    val colsList = allCols.mkString("(", ", ", ")")
+    val updateSet = allCols.filter(_ != pkCol).map(c => s"$c = VALUES($c)").mkString(", ")
+    val extraSetSql = if extraSetClauses.isEmpty then "" else extraSetClauses.map(_.sqlString).mkString(", ", ", ", "")
+    // MySQL does not support WHERE on ON DUPLICATE KEY UPDATE
+    s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON DUPLICATE KEY UPDATE $updateSet$extraSetSql"
 
   override val supportsUpsert: Boolean = true
   override val supportsConflictHandling: Boolean = true
@@ -97,6 +139,20 @@ object SQLite extends DatabaseType:
     val updateSet = allCols.filter(_ != pkCol).map(c => s"$c = EXCLUDED.$c").mkString(", ")
     s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet"
 
+  override def renderUpsertByPkWithHooks(
+      tableName: String,
+      allCols: IArray[String],
+      allColsQueryRepr: String,
+      pkCol: String,
+      extraSetClauses: Vector[SetClause],
+      conditions: Vector[WhereFrag]
+  ): String =
+    val colsList = allCols.mkString("(", ", ", ")")
+    val updateSet = allCols.filter(_ != pkCol).map(c => s"$c = EXCLUDED.$c").mkString(", ")
+    val extraSetSql = if extraSetClauses.isEmpty then "" else extraSetClauses.map(_.sqlString).mkString(", ", ", ", "")
+    val wherePart = if conditions.isEmpty then "" else s" WHERE ${conditions.map(_.sqlString).mkString(" AND ")}"
+    s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet$extraSetSql$wherePart"
+
   override val supportsUpsert: Boolean = true
   override val supportsConflictHandling: Boolean = true
 end SQLite
@@ -116,9 +172,29 @@ object H2 extends DatabaseType, SupportsForShare, SupportsILike, SupportsArrayTy
     val colsList = allCols.mkString("(", ", ", ")")
     s"MERGE INTO $tableName $colsList KEY ($pkCol) VALUES ($allColsQueryRepr)"
 
+  override def renderUpsertByPkWithHooks(
+      tableName: String,
+      allCols: IArray[String],
+      allColsQueryRepr: String,
+      pkCol: String,
+      extraSetClauses: Vector[SetClause],
+      conditions: Vector[WhereFrag]
+  ): String =
+    if extraSetClauses.isEmpty && conditions.isEmpty then
+      // Use MERGE syntax when no hooks/conditions — H2 doesn't support ON CONFLICT
+      renderUpsertByPk(tableName, allCols, allColsQueryRepr, pkCol)
+    else
+      // Fall back to ON CONFLICT syntax for hook-aware upserts (requires H2 2.x)
+      val colsList = allCols.mkString("(", ", ", ")")
+      val updateSet = allCols.filter(_ != pkCol).map(c => s"$c = EXCLUDED.$c").mkString(", ")
+      val extraSetSql = extraSetClauses.map(_.sqlString).mkString(", ", ", ", "")
+      val wherePart = if conditions.isEmpty then "" else s" WHERE ${conditions.map(_.sqlString).mkString(" AND ")}"
+      s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet$extraSetSql$wherePart"
+
   override val supportsInsertReturning: Boolean = true
   override val supportsUpsert: Boolean = true
   override val supportsConflictHandling: Boolean = true
+end H2
 
 object Oracle extends DatabaseType, SupportsRowLocks, SupportsReturning:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =

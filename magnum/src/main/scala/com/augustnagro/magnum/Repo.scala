@@ -1,6 +1,8 @@
 package com.augustnagro.magnum
 
+import java.sql.PreparedStatement
 import javax.sql.DataSource
+import scala.util.Using
 
 /** A read & write data repository
   *
@@ -14,57 +16,229 @@ import javax.sql.DataSource
 open class Repo[EC, E, ID](
     injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]]
 )(using
-    defaults: RepoDefaults[EC, E, ID],
-    meta: EntityMeta[E]
+    meta: EntityMeta[E],
+    ib: InsertBuilder[EC, E]
 ) extends ImmutableRepo[E, ID](injectedScopes):
 
-  /** Deletes an entity using its id */
-  def delete(entity: E)(using DbCon[?]): Unit = defaults.delete(entity)
+  // --- hook collection helpers ---
+
+  private lazy val _collectOnUpdate: Vector[SetClause] =
+    finalScopes.flatMap(_.onUpdate(meta))
+
+  private lazy val _collectRewriteDelete: Vector[SetClause] =
+    finalScopes.flatMap(_.rewriteDelete(meta))
+
+  private lazy val _collectConditions: Vector[WhereFrag] =
+    finalScopes.flatMap(_.conditions(meta))
+
+  private lazy val _hasMutationHooks: Boolean =
+    _collectOnUpdate.nonEmpty || _collectRewriteDelete.nonEmpty
+
+  /** SQL column names that mutation hooks will set — structured access, no string parsing. */
+  private lazy val _hookColumnNames: Set[String] =
+    (_collectOnUpdate ++ _collectRewriteDelete).map(_.col.sqlName.toLowerCase).toSet
+
+  /** Build WHERE sql + params + writer from pk id and scope conditions */
+  private def buildMutationWhere(id: ID): (String, Seq[Any], FragWriter) =
+    val conditions = _collectConditions
+    val pkSql = s"${meta.primaryKey.sqlName} = ?"
+    if conditions.isEmpty then (s" WHERE $pkSql", Seq(id), FragWriter.fromKeys(Vector(id.asInstanceOf[Any])))
+    else
+      val condSql = conditions.map(_.sqlString).mkString(" AND ", " AND ", "")
+      val allParams = Seq(id) ++ conditions.flatMap(_.params)
+      val writer: FragWriter = (ps, pos) =>
+        ps.setObject(pos, id)
+        var p = pos + 1
+        for c <- conditions do p = c.writer.write(ps, p)
+        p
+      (s" WHERE $pkSql$condSql", allParams, writer)
+
+  // --- DELETE methods ---
 
   /** Deletes an entity using its id */
-  def deleteById(id: ID)(using DbCon[?]): Unit = defaults.deleteById(id)
+  def delete(entity: E)(using DbCon[?]): Unit =
+    deleteById(extractPk(entity).asInstanceOf[ID])
+
+  /** Deletes an entity using its id */
+  def deleteById(id: ID)(using con: DbCon[?]): Unit =
+    deleteByIdCount(id)
+
+  private def deleteByIdCount(id: ID)(using con: DbCon[?]): Int =
+    if _collectRewriteDelete.nonEmpty then
+      // Rewrite DELETE as UPDATE SET <rewriteDelete clauses>, <onUpdate clauses>
+      val allSetClauses = _collectRewriteDelete ++ _collectOnUpdate
+      val setSql = allSetClauses.map(_.sqlString).mkString(", ")
+      val (whereSql, whereParams, whereWriter) = buildMutationWhere(id)
+      val sql = s"UPDATE ${meta.tableName} SET $setSql$whereSql"
+      val allParams = allSetClauses.flatMap(_.params) ++ whereParams
+      val writer: FragWriter = (ps, pos) =>
+        var p = pos
+        for c <- allSetClauses do p = c.writer.write(ps, p)
+        whereWriter.write(ps, p)
+      Frag(sql, allParams, writer).update.run()
+    else
+      // No rewrite, but scope conditions apply to DELETE
+      val (whereSql, whereParams, whereWriter) = buildMutationWhere(id)
+      val sql = s"DELETE FROM ${meta.tableName}$whereSql"
+      Frag(sql, whereParams, whereWriter).update.run()
 
   /** Deletes ALL entities */
-  def truncate()(using DbCon[?]): Unit = defaults.truncate()
+  def truncate()(using con: DbCon[?]): Unit =
+    val sql = con.databaseType.renderTruncate(meta.tableName)
+    Frag(sql, Vector.empty, FragWriter.empty).update.run()
 
   /** Delete all provided entities */
   def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
-    defaults.deleteAll(entities)
+    var count = 0L
+    entities.foreach { e =>
+      count += deleteByIdCount(extractPk(e).asInstanceOf[ID])
+    }
+    BatchUpdateResult.Success(count)
 
   /** Deletes all entities with an Iterable of ids */
   def deleteAllById(ids: Iterable[ID])(using DbCon[?]): BatchUpdateResult =
-    defaults.deleteAllById(ids)
+    var count = 0L
+    ids.foreach { id =>
+      count += deleteByIdCount(id)
+    }
+    BatchUpdateResult.Success(count)
+
+  // --- INSERT methods ---
 
   /** Insert and return entity E */
   def insert(entityCreator: EC)(using DbCon[?]): Unit =
-    defaults.insert(entityCreator)
+    ib.insert(entityCreator)
 
   /** Insert and return all new entities */
   def insertAll(entityCreators: Iterable[EC])(using DbCon[?]): Unit =
-    defaults.insertAll(entityCreators)
+    ib.insertAll(entityCreators)
 
-  def insertReturning(entityCreator: EC)(using con: DbCon[?]): E =
-    val result = defaults.insertReturning(entityCreator)
+  def insertReturning[D <: DatabaseType](entityCreator: EC)(using con: DbCon[D], cr: CanReturn[EC, E, D]): E =
+    val result = ib.insertReturning(entityCreator)
     con.trackLoaded(meta.tableName, extractPk(result), result)
     result
 
-  def insertAllReturning(
+  def insertAllReturning[D <: DatabaseType](
       entityCreators: Iterable[EC]
-  )(using con: DbCon[?]): Vector[E] =
-    val results = defaults.insertAllReturning(entityCreators)
+  )(using con: DbCon[D], cr: CanReturn[EC, E, D]): Vector[E] =
+    val results = ib.insertAllReturning(entityCreators)
     results.foreach(e => con.trackLoaded(meta.tableName, extractPk(e), e))
     results
 
+  // --- UPDATE methods ---
+
   /** Update the entity */
-  def update(entity: E)(using DbCon[?]): Unit = defaults.update(entity)
+  def update(entity: E)(using con: DbCon[?]): Unit =
+      val entityProduct = entity.asInstanceOf[Product]
+      val columns = meta.columns
+      val codecs = meta.elementCodecs
+
+      // Build SET clauses for entity fields (excluding PK and columns covered by hooks)
+      val hookCols = _hookColumnNames
+      val entitySetParts = Vector.newBuilder[String]
+      val entitySetIndices = Vector.newBuilder[Int]
+      var i = 0
+      while i < columns.length do
+        if i != pkIndex && !hookCols.contains(columns(i).sqlName.toLowerCase) then
+          entitySetParts += s"${columns(i).sqlName} = ${codecs(i).queryRepr}"
+          entitySetIndices += i
+        i += 1
+      val setParts = entitySetParts.result()
+      val setIndices = entitySetIndices.result()
+
+      // Append onUpdate hook clauses
+      val hookClauses = _collectOnUpdate
+      val hookSetSql = hookClauses.map(_.sqlString)
+      val allSetSql = (setParts ++ hookSetSql).mkString(", ")
+
+      val (whereSql, whereParams, whereWriter) = buildMutationWhere(
+        entityProduct.productElement(pkIndex).asInstanceOf[ID]
+      )
+      val sql = s"UPDATE ${meta.tableName} SET $allSetSql$whereSql"
+
+      val allParams =
+        setIndices.map(idx => entityProduct.productElement(idx)) ++
+          hookClauses.flatMap(_.params) ++
+          whereParams
+
+      Frag(
+        sql,
+        allParams,
+        (ps, pos) =>
+          var p = pos
+          // Write entity fields
+          for idx <- setIndices do
+            val codec = codecs(idx).asInstanceOf[DbCodec[Any]]
+            codec.writeSingle(entityProduct.productElement(idx), ps, p)
+            p += codec.cols.length
+          // Write hook params
+          for c <- hookClauses do p = c.writer.write(ps, p)
+          // Write WHERE params
+          whereWriter.write(ps, p)
+      ).update.run()
 
   /** Update all entities */
   def updateAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
-    defaults.updateAll(entities)
+    var count = 0L
+    entities.foreach { e =>
+      update(e); count += 1
+    }
+    BatchUpdateResult.Success(count)
 
   /** Update only the changed fields between original and current entity */
-  def updatePartial(original: E, current: E)(using DbCon[?]): Unit =
-    defaults.updatePartial(original, current)
+  def updatePartial(original: E, current: E)(using con: DbCon[?]): Unit =
+      val origProduct = original.asInstanceOf[Product]
+      val currProduct = current.asInstanceOf[Product]
+      val origId = origProduct.productElement(pkIndex)
+      val currId = currProduct.productElement(pkIndex)
+      require(origId == currId, s"updatePartial requires same id, got $origId != $currId")
+
+      val arity = origProduct.productArity
+      val changed = Vector.newBuilder[Int]
+      var i = 0
+      while i < arity do
+        if i != pkIndex && origProduct.productElement(i) != currProduct.productElement(i)
+        then changed += i
+        i += 1
+      val changedIndices = changed.result()
+
+      val hookClauses = _collectOnUpdate
+      if changedIndices.isEmpty && hookClauses.isEmpty then return
+
+      val columns = meta.columns
+      val codecs = meta.elementCodecs
+      val hookCols = _hookColumnNames
+
+      // Filter out changed fields that are covered by hooks
+      val filteredIndices = changedIndices.filterNot(idx => hookCols.contains(columns(idx).sqlName.toLowerCase))
+
+      val entitySetClauses = filteredIndices.map(idx => s"${columns(idx).sqlName} = ${codecs(idx).queryRepr}")
+      val hookSetClauses = hookClauses.map(_.sqlString)
+      val allSetSql = (entitySetClauses ++ hookSetClauses).mkString(", ")
+
+      // If nothing to set (no changes, no hooks), skip
+      if allSetSql.isEmpty then return
+
+      val (whereSql, whereParams, whereWriter) = buildMutationWhere(currId.asInstanceOf[ID])
+      val sql = s"UPDATE ${meta.tableName} SET $allSetSql$whereSql"
+
+      val allParams =
+        filteredIndices.map(idx => currProduct.productElement(idx)) ++
+          hookClauses.flatMap(_.params) ++
+          whereParams
+
+      Frag(
+        sql,
+        allParams,
+        (ps, pos) =>
+          var p = pos
+          for idx <- filteredIndices do
+            val codec = codecs(idx).asInstanceOf[DbCodec[Any]]
+            codec.writeSingle(currProduct.productElement(idx), ps, p)
+            p += codec.cols.length
+          for c <- hookClauses do p = c.writer.write(ps, p)
+          whereWriter.write(ps, p)
+      ).update.run()
 
   /** Save entity: partial update if tracked, upsert otherwise. */
   def save(entity: E)(using con: DbCon[?]): Unit =
@@ -73,32 +247,74 @@ open class Repo[EC, E, ID](
       case Some(original) =>
         updatePartial(original.asInstanceOf[E], entity)
       case None =>
-        defaults.upsertByPk(entity)
+        upsertByPk(entity)
+
+  /** Upsert by primary key. Hook-aware: appends onUpdate SET clauses and scope conditions. */
+  private def upsertByPk(entity: E)(using con: DbCon[?]): Unit =
+      val dbType = con.databaseType
+      val columns = meta.columns
+      val codecs = meta.elementCodecs
+      val allCols = IArray.from(columns.map(_.sqlName))
+      val allColsQueryRepr = codecs.map(_.queryRepr).mkString(", ")
+      val pkCol = meta.primaryKey.sqlName
+
+      val hookClauses = _collectOnUpdate
+      val conditions = _collectConditions
+
+      val sql = dbType.renderUpsertByPkWithHooks(
+        meta.tableName,
+        allCols,
+        allColsQueryRepr,
+        pkCol,
+        hookClauses,
+        conditions
+      )
+
+      val entityProduct = entity.asInstanceOf[Product]
+
+      Frag(
+        sql,
+        Seq.empty, // params managed by writer
+        (ps, pos) =>
+          var p = pos
+          // Write entity fields
+          var i = 0
+          while i < columns.length do
+            val codec = codecs(i).asInstanceOf[DbCodec[Any]]
+            codec.writeSingle(entityProduct.productElement(i), ps, p)
+            p += codec.cols.length
+            i += 1
+          // Write hook params
+          for c <- hookClauses do p = c.writer.write(ps, p)
+          // Write condition params
+          for c <- conditions do p = c.writer.write(ps, p)
+          p
+      ).update.run()
 
   /** Insert with conflict handling. */
   def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[?]): Unit =
-    defaults.insertOnConflict(entityCreator, target, action)
+    ib.insertOnConflict(entityCreator, target, action)
 
   /** Insert with conflict handling, updating all EC columns on conflict. */
   def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon[?]): Unit =
-    defaults.insertOnConflictUpdateAll(entityCreator, target)
+    ib.insertOnConflictUpdateAll(entityCreator, target)
 
   /** Bulk insert, skipping rows that conflict. Returns the number of rows actually inserted. */
   def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon[?]): Int =
-    defaults.insertAllIgnoring(entityCreators)
+    ib.insertAllIgnoring(entityCreators)
 
   /** Find an existing entity matching the predicate, or insert a new one. */
-  def firstOrCreate(predicate: WhereFrag, creator: => EC)(using con: DbTx[?]): E =
+  def firstOrCreate[D <: DatabaseType](predicate: WhereFrag, creator: => EC)(using con: DbTx[D], cr: CanReturn[EC, E, D]): E =
     val found = applyScopes(
       QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
     ).where(predicate).first()
     found.getOrElse:
-      val result = defaults.insertReturning(creator)
+      val result = ib.insertReturning(creator)
       con.trackLoaded(meta.tableName, extractPk(result), result)
       result
 
   /** Find and update an existing entity, or insert a new one. */
-  def updateOrCreate(predicate: WhereFrag, creator: => EC, updater: E => E)(using con: DbTx[?]): E =
+  def updateOrCreate[D <: DatabaseType](predicate: WhereFrag, creator: => EC, updater: E => E)(using con: DbTx[D], cr: CanReturn[EC, E, D]): E =
     val found = applyScopes(
       QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
     ).where(predicate).first()
@@ -108,18 +324,35 @@ open class Repo[EC, E, ID](
         update(updated)
         updated
       case None =>
-        val result = defaults.insertReturning(creator)
+        val result = ib.insertReturning(creator)
         con.trackLoaded(meta.tableName, extractPk(result), result)
         result
 
   /** Touch an entity, setting its @updatedAt column to CURRENT_TIMESTAMP. */
   def touch(entity: E)(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon[?]): Unit =
     val id = extractPk(entity)
-    Frag(
-      s"UPDATE ${entityMeta.tableName} SET ${hasUpdatedAt.column.sqlName} = CURRENT_TIMESTAMP WHERE ${entityMeta.primaryKey.sqlName} = ?",
-      Seq(id),
-      FragWriter.fromKeys(Vector(id))
-    ).update.run()
+    val conditions = _collectConditions
+    val pkSql = s"${entityMeta.primaryKey.sqlName} = ?"
+    if conditions.isEmpty then
+      Frag(
+        s"UPDATE ${entityMeta.tableName} SET ${hasUpdatedAt.column.sqlName} = CURRENT_TIMESTAMP WHERE $pkSql",
+        Seq(id),
+        FragWriter.fromKeys(Vector(id))
+      ).update.run()
+    else
+      val condSql = conditions.map(_.sqlString).mkString(" AND ", " AND ", "")
+      val allParams = Seq(id) ++ conditions.flatMap(_.params)
+      val writer: FragWriter = (ps, pos) =>
+        ps.setObject(pos, id)
+        var p = pos + 1
+        for c <- conditions do p = c.writer.write(ps, p)
+        p
+      Frag(
+        s"UPDATE ${entityMeta.tableName} SET ${hasUpdatedAt.column.sqlName} = CURRENT_TIMESTAMP WHERE $pkSql$condSql",
+        allParams,
+        writer
+      ).update.run()
+  end touch
 
   /** Re-fetch the entity from the database using its primary key. */
   def refresh(entity: E)(using DbCon[?]): E =

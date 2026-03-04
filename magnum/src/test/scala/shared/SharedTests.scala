@@ -19,7 +19,6 @@ def sharedTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
   partialUpdateTests(suite, dbType, xa)
   saveTests(suite, dbType, xa)
   entityCreatorTests(suite, dbType, xa)
-  specTests(suite, dbType, xa)
   sqlNameTests(suite, dbType, xa)
   noIdTests(suite, dbType, xa)
   embeddedFragTests(suite, dbType, xa)

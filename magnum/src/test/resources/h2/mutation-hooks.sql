@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS mh_item CASCADE;
+CREATE TABLE mh_item (
+  id BIGINT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  deleted_at TIMESTAMP WITH TIME ZONE,
+  status VARCHAR NOT NULL DEFAULT 'active'
+);
+INSERT INTO mh_item VALUES (1, 'Alpha', NULL, NULL, 'active');
+INSERT INTO mh_item VALUES (2, 'Beta', NULL, NULL, 'active');
+INSERT INTO mh_item VALUES (3, 'Gamma', NULL, TIMESTAMP WITH TIME ZONE '2025-01-01T00:00:00Z', 'active');

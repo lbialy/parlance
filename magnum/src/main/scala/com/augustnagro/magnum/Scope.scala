@@ -17,7 +17,17 @@ trait Scope[E]:
   /** ORDER BY clauses this scope contributes. Appended after all scope conditions. */
   def orderings(meta: TableMeta[E]): Vector[OrderByFrag] = Vector.empty
 
+  /** Extra SET clauses to include in UPDATE statements (e.g. `updated_at = CURRENT_TIMESTAMP`). */
+  def onUpdate(meta: TableMeta[E]): Vector[SetClause] = Vector.empty
+
+  /** Extra SET clauses to include in INSERT statements. */
+  def onInsert(meta: TableMeta[E]): Vector[SetClause] = Vector.empty
+
+  /** If non-empty, DELETE is rewritten to UPDATE SET <clauses> (e.g. `deleted_at = CURRENT_TIMESTAMP`). */
+  def rewriteDelete(meta: TableMeta[E]): Vector[SetClause] = Vector.empty
+
   /** Key used to identify this scope for selective removal via `queryWithout[S]`. Defaults to a ClassTag of the runtime class. Override for
     * anonymous classes to use a well-known tag.
     */
   def key: ClassTag[?] = ClassTag(this.getClass)
+end Scope

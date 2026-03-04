@@ -31,26 +31,34 @@ class InsertBuilder[EC, E] @scala.annotation.publicInBinary private[magnum] (
         ecCodec.write(ecs, ps)
         timed(batchUpdateResult(ps.executeBatch()))
 
-  def insertReturning(ec: EC)(using con: DbCon[?]): E =
-    handleQuery(insertSql, ec):
-      Using.Manager: use =>
-        val ps = use(con.connection.prepareStatement(insertSql, insertGenKeys))
-        ecCodec.writeSingle(ec, ps)
-        timed:
-          ps.executeUpdate()
-          val rs = use(ps.getGeneratedKeys)
-          rs.next()
-          eCodec.readSingle(rs)
+  def insertReturning[D <: DatabaseType](ec: EC)(using con: DbCon[D], cr: CanReturn[EC, E, D]): E =
+    if !con.databaseType.supportsInsertReturning then
+      insert(ec)
+      ec.asInstanceOf[E]
+    else
+      handleQuery(insertSql, ec):
+        Using.Manager: use =>
+          val ps = use(con.connection.prepareStatement(insertSql, insertGenKeys))
+          ecCodec.writeSingle(ec, ps)
+          timed:
+            ps.executeUpdate()
+            val rs = use(ps.getGeneratedKeys)
+            rs.next()
+            eCodec.readSingle(rs)
 
-  def insertAllReturning(ecs: Iterable[EC])(using con: DbCon[?]): Vector[E] =
-    handleQuery(insertSql, ecs):
-      Using.Manager: use =>
-        val ps = use(con.connection.prepareStatement(insertSql, insertGenKeys))
-        ecCodec.write(ecs, ps)
-        timed:
-          batchUpdateResult(ps.executeBatch())
-          val rs = use(ps.getGeneratedKeys)
-          eCodec.read(rs)
+  def insertAllReturning[D <: DatabaseType](ecs: Iterable[EC])(using con: DbCon[D], cr: CanReturn[EC, E, D]): Vector[E] =
+    if !con.databaseType.supportsInsertReturning then
+      insertAll(ecs)
+      ecs.toVector.asInstanceOf[Vector[E]]
+    else
+      handleQuery(insertSql, ecs):
+        Using.Manager: use =>
+          val ps = use(con.connection.prepareStatement(insertSql, insertGenKeys))
+          ecCodec.write(ecs, ps)
+          timed:
+            batchUpdateResult(ps.executeBatch())
+            val rs = use(ps.getGeneratedKeys)
+            eCodec.read(rs)
 
   def insertOnConflict(ec: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon[?]): Unit =
     action match
@@ -112,3 +120,12 @@ class InsertBuilder[EC, E] @scala.annotation.publicInBinary private[magnum] (
           count
 
 end InsertBuilder
+
+object InsertBuilder:
+  import scala.deriving.Mirror
+
+  inline given derived[EC, E](using
+      inline meta: EntityMeta[E],
+      inline ecMirror: Mirror.ProductOf[EC],
+      ecCodec: DbCodec[EC]
+  ): InsertBuilder[EC, E] = QueryBuilder.into[EC, E]
