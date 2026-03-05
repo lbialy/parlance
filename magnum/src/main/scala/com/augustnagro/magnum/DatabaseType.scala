@@ -1,5 +1,7 @@
 package com.augustnagro.magnum
 
+import java.sql.Types
+
 trait DatabaseType:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String
 
@@ -33,7 +35,12 @@ trait SupportsMutations extends DatabaseType:
 trait SupportsRowLocks extends DatabaseType
 trait SupportsForShare extends SupportsRowLocks
 trait SupportsILike extends DatabaseType
-trait SupportsArrayTypes extends DatabaseType
+trait SupportsArrayTypes extends DatabaseType:
+  /** Map a JDBC type code to the SQL type name for Connection.createArrayOf.
+    * Returns None if the type cannot be used in arrays, in which case
+    * findAllById falls back to IN expansion.
+    */
+  def arrayTypeName(jdbcType: Int): Option[String]
 trait SupportsReturning extends DatabaseType
 trait SupportsPartialJoins extends DatabaseType
 trait SupportsMultiColumnReturningKeys extends SupportsReturning
@@ -69,6 +76,21 @@ object Postgres extends DatabaseType, SupportsMutations, SupportsForShare, Suppo
     s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet$extraSetSql$wherePart"
 
   override val supportsInsertReturning: Boolean = true
+
+  def arrayTypeName(jdbcType: Int): Option[String] = jdbcType match
+    case Types.BIGINT                    => Some("bigint")
+    case Types.INTEGER                   => Some("integer")
+    case Types.SMALLINT                  => Some("smallint")
+    case Types.TINYINT                   => Some("smallint")
+    case Types.VARCHAR                   => Some("varchar")
+    case Types.BOOLEAN                   => Some("boolean")
+    case Types.DOUBLE                    => Some("float8")
+    case Types.REAL                      => Some("float4")
+    case Types.NUMERIC                   => Some("numeric")
+    case Types.DATE                      => Some("date")
+    case Types.TIMESTAMP                 => Some("timestamp")
+    case Types.TIMESTAMP_WITH_TIMEZONE   => Some("timestamptz")
+    case _                               => None
 end Postgres
 
 object MySQL extends DatabaseType, SupportsMutations, SupportsRowLocks, SupportsPartialJoins:
@@ -175,6 +197,21 @@ object H2 extends DatabaseType, SupportsMutations, SupportsForShare, SupportsILi
       s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet$extraSetSql$wherePart"
 
   override val supportsInsertReturning: Boolean = true
+
+  def arrayTypeName(jdbcType: Int): Option[String] = jdbcType match
+    case Types.BIGINT                    => Some("BIGINT")
+    case Types.INTEGER                   => Some("INTEGER")
+    case Types.SMALLINT                  => Some("SMALLINT")
+    case Types.TINYINT                   => Some("TINYINT")
+    case Types.VARCHAR                   => Some("VARCHAR")
+    case Types.BOOLEAN                   => Some("BOOLEAN")
+    case Types.DOUBLE                    => Some("DOUBLE")
+    case Types.REAL                      => Some("REAL")
+    case Types.NUMERIC                   => Some("NUMERIC")
+    case Types.DATE                      => Some("DATE")
+    case Types.TIMESTAMP                 => Some("TIMESTAMP")
+    case Types.TIMESTAMP_WITH_TIMEZONE   => Some("TIMESTAMP WITH TIME ZONE")
+    case _                               => None
 end H2
 
 object Oracle extends DatabaseType, SupportsMutations, SupportsRowLocks, SupportsReturning, SupportsPartialJoins:

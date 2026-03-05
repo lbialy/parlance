@@ -55,9 +55,29 @@ open class ImmutableRepo[E, ID](
       )
     )
 
-  /** Build a WhereFrag for `pk IN (?, ?, ...)` */
-  protected def pkInFrag(ids: Iterable[ID]): WhereFrag =
+  /** JDBC type code for the primary key column, used for array type optimization. */
+  private val pkJdbcType: Int = meta.elementCodecs(pkIndex).cols(0)
+
+  /** Build a WhereFrag for `pk IN (?, ?, ...)` or `pk = ANY(?)` when supported. */
+  protected def pkInFrag(ids: Iterable[ID], con: DbCon[?]): WhereFrag =
     val keys = ids.toVector
+    con.databaseType match
+      case sat: SupportsArrayTypes if !meta.isCompositeKey =>
+        sat.arrayTypeName(pkJdbcType) match
+          case Some(typeName) =>
+            WhereFrag(
+              Frag(
+                s"${meta.primaryKey.sqlName} = ANY(?)",
+                keys,
+                FragWriter.anyArray(keys.asInstanceOf[Vector[Any]], typeName)
+              )
+            )
+          case None =>
+            pkInFragExpanded(keys)
+      case _ =>
+        pkInFragExpanded(keys)
+
+  private def pkInFragExpanded(keys: Vector[ID]): WhereFrag =
     val placeholders = keys.map(_ => "?").mkString(", ")
     WhereFrag(
       Frag(
@@ -87,7 +107,7 @@ open class ImmutableRepo[E, ID](
     */
   def findAllById(ids: Iterable[ID])(using con: DbCon[?]): Vector[E] =
     if ids.isEmpty then Vector.empty
-    else trackAll(scopedQb.where(pkInFrag(ids)).run())
+    else trackAll(scopedQb.where(pkInFrag(ids, con)).run())
 
   /** All scopes that will be applied to queries created via `query`. Override to add local scopes in subclasses.
     */

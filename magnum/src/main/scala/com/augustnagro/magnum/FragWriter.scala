@@ -16,3 +16,9 @@ object FragWriter:
       ps.setObject(i, key)
       i += 1
     i
+
+  /** Write a single JDBC array parameter using Connection.createArrayOf. */
+  def anyArray(keys: Vector[Any], jdbcTypeName: String): FragWriter = (ps, pos) =>
+    val arr = ps.getConnection.createArrayOf(jdbcTypeName, keys.toArray[Any].asInstanceOf[Array[AnyRef]])
+    ps.setArray(pos, arr)
+    pos + 1
