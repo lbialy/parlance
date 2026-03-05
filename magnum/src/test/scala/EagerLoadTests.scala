@@ -1,12 +1,12 @@
 import com.augustnagro.magnum.*
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class ElAuthor(@Id id: Long, name: String) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class ElBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class ElReview(@Id id: Long, bookId: Long, score: Int, body: String) derives EntityMeta
 
 class EagerLoadTests extends QbTestBase:

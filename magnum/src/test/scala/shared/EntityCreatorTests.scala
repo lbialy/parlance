@@ -6,55 +6,36 @@ import munit.{FunSuite, Location}
 
 import scala.util.Using
 
-def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def entityCreatorTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location
 ): Unit =
   import suite.*
-  if dbType == ClickhouseDbType then return
 
   case class MyUserCreator(firstName: String) derives DbCodec
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class MyUser(firstName: String, id: Long) derives EntityMeta
 
   val userRepo = Repo[MyUserCreator, MyUser, Long]()
   val user = TableInfo[MyUserCreator, MyUser, Long]
 
   test("insert EntityCreator"):
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       userRepo.insert(MyUserCreator("Ash"))
       userRepo.insert(MyUserCreator("Steve"))
       assert(userRepo.count == 5L)
       assert(userRepo.findAll.map(_.firstName).contains("Steve"))
 
-  test("insertReturning EntityCreator"):
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
-    xa().connect:
-      val user = userRepo.insertReturning(MyUserCreator("Ash"))
-      assert(user.firstName == "Ash")
-
-  test("insertAllReturning EntityCreator"):
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
-    xa().connect:
-      val newUsers = Vector(
-        MyUserCreator("Ash"),
-        MyUserCreator("Steve"),
-        MyUserCreator("Josh")
-      )
-      val users = userRepo.insertAllReturning(newUsers)
-      assert(userRepo.count == 6L)
-      assert(users.size == 3)
-      assert(users.last.firstName == newUsers.last.firstName)
-
   test("insert invalid EntityCreator"):
+    assume(xa().databaseType != ClickHouse)
     intercept[SqlException]:
       xa().connect:
         val invalidUser = MyUserCreator(null)
         userRepo.insert(invalidUser)
 
   test("insertAll EntityCreator"):
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val newUsers = Vector(
         MyUserCreator("Ash"),
@@ -68,6 +49,7 @@ def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])
       )
 
   test("custom insert EntityCreator"):
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val u = MyUserCreator("Ash")
       val update =
@@ -82,6 +64,7 @@ def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])
       assert(userRepo.findAll.exists(_.firstName == "Ash"))
 
   test("custom update EntityCreator"):
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val u = userRepo.findAll.head
       val newName = "Ash"
@@ -96,12 +79,13 @@ def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])
       assert(userRepo.findAll.exists(_.firstName == "Ash"))
 
   test(".returning iterator"):
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
+    assume(xa().databaseType != ClickHouse)
+    assume(xa().databaseType != MySQL)
+    assume(xa().databaseType != SQLite)
     xa().connect:
       Using.Manager(implicit use =>
         val it =
-          if dbType == H2DbType then
+          if xa().databaseType == H2 then
             sql"INSERT INTO $user ${user.insertColumns} VALUES ('Bob')"
               .returningKeys[Long](user.id)
               .iterator()
@@ -113,3 +97,35 @@ def entityCreatorTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])
       )
 
 end entityCreatorTests
+
+def entityCreatorReturningTests[D <: SupportsReturning](
+    suite: FunSuite,
+    xa: () => Transactor[D]
+)(using Location): Unit =
+  import suite.*
+
+  case class MyUserCreator(firstName: String) derives DbCodec
+
+  @Table(SqlNameMapper.CamelToSnakeCase)
+  case class MyUser(firstName: String, id: Long) derives EntityMeta
+
+  val userRepo = Repo[MyUserCreator, MyUser, Long]()
+
+  test("insertReturning EntityCreator"):
+    xa().connect:
+      val user = userRepo.insertReturning(MyUserCreator("Ash"))
+      assert(user.firstName == "Ash")
+
+  test("insertAllReturning EntityCreator"):
+    xa().connect:
+      val newUsers = Vector(
+        MyUserCreator("Ash"),
+        MyUserCreator("Steve"),
+        MyUserCreator("Josh")
+      )
+      val users = userRepo.insertAllReturning(newUsers)
+      assert(userRepo.count == 6L)
+      assert(users.size == 3)
+      assert(users.last.firstName == newUsers.last.firstName)
+
+end entityCreatorReturningTests

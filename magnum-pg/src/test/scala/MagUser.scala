@@ -1,4 +1,4 @@
-import com.augustnagro.magnum.{DbCodec, Id, PostgresDbType, SqlName, Table}
+import com.augustnagro.magnum.{DbCodec, Id, SqlName, Table}
 import com.augustnagro.magnum.pg.PgCodec.given
 import com.augustnagro.magnum.pg.enums.PgEnumToScalaEnumSqlArrayCodec
 import com.augustnagro.magnum.pg.enums.PgEnumDbCodec
@@ -9,7 +9,7 @@ import java.time.OffsetDateTime
 import java.util.Objects
 import java.util.UUID
 
-@Table(PostgresDbType)
+@Table()
 @SqlName("mag_user")
 case class MagUser(
     @Id id: Long,

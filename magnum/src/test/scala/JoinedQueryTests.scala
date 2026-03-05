@@ -1,9 +1,9 @@
 import com.augustnagro.magnum.*
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class JnAuthor(@Id id: Long, name: String) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class JnBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
 
 class JoinedQueryTests extends QbTestBase:

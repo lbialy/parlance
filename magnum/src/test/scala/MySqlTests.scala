@@ -19,7 +19,7 @@ class MySqlTests extends FunSuite, TestContainersFixtures:
       test => test.withTags(test.tags + new Tag("Slow"))
     )
 
-  sharedTests(this, MySqlDbType, xa)
+  sharedTests(this, xa)
 
   val mySqlContainer = ForAllContainerFixture(
     MySQLContainer

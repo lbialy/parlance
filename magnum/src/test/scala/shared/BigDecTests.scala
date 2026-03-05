@@ -3,13 +3,13 @@ package shared
 import com.augustnagro.magnum.*
 import munit.{FunSuite, Location}
 
-def bigDecTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def bigDecTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location,
     DbCodec[BigDecimal]
 ): Unit =
   import suite.*
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class BigDec(id: Int, myBigDec: Option[BigDecimal]) derives EntityMeta
 
   val bigDecRepo = Repo[BigDec, BigDec, Int]()

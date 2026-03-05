@@ -2,7 +2,7 @@ import com.augustnagro.magnum.*
 
 import java.time.OffsetDateTime
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class SdUser(
     @Id id: Long,
     name: String,

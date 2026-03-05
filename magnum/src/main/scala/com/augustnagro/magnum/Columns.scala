@@ -8,7 +8,7 @@ import scala.quoted.*
   * The returned value has a structural refinement type mapping each field of E to `Col[FieldType]`. For example:
   *
   * {{{
-  *   @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  *   @Table(SqlNameMapper.CamelToSnakeCase)
   *   case class User(@Id id: Long, firstName: String, age: Int)
   *       derives DbCodec, TableMeta
   *

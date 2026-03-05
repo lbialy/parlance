@@ -1,7 +1,7 @@
-import com.augustnagro.magnum.{DbCodec, PostgresDbType, SqlName, SqlNameMapper, Table}
+import com.augustnagro.magnum.{DbCodec, SqlName, SqlNameMapper, Table}
 
 @SqlName("colour")
-@Table(PostgresDbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 enum Color derives DbCodec:
   case RedOrange
   @SqlName("Greenish") case Green

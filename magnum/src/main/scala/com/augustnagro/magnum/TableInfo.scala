@@ -9,7 +9,7 @@ import scala.quoted.*
   * For example,
   *
   * {{{
-  *   @Table(PostgresDbType, SqlNameMapper.CamelToSnakeCase)
+  *   @Table(SqlNameMapper.CamelToSnakeCase)
   *   case class User(@Id id: Long, firstName: String)
   *     derives DbCodec
   *

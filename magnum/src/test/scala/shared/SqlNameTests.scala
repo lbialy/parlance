@@ -5,13 +5,13 @@ import munit.{FunSuite, Location}
 
 import java.time.OffsetDateTime
 
-def sqlNameTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def sqlNameTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location
 ): Unit =
   import suite.*
 
   @SqlName("car")
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class CustomCar(
       model: String,
       @Id id: Long,

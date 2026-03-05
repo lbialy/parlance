@@ -7,13 +7,13 @@ import java.sql.{Connection, PreparedStatement, ResultSet}
 import java.time.{OffsetDateTime, ZoneOffset}
 import scala.util.Using
 
-def immutableRepoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def immutableRepoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location,
     DbCodec[OffsetDateTime]
 ): Unit =
   import suite.*
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class Car(
       model: String,
       @Id id: Long,
@@ -73,10 +73,10 @@ def immutableRepoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])
       assert(carRepo.findById(4L) == None)
 
   test("findAllByIds"):
-    assume(dbType != ClickhouseDbType)
-    assume(dbType != MySqlDbType)
-    assume(dbType != OracleDbType)
-    assume(dbType != SqliteDbType)
+    assume(xa().databaseType != ClickHouse)
+    assume(xa().databaseType != MySQL)
+    assume(xa().databaseType != Oracle)
+    assume(xa().databaseType != SQLite)
     xa().connect:
       val ids = carRepo.findAllById(Vector(1L, 3L)).map(_.id)
       assert(ids == Vector(1L, 3L))

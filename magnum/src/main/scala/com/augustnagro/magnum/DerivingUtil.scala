@@ -11,7 +11,7 @@ object DerivingUtil:
   /** For a Simple (non-ADT) enum type E, constructs a sequence of mappings from sql string representation to enum value. For example,
     *
     * {{{
-    *   @Table(PostgresDbType, SqlNameMapper.CamelToUpperSnakeCase)
+    *   @Table(SqlNameMapper.CamelToUpperSnakeCase)
     *   enum Color { case Red, @SqlName("greeeeeen") Green, Blue }
     * }}}
     *

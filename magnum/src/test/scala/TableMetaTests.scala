@@ -9,10 +9,10 @@ class TableMetaTests extends FunSuite:
       test => test.withTags(test.tags + new Tag("QB"))
     )
 
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class User(@Id id: Long, firstName: String, age: Int) derives EntityMeta
 
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class Product(
       name: String,
       @SqlName("custom_col") description: String,
@@ -20,7 +20,7 @@ class TableMetaTests extends FunSuite:
   ) derives EntityMeta
 
   @SqlName("custom_table")
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class CustomNamed(@Id id: Long, value: String) derives EntityMeta
 
   test("tableName is derived via nameMapper"):

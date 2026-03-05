@@ -33,7 +33,7 @@ class SqliteTests extends FunSuite:
   given DbCodec[LocalDateTime] =
     DbCodec[String].biMap(LocalDateTime.parse, _.toString)
 
-  sharedTests(this, SqliteDbType, xa)
+  sharedTests(this, xa)
 
   lazy val sqliteDbPath = Files.createTempFile(null, ".db").toAbsolutePath
 

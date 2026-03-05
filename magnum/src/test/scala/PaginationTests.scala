@@ -2,7 +2,7 @@ import com.augustnagro.magnum.*
 
 import java.time.LocalDateTime
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class QbPaginated(@Id id: Long, name: String, score: Int, createdAt: LocalDateTime) derives EntityMeta
 
 class PaginationTests extends QbTestBase:

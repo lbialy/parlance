@@ -5,14 +5,13 @@ import munit.{FunSuite, Location}
 
 import java.time.OffsetDateTime
 
-def optionalProductTests(
+def optionalProductTests[D <: DatabaseType](
     suite: FunSuite,
-    dbType: DbType,
-    xa: () => Transactor[?]
+    xa: () => Transactor[D]
 )(using Location, DbCodec[BigDecimal], DbCodec[OffsetDateTime]): Unit =
   import suite.*
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class Car(
       model: String,
       @Id id: Long,
@@ -22,11 +21,11 @@ def optionalProductTests(
       created: OffsetDateTime
   ) derives EntityMeta
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class BigDec(id: Int, myBigDec: Option[BigDecimal]) derives EntityMeta
 
   test("left join with optional product type"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val res = sql"select * from car c left join big_dec bd on bd.id = c.id"
         .query[(Car, Option[BigDec])]

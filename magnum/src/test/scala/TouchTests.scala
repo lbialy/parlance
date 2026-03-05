@@ -2,7 +2,7 @@ import com.augustnagro.magnum.*
 
 import java.time.OffsetDateTime
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class TouchableItem(@Id id: Long, name: String, status: String, @updatedAt updatedAt: OffsetDateTime) derives EntityMeta
 
 class TouchTests extends QbTestBase:
@@ -59,7 +59,7 @@ class TouchTests extends QbTestBase:
   test("touch() does not compile without @updatedAt"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+      @Table(SqlNameMapper.CamelToSnakeCase)
       case class NoUpdatedAt(@Id id: Long, name: String) derives EntityMeta
       def test(using DbCon[?]): Unit =
         QueryBuilder.from[NoUpdatedAt].touch()

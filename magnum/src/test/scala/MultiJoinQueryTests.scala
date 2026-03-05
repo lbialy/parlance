@@ -1,15 +1,15 @@
 import com.augustnagro.magnum.*
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class MjCountry(@Id id: Long, name: String) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class MjPublisher(@Id id: Long, name: String) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class MjAuthor(@Id id: Long, name: String, countryId: Long) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class MjBook(@Id id: Long, authorId: Long, publisherId: Long, title: String) derives EntityMeta
 
 class MultiJoinQueryTests extends QbTestBase:

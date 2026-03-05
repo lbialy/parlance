@@ -18,20 +18,23 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
       test => test.withTags(test.tags + new Tag("Slow"))
     )
 
-  sharedTests(this, ClickhouseDbType, xa)
+  sharedTests(this, xa)
 
   test("insertReturning disallowed when EC != E on ClickHouse"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
       import java.util.UUID
       case class UserCreator(name: String) derives DbCodec
-      @Table(ClickHouse)
+      @Table()
       case class User(id: UUID, name: String) derives EntityMeta
       val repo = Repo[UserCreator, User, UUID]()
       def test(using DbCon[ClickHouse.type]): Unit =
         repo.insertReturning(UserCreator("test"))
     """)
-    assert(errors.nonEmpty, "Expected compile error for insertReturning with EC != E on ClickHouse")
+    assert(
+      errors.contains("No given instance of type com.augustnagro.magnum.CanReturn[UserCreator, User, D] was found"),
+      s"Expected CanReturn compile error but got: $errors"
+    )
 
   val clickHouseContainer = ForAllContainerFixture(
     ClickHouseContainer

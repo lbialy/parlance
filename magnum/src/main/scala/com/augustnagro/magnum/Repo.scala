@@ -129,53 +129,54 @@ open class Repo[EC, E, ID](
 
   /** Update the entity */
   def update(entity: E)(using con: DbCon[?]): Unit =
-      val entityProduct = entity.asInstanceOf[Product]
-      val columns = meta.columns
-      val codecs = meta.elementCodecs
+    val entityProduct = entity.asInstanceOf[Product]
+    val columns = meta.columns
+    val codecs = meta.elementCodecs
 
-      // Build SET clauses for entity fields (excluding PK and columns covered by hooks)
-      val hookCols = _hookColumnNames
-      val entitySetParts = Vector.newBuilder[String]
-      val entitySetIndices = Vector.newBuilder[Int]
-      var i = 0
-      while i < columns.length do
-        if i != pkIndex && !hookCols.contains(columns(i).sqlName.toLowerCase) then
-          entitySetParts += s"${columns(i).sqlName} = ${codecs(i).queryRepr}"
-          entitySetIndices += i
-        i += 1
-      val setParts = entitySetParts.result()
-      val setIndices = entitySetIndices.result()
+    // Build SET clauses for entity fields (excluding PK and columns covered by hooks)
+    val hookCols = _hookColumnNames
+    val entitySetParts = Vector.newBuilder[String]
+    val entitySetIndices = Vector.newBuilder[Int]
+    var i = 0
+    while i < columns.length do
+      if i != pkIndex && !hookCols.contains(columns(i).sqlName.toLowerCase) then
+        entitySetParts += s"${columns(i).sqlName} = ${codecs(i).queryRepr}"
+        entitySetIndices += i
+      i += 1
+    val setParts = entitySetParts.result()
+    val setIndices = entitySetIndices.result()
 
-      // Append onUpdate hook clauses
-      val hookClauses = _collectOnUpdate
-      val hookSetSql = hookClauses.map(_.sqlString)
-      val allSetSql = (setParts ++ hookSetSql).mkString(", ")
+    // Append onUpdate hook clauses
+    val hookClauses = _collectOnUpdate
+    val hookSetSql = hookClauses.map(_.sqlString)
+    val allSetSql = (setParts ++ hookSetSql).mkString(", ")
 
-      val (whereSql, whereParams, whereWriter) = buildMutationWhere(
-        entityProduct.productElement(pkIndex).asInstanceOf[ID]
-      )
-      val sql = s"UPDATE ${meta.tableName} SET $allSetSql$whereSql"
+    val (whereSql, whereParams, whereWriter) = buildMutationWhere(
+      entityProduct.productElement(pkIndex).asInstanceOf[ID]
+    )
+    val sql = s"UPDATE ${meta.tableName} SET $allSetSql$whereSql"
 
-      val allParams =
-        setIndices.map(idx => entityProduct.productElement(idx)) ++
-          hookClauses.flatMap(_.params) ++
-          whereParams
+    val allParams =
+      setIndices.map(idx => entityProduct.productElement(idx)) ++
+        hookClauses.flatMap(_.params) ++
+        whereParams
 
-      Frag(
-        sql,
-        allParams,
-        (ps, pos) =>
-          var p = pos
-          // Write entity fields
-          for idx <- setIndices do
-            val codec = codecs(idx).asInstanceOf[DbCodec[Any]]
-            codec.writeSingle(entityProduct.productElement(idx), ps, p)
-            p += codec.cols.length
-          // Write hook params
-          for c <- hookClauses do p = c.writer.write(ps, p)
-          // Write WHERE params
-          whereWriter.write(ps, p)
-      ).update.run()
+    Frag(
+      sql,
+      allParams,
+      (ps, pos) =>
+        var p = pos
+        // Write entity fields
+        for idx <- setIndices do
+          val codec = codecs(idx).asInstanceOf[DbCodec[Any]]
+          codec.writeSingle(entityProduct.productElement(idx), ps, p)
+          p += codec.cols.length
+        // Write hook params
+        for c <- hookClauses do p = c.writer.write(ps, p)
+        // Write WHERE params
+        whereWriter.write(ps, p)
+    ).update.run()
+  end update
 
   /** Update all entities */
   def updateAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
@@ -187,58 +188,59 @@ open class Repo[EC, E, ID](
 
   /** Update only the changed fields between original and current entity */
   def updatePartial(original: E, current: E)(using con: DbCon[?]): Unit =
-      val origProduct = original.asInstanceOf[Product]
-      val currProduct = current.asInstanceOf[Product]
-      val origId = origProduct.productElement(pkIndex)
-      val currId = currProduct.productElement(pkIndex)
-      require(origId == currId, s"updatePartial requires same id, got $origId != $currId")
+    val origProduct = original.asInstanceOf[Product]
+    val currProduct = current.asInstanceOf[Product]
+    val origId = origProduct.productElement(pkIndex)
+    val currId = currProduct.productElement(pkIndex)
+    require(origId == currId, s"updatePartial requires same id, got $origId != $currId")
 
-      val arity = origProduct.productArity
-      val changed = Vector.newBuilder[Int]
-      var i = 0
-      while i < arity do
-        if i != pkIndex && origProduct.productElement(i) != currProduct.productElement(i)
-        then changed += i
-        i += 1
-      val changedIndices = changed.result()
+    val arity = origProduct.productArity
+    val changed = Vector.newBuilder[Int]
+    var i = 0
+    while i < arity do
+      if i != pkIndex && origProduct.productElement(i) != currProduct.productElement(i)
+      then changed += i
+      i += 1
+    val changedIndices = changed.result()
 
-      val hookClauses = _collectOnUpdate
-      if changedIndices.isEmpty && hookClauses.isEmpty then return
+    val hookClauses = _collectOnUpdate
+    if changedIndices.isEmpty && hookClauses.isEmpty then return
 
-      val columns = meta.columns
-      val codecs = meta.elementCodecs
-      val hookCols = _hookColumnNames
+    val columns = meta.columns
+    val codecs = meta.elementCodecs
+    val hookCols = _hookColumnNames
 
-      // Filter out changed fields that are covered by hooks
-      val filteredIndices = changedIndices.filterNot(idx => hookCols.contains(columns(idx).sqlName.toLowerCase))
+    // Filter out changed fields that are covered by hooks
+    val filteredIndices = changedIndices.filterNot(idx => hookCols.contains(columns(idx).sqlName.toLowerCase))
 
-      val entitySetClauses = filteredIndices.map(idx => s"${columns(idx).sqlName} = ${codecs(idx).queryRepr}")
-      val hookSetClauses = hookClauses.map(_.sqlString)
-      val allSetSql = (entitySetClauses ++ hookSetClauses).mkString(", ")
+    val entitySetClauses = filteredIndices.map(idx => s"${columns(idx).sqlName} = ${codecs(idx).queryRepr}")
+    val hookSetClauses = hookClauses.map(_.sqlString)
+    val allSetSql = (entitySetClauses ++ hookSetClauses).mkString(", ")
 
-      // If nothing to set (no changes, no hooks), skip
-      if allSetSql.isEmpty then return
+    // If nothing to set (no changes, no hooks), skip
+    if allSetSql.isEmpty then return
 
-      val (whereSql, whereParams, whereWriter) = buildMutationWhere(currId.asInstanceOf[ID])
-      val sql = s"UPDATE ${meta.tableName} SET $allSetSql$whereSql"
+    val (whereSql, whereParams, whereWriter) = buildMutationWhere(currId.asInstanceOf[ID])
+    val sql = s"UPDATE ${meta.tableName} SET $allSetSql$whereSql"
 
-      val allParams =
-        filteredIndices.map(idx => currProduct.productElement(idx)) ++
-          hookClauses.flatMap(_.params) ++
-          whereParams
+    val allParams =
+      filteredIndices.map(idx => currProduct.productElement(idx)) ++
+        hookClauses.flatMap(_.params) ++
+        whereParams
 
-      Frag(
-        sql,
-        allParams,
-        (ps, pos) =>
-          var p = pos
-          for idx <- filteredIndices do
-            val codec = codecs(idx).asInstanceOf[DbCodec[Any]]
-            codec.writeSingle(currProduct.productElement(idx), ps, p)
-            p += codec.cols.length
-          for c <- hookClauses do p = c.writer.write(ps, p)
-          whereWriter.write(ps, p)
-      ).update.run()
+    Frag(
+      sql,
+      allParams,
+      (ps, pos) =>
+        var p = pos
+        for idx <- filteredIndices do
+          val codec = codecs(idx).asInstanceOf[DbCodec[Any]]
+          codec.writeSingle(currProduct.productElement(idx), ps, p)
+          p += codec.cols.length
+        for c <- hookClauses do p = c.writer.write(ps, p)
+        whereWriter.write(ps, p)
+    ).update.run()
+  end updatePartial
 
   /** Save entity: partial update if tracked, upsert otherwise. */
   def save(entity: E)(using con: DbCon[?]): Unit =
@@ -251,45 +253,46 @@ open class Repo[EC, E, ID](
 
   /** Upsert by primary key. Hook-aware: appends onUpdate SET clauses and scope conditions. */
   private def upsertByPk(entity: E)(using con: DbCon[?]): Unit =
-      val dbType = con.databaseType
-      val columns = meta.columns
-      val codecs = meta.elementCodecs
-      val allCols = IArray.from(columns.map(_.sqlName))
-      val allColsQueryRepr = codecs.map(_.queryRepr).mkString(", ")
-      val pkCol = meta.primaryKey.sqlName
+    val dbType = con.databaseType
+    val columns = meta.columns
+    val codecs = meta.elementCodecs
+    val allCols = IArray.from(columns.map(_.sqlName))
+    val allColsQueryRepr = codecs.map(_.queryRepr).mkString(", ")
+    val pkCol = meta.primaryKey.sqlName
 
-      val hookClauses = _collectOnUpdate
-      val conditions = _collectConditions
+    val hookClauses = _collectOnUpdate
+    val conditions = _collectConditions
 
-      val sql = dbType.renderUpsertByPkWithHooks(
-        meta.tableName,
-        allCols,
-        allColsQueryRepr,
-        pkCol,
-        hookClauses,
-        conditions
-      )
+    val sql = dbType.renderUpsertByPkWithHooks(
+      meta.tableName,
+      allCols,
+      allColsQueryRepr,
+      pkCol,
+      hookClauses,
+      conditions
+    )
 
-      val entityProduct = entity.asInstanceOf[Product]
+    val entityProduct = entity.asInstanceOf[Product]
 
-      Frag(
-        sql,
-        Seq.empty, // params managed by writer
-        (ps, pos) =>
-          var p = pos
-          // Write entity fields
-          var i = 0
-          while i < columns.length do
-            val codec = codecs(i).asInstanceOf[DbCodec[Any]]
-            codec.writeSingle(entityProduct.productElement(i), ps, p)
-            p += codec.cols.length
-            i += 1
-          // Write hook params
-          for c <- hookClauses do p = c.writer.write(ps, p)
-          // Write condition params
-          for c <- conditions do p = c.writer.write(ps, p)
-          p
-      ).update.run()
+    Frag(
+      sql,
+      Seq.empty, // params managed by writer
+      (ps, pos) =>
+        var p = pos
+        // Write entity fields
+        var i = 0
+        while i < columns.length do
+          val codec = codecs(i).asInstanceOf[DbCodec[Any]]
+          codec.writeSingle(entityProduct.productElement(i), ps, p)
+          p += codec.cols.length
+          i += 1
+        // Write hook params
+        for c <- hookClauses do p = c.writer.write(ps, p)
+        // Write condition params
+        for c <- conditions do p = c.writer.write(ps, p)
+        p
+    ).update.run()
+  end upsertByPk
 
   /** Insert with conflict handling. */
   def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[?]): Unit =
@@ -314,7 +317,10 @@ open class Repo[EC, E, ID](
       result
 
   /** Find and update an existing entity, or insert a new one. */
-  def updateOrCreate[D <: DatabaseType](predicate: WhereFrag, creator: => EC, updater: E => E)(using con: DbTx[D], cr: CanReturn[EC, E, D]): E =
+  def updateOrCreate[D <: DatabaseType](predicate: WhereFrag, creator: => EC, updater: E => E)(using
+      con: DbTx[D],
+      cr: CanReturn[EC, E, D]
+  ): E =
     val found = applyScopes(
       QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
     ).where(predicate).first()

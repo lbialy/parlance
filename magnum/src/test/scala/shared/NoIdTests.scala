@@ -5,13 +5,13 @@ import munit.{FunSuite, Location}
 
 import java.time.OffsetDateTime
 
-def noIdTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def noIdTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location,
     DbCodec[OffsetDateTime]
 ): Unit =
   import suite.*
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class NoId(
       createdAt: OffsetDateTime,
       userName: String,

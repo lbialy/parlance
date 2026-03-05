@@ -10,13 +10,13 @@ class RelationshipTests extends FunSuite:
       test => test.withTags(test.tags + new Tag("QB"))
     )
 
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class RAuthor(@Id id: Long, name: String) derives EntityMeta
 
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class RBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
 
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class RBookDetail(@Id id: Long, bookId: Long, isbn: String) derives EntityMeta
 
   test("belongsTo compiles and stores correct metadata"):
@@ -38,9 +38,9 @@ class RelationshipTests extends FunSuite:
   test("non-existent field on source fails at compile time"):
     val errors = typeCheckErrors("""
       import com.augustnagro.magnum.*
-      @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+      @Table(SqlNameMapper.CamelToSnakeCase)
       case class NBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
-      @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+      @Table(SqlNameMapper.CamelToSnakeCase)
       case class NAuthor(@Id id: Long, name: String) derives EntityMeta
       Relationship.belongsTo[NBook, NAuthor](_.nonExistent, _.id)
     """)
@@ -49,9 +49,9 @@ class RelationshipTests extends FunSuite:
   test("non-existent field on target fails at compile time"):
     val errors = typeCheckErrors("""
       import com.augustnagro.magnum.*
-      @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+      @Table(SqlNameMapper.CamelToSnakeCase)
       case class NBook2(@Id id: Long, authorId: Long, title: String) derives EntityMeta
-      @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+      @Table(SqlNameMapper.CamelToSnakeCase)
       case class NAuthor2(@Id id: Long, name: String) derives EntityMeta
       Relationship.belongsTo[NBook2, NAuthor2](_.authorId, _.nonExistent)
     """)

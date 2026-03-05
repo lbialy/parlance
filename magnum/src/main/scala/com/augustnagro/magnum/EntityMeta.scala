@@ -8,7 +8,7 @@ import scala.quoted.*
   *
   * Derive on @Table-annotated case classes instead of separate DbCodec + TableMeta:
   * {{{
-  *   @Table(PostgresDbType, SqlNameMapper.CamelToSnakeCase)
+  *   @Table(SqlNameMapper.CamelToSnakeCase)
   *   case class User(@Id id: Long, name: String) derives EntityMeta
   * }}}
   */

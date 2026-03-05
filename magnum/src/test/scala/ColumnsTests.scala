@@ -10,13 +10,13 @@ class ColumnsTests extends FunSuite:
       test => test.withTags(test.tags + new Tag("QB"))
     )
 
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class User(@Id id: Long, firstName: String, age: Int) derives EntityMeta
 
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class WithOptional(@Id id: Long, nickname: Option[String]) derives EntityMeta
 
-  @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class WithSqlName(
       @Id id: Long,
       @SqlName("custom_col") description: String
@@ -44,7 +44,7 @@ class ColumnsTests extends FunSuite:
   test("non-existent field is a compile error"):
     val errors = typeCheckErrors("""
       import com.augustnagro.magnum.*
-      @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+      @Table(SqlNameMapper.CamelToSnakeCase)
       case class NegTest(@Id id: Long, name: String) derives EntityMeta
       val cols = Columns.of[NegTest]
       cols.nonExistent

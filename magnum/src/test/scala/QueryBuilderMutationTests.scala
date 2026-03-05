@@ -1,6 +1,6 @@
 import com.augustnagro.magnum.*
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class QbCounter(@Id id: Long, name: String, status: String, viewCount: Long, score: Int) derives EntityMeta
 
 class QueryBuilderMutationTests extends QbTestBase:
@@ -195,7 +195,7 @@ class QueryBuilderMutationTests extends QbTestBase:
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
       import java.time.Instant
-      @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+      @Table(SqlNameMapper.CamelToSnakeCase)
       case class Timestamped(@Id id: Long, createdAt: Instant) derives EntityMeta
       def test(using DbCon[?]): Unit =
         QueryBuilder.from[Timestamped].increment(_.createdAt, Instant.now())

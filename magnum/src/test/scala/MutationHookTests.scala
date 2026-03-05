@@ -3,7 +3,7 @@ import com.augustnagro.magnum.*
 import java.time.OffsetDateTime
 import scala.reflect.{ClassTag, classTag}
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class MhItem(
     @Id id: Long,
     name: String,

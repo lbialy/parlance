@@ -18,7 +18,8 @@ class PgTests extends FunSuite, TestContainersFixtures:
       test => test.withTags(test.tags + new Tag("Slow"))
     )
 
-  sharedTests(this, PostgresDbType, xa)
+  sharedTests(this, xa)
+  entityCreatorReturningTests(this, xa)
 
   val pgContainer = ForAllContainerFixture(
     PostgreSQLContainer

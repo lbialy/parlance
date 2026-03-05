@@ -1,6 +1,6 @@
 import com.augustnagro.magnum.*
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class UpsertItem(@Id id: Long, name: String, amount: Int) derives EntityMeta
 
 object UpsertItemRepo extends Repo[UpsertItem, UpsertItem, Long]

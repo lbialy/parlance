@@ -26,7 +26,8 @@ class OracleTests extends FunSuite, TestContainersFixtures:
   given DbCodec[LocalTime] =
     DbCodec[String].biMap(LocalTime.parse, _.toString)
 
-  sharedTests(this, OracleDbType, xa)
+  sharedTests(this, xa)
+  entityCreatorReturningTests(this, xa)
 
   val oracleContainer = ForAllContainerFixture(
     OracleContainer

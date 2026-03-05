@@ -6,10 +6,9 @@ import munit.FunSuite
 import java.time.OffsetDateTime
 import java.util.UUID
 
-def partialUpdateTests(
+def partialUpdateTests[D <: DatabaseType](
     suite: FunSuite,
-    dbType: DbType,
-    xa: () => Transactor[?]
+    xa: () => Transactor[D]
 )(using
     munit.Location,
     DbCodec[UUID],
@@ -18,7 +17,7 @@ def partialUpdateTests(
 ): Unit =
   import suite.*
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class Person(
       id: Long,
       firstName: Option[String],
@@ -31,7 +30,7 @@ def partialUpdateTests(
   val personRepo = Repo[Person, Person, Long]()
 
   test("updatePartial single field changed"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val current = original.copy(lastName = "UpdatedLastName")
@@ -42,7 +41,7 @@ def partialUpdateTests(
       assert(fetched.isAdmin == original.isAdmin)
 
   test("updatePartial multiple fields changed"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val current =
@@ -54,7 +53,7 @@ def partialUpdateTests(
       assert(fetched.lastName == original.lastName)
 
   test("updatePartial no-op when nothing changed"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       personRepo.updatePartial(original, original)
@@ -62,7 +61,7 @@ def partialUpdateTests(
       assert(fetched == original)
 
   test("updatePartial rejects different PKs"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val p1 = personRepo.findById(1L).get
       val p2 = personRepo.findById(2L).get
@@ -70,7 +69,7 @@ def partialUpdateTests(
         personRepo.updatePartial(p1, p2)
 
   test("updatePartial Option field None to Some"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val newSocialId = UUID.randomUUID()
@@ -80,7 +79,7 @@ def partialUpdateTests(
       assert(fetched.socialId == Some(newSocialId))
 
   test("updatePartial Option field Some to None"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val withSocial = original.copy(socialId = Some(UUID.randomUUID()))

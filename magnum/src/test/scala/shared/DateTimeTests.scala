@@ -7,7 +7,7 @@ import java.sql.Connection
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, ZoneOffset}
 import scala.util.Using
 
-def dateTimeTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def dateTimeTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location,
     DbCodec[OffsetDateTime],
     DbCodec[LocalDate],
@@ -15,7 +15,7 @@ def dateTimeTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(usin
 ): Unit =
   import suite.*
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class MyTime(
       a: OffsetDateTime,
       b: LocalDate,

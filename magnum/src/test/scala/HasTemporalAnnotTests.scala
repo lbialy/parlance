@@ -7,7 +7,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
   // --- HasDeletedAt negative tests ---
 
   test("@deletedAt on non-Option type should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @deletedAt deletedAt: Instant) derives EntityMeta
     val errors = compileErrors("HasDeletedAt.derived[Bad]")
     assert(
@@ -18,7 +18,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
     )
 
   test("@deletedAt on String should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @deletedAt deletedAt: String) derives EntityMeta
     val errors = compileErrors("HasDeletedAt.derived[Bad]")
     assert(
@@ -29,7 +29,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
     )
 
   test("missing @deletedAt annotation should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, deletedAt: Option[OffsetDateTime]) derives EntityMeta
     val errors = compileErrors("HasDeletedAt.derived[Bad]")
     assert(
@@ -42,7 +42,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
   // --- HasCreatedAt negative tests ---
 
   test("@createdAt on String should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @createdAt createdAt: String) derives EntityMeta
     val errors = compileErrors("HasCreatedAt.derived[Bad]")
     assert(
@@ -53,7 +53,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
     )
 
   test("@createdAt on Option[Instant] should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @createdAt createdAt: Option[Instant]) derives EntityMeta
     val errors = compileErrors("HasCreatedAt.derived[Bad]")
     assert(
@@ -64,7 +64,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
     )
 
   test("missing @createdAt annotation should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, createdAt: Instant) derives EntityMeta
     val errors = compileErrors("HasCreatedAt.derived[Bad]")
     assert(
@@ -77,7 +77,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
   // --- HasUpdatedAt negative tests ---
 
   test("@updatedAt on Option[Instant] should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @updatedAt updatedAt: Option[Instant]) derives EntityMeta
     val errors = compileErrors("HasUpdatedAt.derived[Bad]")
     assert(
@@ -88,7 +88,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
     )
 
   test("@updatedAt on String should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @updatedAt updatedAt: String) derives EntityMeta
     val errors = compileErrors("HasUpdatedAt.derived[Bad]")
     assert(
@@ -99,7 +99,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
     )
 
   test("missing @updatedAt annotation should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, updatedAt: Instant) derives EntityMeta
     val errors = compileErrors("HasUpdatedAt.derived[Bad]")
     assert(
@@ -112,7 +112,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
   // --- Duplicate annotation tests ---
 
   test("multiple @deletedAt fields should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @deletedAt a: Option[Instant], @deletedAt b: Option[Instant]) derives EntityMeta
     val errors = compileErrors("HasDeletedAt.derived[Bad]")
     assert(
@@ -123,7 +123,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
     )
 
   test("multiple @createdAt fields should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @createdAt a: Instant, @createdAt b: OffsetDateTime) derives EntityMeta
     val errors = compileErrors("HasCreatedAt.derived[Bad]")
     assert(
@@ -134,7 +134,7 @@ class HasTemporalAnnotTests extends munit.FunSuite:
     )
 
   test("multiple @updatedAt fields should not compile"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Bad(@Id id: Long, @updatedAt a: Instant, @updatedAt b: OffsetDateTime) derives EntityMeta
     val errors = compileErrors("HasUpdatedAt.derived[Bad]")
     assert(
@@ -147,27 +147,27 @@ class HasTemporalAnnotTests extends munit.FunSuite:
   // --- Positive: valid derivations compile ---
 
   test("@deletedAt on Option[OffsetDateTime] compiles"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Good(@Id id: Long, @deletedAt deletedAt: Option[OffsetDateTime]) derives EntityMeta, HasDeletedAt
     val hda = summon[HasDeletedAt[Good]]
     assertEquals(hda.index, 1)
     assertEquals(hda.column.scalaName, "deletedAt")
 
   test("@deletedAt on Option[Instant] compiles"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Good(@Id id: Long, @deletedAt deletedAt: Option[Instant]) derives EntityMeta, HasDeletedAt
     val hda = summon[HasDeletedAt[Good]]
     assertEquals(hda.index, 1)
 
   test("@createdAt on Instant compiles"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Good(@Id id: Long, @createdAt createdAt: Instant) derives EntityMeta, HasCreatedAt
     val hca = summon[HasCreatedAt[Good]]
     assertEquals(hca.index, 1)
     assertEquals(hca.column.scalaName, "createdAt")
 
   test("@updatedAt on OffsetDateTime compiles"):
-    @Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+    @Table(SqlNameMapper.CamelToSnakeCase)
     case class Good(@Id id: Long, @updatedAt updatedAt: OffsetDateTime) derives EntityMeta, HasUpdatedAt
     val hua = summon[HasUpdatedAt[Good]]
     assertEquals(hua.index, 1)

@@ -302,11 +302,11 @@ private def tableExprs[EC: Type, E: Type, ID: Type](using
           )
         case _ =>
           report.errorAndAbort(
-            s"A Mirror is required to derive RepoDefaults for ${TypeRepr.of[EC].show}"
+            s"A Mirror is required to derive table metadata for ${TypeRepr.of[EC].show}"
           )
     case _ =>
       report.errorAndAbort(
-        s"A Mirror is required to derive RepoDefaults for ${TypeRepr.of[E].show}"
+        s"A Mirror is required to derive table metadata for ${TypeRepr.of[E].show}"
       )
   end match
 end tableExprs

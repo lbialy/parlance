@@ -1,9 +1,9 @@
 import com.augustnagro.magnum.*
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class QbMutItem(@Id id: Long, name: String, amount: Int) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class QbMutItemCreator(name: String, amount: Int) derives DbCodec
 
 class InsertBuilderTests extends QbTestBase:

@@ -3,7 +3,7 @@ package shared
 import com.augustnagro.magnum.*
 import munit.{FunSuite, Location}
 
-def multilineFragTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def multilineFragTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location
 ): Unit =
   import suite.*

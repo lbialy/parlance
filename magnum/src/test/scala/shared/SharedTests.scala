@@ -6,7 +6,7 @@ import munit.{FunSuite, Location}
 import java.time.{LocalTime, OffsetDateTime}
 import java.util.UUID
 
-def sharedTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def sharedTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location,
     DbCodec[UUID],
     DbCodec[Boolean],
@@ -14,18 +14,18 @@ def sharedTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     DbCodec[BigDecimal],
     DbCodec[LocalTime]
 ): Unit =
-  immutableRepoTests(suite, dbType, xa)
-  repoTests(suite, dbType, xa)
-  partialUpdateTests(suite, dbType, xa)
-  saveTests(suite, dbType, xa)
-  entityCreatorTests(suite, dbType, xa)
-  sqlNameTests(suite, dbType, xa)
-  noIdTests(suite, dbType, xa)
-  embeddedFragTests(suite, dbType, xa)
-  multilineFragTests(suite, dbType, xa)
-  bigDecTests(suite, dbType, xa)
-  optionalProductTests(suite, dbType, xa)
-  dateTimeTests(suite, dbType, xa)
-  tupleTests(suite, dbType, xa)
-  entityExtensionTests(suite, dbType, xa)
+  immutableRepoTests(suite, xa)
+  repoTests(suite, xa)
+  partialUpdateTests(suite, xa)
+  saveTests(suite, xa)
+  entityCreatorTests(suite, xa)
+  sqlNameTests(suite, xa)
+  noIdTests(suite, xa)
+  embeddedFragTests(suite, xa)
+  multilineFragTests(suite, xa)
+  bigDecTests(suite, xa)
+  optionalProductTests(suite, xa)
+  dateTimeTests(suite, xa)
+  tupleTests(suite, xa)
+  entityExtensionTests(suite, xa)
 end sharedTests

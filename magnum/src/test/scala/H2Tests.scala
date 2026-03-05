@@ -9,7 +9,8 @@ import scala.util.Using.Manager
 
 class H2Tests extends FunSuite:
 
-  sharedTests(this, H2DbType, xa)
+  sharedTests(this, xa)
+  entityCreatorReturningTests(this, xa)
 
   lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
 

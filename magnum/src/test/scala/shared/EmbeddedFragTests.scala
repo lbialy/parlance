@@ -5,7 +5,7 @@ import munit.{FunSuite, Location}
 
 import java.util.UUID
 
-def embeddedFragTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def embeddedFragTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location
 ): Unit =
   import suite.*
@@ -18,7 +18,7 @@ def embeddedFragTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(
         .run()
         .head
     val isAdminFrag =
-      if dbType == OracleDbType then sql"is_admin = 'Y'"
+      if xa().databaseType == Oracle then sql"is_admin = 'Y'"
       else sql"is_admin = true"
     xa().connect:
       val johnCnt =

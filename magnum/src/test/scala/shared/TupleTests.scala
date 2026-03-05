@@ -6,13 +6,13 @@ import munit.{FunSuite, Location}
 import java.sql.{PreparedStatement, ResultSet}
 import java.time.OffsetDateTime
 
-def tupleTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def tupleTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     Location,
     DbCodec[OffsetDateTime]
 ): Unit =
   import suite.*
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class Car(
       model: String,
       @Id id: Long,
@@ -53,7 +53,7 @@ def tupleTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     )
 
   test("large tuple select option"):
-    assume(dbType != OracleDbType)
+    assume(xa().databaseType != Oracle)
     val tupleA = xa().connect:
       sql"select model, color, top_speed, id, vin from car where id = 1"
         .query[Option[(String, Color, Int, Long, Option[Int])]]
@@ -93,7 +93,7 @@ def tupleTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(res.color == Color.Red)
 
   test("large tuple in large tuple"):
-    assume(dbType != OracleDbType)
+    assume(xa().databaseType != Oracle)
     xa().connect:
       val tuple = sql"select 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
         .query[(Int, Int, (Int, Int, Int, Int, Int, Int), Int, Int, Int, Int)]

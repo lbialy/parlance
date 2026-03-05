@@ -1,15 +1,15 @@
 import com.augustnagro.magnum.*
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class ClPerson(@Id id: Long, name: String) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class ClTrip(@Id id: Long, destination: String) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class ClChecklist(@Id id: Long, tripId: Long, title: String) derives EntityMeta
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class ClChecklistItem(@Id id: Long, checklistId: Long, formId: Long, description: String) derives EntityMeta
 
 class WhereHasTests extends QbTestBase:

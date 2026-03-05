@@ -9,7 +9,7 @@ import scala.reflect.{ClassTag, classTag}
   *
   * Usage:
   * {{{
-  *   @Table(PostgresDbType, SqlNameMapper.CamelToSnakeCase)
+  *   @Table(SqlNameMapper.CamelToSnakeCase)
   *   case class SdUser(@Id id: Long, name: String, @deletedAt deletedAt: Option[OffsetDateTime])
   *     derives EntityMeta, HasDeletedAt
   *

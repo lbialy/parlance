@@ -2,7 +2,7 @@ import com.augustnagro.magnum.*
 
 import scala.reflect.{ClassTag, classTag}
 
-@Table(H2DbType, SqlNameMapper.CamelToSnakeCase)
+@Table(SqlNameMapper.CamelToSnakeCase)
 case class RepoItem(
     @Id id: Long,
     name: String,

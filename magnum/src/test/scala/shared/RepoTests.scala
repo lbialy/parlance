@@ -7,7 +7,7 @@ import munit.FunSuite
 import java.time.OffsetDateTime
 import java.util.UUID
 
-def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
+def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     munit.Location,
     DbCodec[UUID],
     DbCodec[Boolean],
@@ -15,7 +15,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
 ): Unit =
   import suite.*
 
-  @Table(dbType, SqlNameMapper.CamelToSnakeCase)
+  @Table(SqlNameMapper.CamelToSnakeCase)
   case class Person(
       id: Long,
       firstName: Option[String],
@@ -53,18 +53,18 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       val p1 = personRepo.findById(1L).get
       val p2 = p1.copy(id = 2L)
       val p3 = p1.copy(id = 999L)
-      val expectedRowsUpdate = dbType match
-        case ClickhouseDbType => 3
-        case _                => 2
+      val expectedRowsUpdate = xa().databaseType match
+        case ClickHouse => 3
+        case _          => 2
       val res = personRepo.deleteAll(Vector(p1, p2, p3))
       assert(res == BatchUpdateResult.Success(expectedRowsUpdate))
       assert(6L == personRepo.count)
 
   test("deleteAllById"):
     xa().connect:
-      val expectedRowsUpdate = dbType match
-        case ClickhouseDbType => 3
-        case _                => 2
+      val expectedRowsUpdate = xa().databaseType match
+        case ClickHouse => 3
+        case _          => 2
       val res = personRepo.deleteAllById(Vector(1L, 2L, 1L))
       assert(res == BatchUpdateResult.Success(expectedRowsUpdate))
       assert(6L == personRepo.count)
@@ -100,8 +100,8 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(personRepo.findAll.map(_.lastName).contains("Smith"))
 
   test("insertReturning"):
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
+    assume(xa().databaseType != MySQL)
+    assume(xa().databaseType != SQLite)
     xa().connect:
       val person = personRepo.insertReturning(
         Person(
@@ -116,8 +116,8 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(person.lastName == "Smith")
 
   test("insertAllReturning"):
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
+    assume(xa().databaseType != MySQL)
+    assume(xa().databaseType != SQLite)
     xa().connect:
       val newPc = Vector(
         Person(
@@ -158,7 +158,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
         personRepo.insert(invalidP)
 
   test("update"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val p = personRepo.findById(1L).get
       val updated = p.copy(firstName = None, isAdmin = false)
@@ -166,7 +166,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(personRepo.findById(1L).get == updated)
 
   test("update invalid"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     intercept[SqlException]:
       xa().connect:
         val p = personRepo.findById(1L).get
@@ -208,7 +208,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       )
 
   test("updateAll"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val newPeople = Vector(
         personRepo.findById(1L).get.copy(lastName = "Peterson"),
@@ -220,7 +220,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(personRepo.findById(2L).get == newPeople(1))
 
   test("transact"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     val count = xa().transact:
       val p = Person(
         id = 9L,
@@ -235,7 +235,7 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
     assert(count == 9L)
 
   test("transact failed"):
-    assume(dbType != ClickhouseDbType)
+    assume(xa().databaseType != ClickHouse)
     val transactor = xa()
     val p = Person(
       id = 9L,
@@ -305,19 +305,19 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(personRepo.findById(p.id).get.isAdmin == true)
 
   test("custom returning a single column"):
-    assume(dbType != ClickhouseDbType)
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
+    assume(xa().databaseType != ClickHouse)
+    assume(xa().databaseType != MySQL)
+    assume(xa().databaseType != SQLite)
     xa().connect:
       val personId =
-        if dbType == H2DbType then
+        if xa().databaseType == H2 then
           sql"""insert into person (id, first_name, last_name, created, is_admin)
                 values (9, 'Arton', 'Senna', now(), true)
                 """
             .returningKeys[Long]("id")
             .run()
             .head
-        else if dbType == OracleDbType then
+        else if xa().databaseType == Oracle then
           sql"""insert into person (id, first_name, last_name, created, is_admin)
                 values (9, 'Arton', 'Senna', current_timestamp, 'Y')"""
             .returningKeys[Long]("id")
@@ -329,13 +329,13 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(personRepo.findById(personId).get.lastName == "Senna")
 
   test("custom returning multiple columns"):
-    assume(dbType != ClickhouseDbType)
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
-    assume(dbType != OracleDbType)
+    assume(xa().databaseType != ClickHouse)
+    assume(xa().databaseType != MySQL)
+    assume(xa().databaseType != SQLite)
+    assume(xa().databaseType != Oracle)
     xa().connect:
       val cols =
-        if dbType == H2DbType then
+        if xa().databaseType == H2 then
           sql"""insert into person (id, first_name, last_name, created, is_admin) values
              (9, 'Arton', 'Senna', now(), true),
              (10, 'Demo', 'User', now(), false)
@@ -355,12 +355,12 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(newLastNames == Vector("Senna", "User"))
 
   test("custom returning with no rows updated"):
-    assume(dbType != ClickhouseDbType)
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
+    assume(xa().databaseType != ClickHouse)
+    assume(xa().databaseType != MySQL)
+    assume(xa().databaseType != SQLite)
     xa().connect:
       val personIds =
-        if dbType == H2DbType || dbType == OracleDbType then
+        if xa().databaseType == H2 || xa().databaseType == Oracle then
           sql"update person set first_name = 'xxx' where last_name = 'Not Here'"
             .returningKeys[Long](ColumnNames("id", IArray(person.id)))
             .run()
@@ -371,12 +371,12 @@ def repoTests(suite: FunSuite, dbType: DbType, xa: () => Transactor[?])(using
       assert(personIds.isEmpty)
 
   test("returning non primary key column"):
-    assume(dbType != ClickhouseDbType)
-    assume(dbType != MySqlDbType)
-    assume(dbType != SqliteDbType)
+    assume(xa().databaseType != ClickHouse)
+    assume(xa().databaseType != MySQL)
+    assume(xa().databaseType != SQLite)
     xa().connect:
       val personFirstNames =
-        if dbType == H2DbType || dbType == OracleDbType then
+        if xa().databaseType == H2 || xa().databaseType == Oracle then
           sql"update person set last_name = 'xxx'"
             .returningKeys[String](person.firstName)
             .run()
