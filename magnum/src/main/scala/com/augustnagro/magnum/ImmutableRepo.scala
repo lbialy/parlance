@@ -23,13 +23,11 @@ open class ImmutableRepo[E, ID](
   /** Expose entity codec for traits with self-type. */
   protected def entityCodec: DbCodec[E] = meta
 
-  /** Index of the primary key column in the entity's product elements. */
-  protected val pkIndex: Int =
-    meta.columns.indexWhere(_.scalaName == meta.primaryKey.scalaName)
+  /** Cached index of the primary key column in the entity's product elements. */
+  protected val pkIndex: Int = meta.pkIndex
 
   /** Extract the primary key value from an entity. */
-  protected def extractPk(entity: E): Any =
-    entity.asInstanceOf[Product].productElement(pkIndex)
+  protected def extractPk(entity: E): Any = meta.extractPk(entity)
 
   private def track(entity: E)(using con: DbCon[?]): E =
     con.trackLoaded(meta.tableName, extractPk(entity), entity)

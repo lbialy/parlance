@@ -28,10 +28,7 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
   private lazy val pkSql: String = self.entityMeta.primaryKey.sqlName
 
   private def extractId(entity: E): ID =
-    val pkIdx = self.entityMeta.columns.indexWhere(
-      _.scalaName == self.entityMeta.primaryKey.scalaName
-    )
-    entity.asInstanceOf[Product].productElement(pkIdx).asInstanceOf[ID]
+    self.entityMeta.extractPk(entity).asInstanceOf[ID]
 
   // --- scope with mutation hooks ---
 

@@ -51,8 +51,8 @@ class WritablePivotRelation[S, T, P, PC, +CT <: Selectable, +PCT <: Selectable](
       con: DbCon[?]
   ): SyncResult =
     val rel = underlying
-    val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
-    val targetPkIdx = tm.columns.indexWhere(_.scalaName == rel.targetPk.scalaName)
+    val sourcePkIdx = sm.columnIndex(rel.sourcePk.scalaName)
+    val targetPkIdx = tm.columnIndex(rel.targetPk.scalaName)
     val sourceKey = source.asInstanceOf[Product].productElement(sourcePkIdx)
 
     val currentKeys = BelongsToManyOps.fetchTargetKeys(rel, sourceKey, con)
@@ -151,8 +151,8 @@ private[magnum] object BelongsToManyOps:
       con: DbCon[?]
   ): Int =
     if targets.isEmpty then return 0
-    val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
-    val targetPkIdx = tm.columns.indexWhere(_.scalaName == rel.targetPk.scalaName)
+    val sourcePkIdx = sm.columnIndex(rel.sourcePk.scalaName)
+    val targetPkIdx = tm.columnIndex(rel.targetPk.scalaName)
     val sourceKey = source.asInstanceOf[Product].productElement(sourcePkIdx)
     val sql = s"INSERT INTO ${rel.pivotTable} (${rel.sourceFk}, ${rel.targetFk}) VALUES (?, ?)"
     Using.resource(con.connection.prepareStatement(sql)): ps =>
@@ -173,8 +173,8 @@ private[magnum] object BelongsToManyOps:
       con: DbCon[?]
   ): Int =
     if targets.isEmpty then return 0
-    val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
-    val targetPkIdx = tm.columns.indexWhere(_.scalaName == rel.targetPk.scalaName)
+    val sourcePkIdx = sm.columnIndex(rel.sourcePk.scalaName)
+    val targetPkIdx = tm.columnIndex(rel.targetPk.scalaName)
     val sourceKey = source.asInstanceOf[Product].productElement(sourcePkIdx)
     val targetKeys = targets.map(t => t.asInstanceOf[Product].productElement(targetPkIdx))
     detachByTargetKeys(rel, sourceKey, targetKeys.toVector, con)
@@ -200,7 +200,7 @@ private[magnum] object BelongsToManyOps:
       sm: EntityMeta[S],
       con: DbCon[?]
   ): Int =
-    val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
+    val sourcePkIdx = sm.columnIndex(rel.sourcePk.scalaName)
     val sourceKey = source.asInstanceOf[Product].productElement(sourcePkIdx)
     val sql = s"DELETE FROM ${rel.pivotTable} WHERE ${rel.sourceFk} = ?"
     Using.resource(con.connection.prepareStatement(sql)): ps =>
@@ -228,8 +228,8 @@ private[magnum] object BelongsToManyOps:
       tm: EntityMeta[T],
       con: DbCon[?]
   ): SyncResult =
-    val sourcePkIdx = sm.columns.indexWhere(_.scalaName == rel.sourcePk.scalaName)
-    val targetPkIdx = tm.columns.indexWhere(_.scalaName == rel.targetPk.scalaName)
+    val sourcePkIdx = sm.columnIndex(rel.sourcePk.scalaName)
+    val targetPkIdx = tm.columnIndex(rel.targetPk.scalaName)
     val sourceKey = source.asInstanceOf[Product].productElement(sourcePkIdx)
 
     val currentKeys = fetchTargetKeys(rel, sourceKey, con)

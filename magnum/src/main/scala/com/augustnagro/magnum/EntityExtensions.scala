@@ -1,10 +1,7 @@
 package com.augustnagro.magnum
 
-private def pkIndex(meta: TableMeta[?]): Int =
-  meta.columns.indexWhere(_.scalaName == meta.primaryKey.scalaName)
-
 private def extractPkValue(entity: Any, meta: TableMeta[?]): Any =
-  entity.asInstanceOf[Product].productElement(pkIndex(meta))
+  entity.asInstanceOf[Product].productElement(meta.pkIndex)
 
 // --- Group 1a: Mutations ---
 extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[? <: SupportsMutations])

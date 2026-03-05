@@ -869,9 +869,8 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
 
   // --- Entity-level mutations (ignore QB WHERE state) ---
 
-  private def pkIndex: Int =
-    val pkName = meta.primaryKey.scalaName
-    meta.columns.indexWhere(_.scalaName == pkName)
+  private val _pkIndex: Int = meta.pkIndex
+  private def pkIndex: Int = _pkIndex
 
   def updateEntity(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val idx = pkIndex
