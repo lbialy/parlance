@@ -7,7 +7,7 @@ import munit.FunSuite
 import java.time.OffsetDateTime
 import java.util.UUID
 
-def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
+def repoTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(using
     munit.Location,
     DbCodec[UUID],
     DbCodec[Boolean],
@@ -53,20 +53,14 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
       val p1 = personRepo.findById(1L).get
       val p2 = p1.copy(id = 2L)
       val p3 = p1.copy(id = 999L)
-      val expectedRowsUpdate = xa().databaseType match
-        case ClickHouse => 3
-        case _          => 2
       val res = personRepo.deleteAll(Vector(p1, p2, p3))
-      assert(res == BatchUpdateResult.Success(expectedRowsUpdate))
+      assert(res == BatchUpdateResult.Success(2))
       assert(6L == personRepo.count)
 
   test("deleteAllById"):
     xa().connect:
-      val expectedRowsUpdate = xa().databaseType match
-        case ClickHouse => 3
-        case _          => 2
       val res = personRepo.deleteAllById(Vector(1L, 2L, 1L))
-      assert(res == BatchUpdateResult.Success(expectedRowsUpdate))
+      assert(res == BatchUpdateResult.Success(2))
       assert(6L == personRepo.count)
 
   test("truncate"):
@@ -99,57 +93,6 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
       assert(personRepo.count == 10L)
       assert(personRepo.findAll.map(_.lastName).contains("Smith"))
 
-  test("insertReturning"):
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != SQLite)
-    xa().connect:
-      val person = personRepo.insertReturning(
-        Person(
-          id = 9L,
-          firstName = Some("John"),
-          lastName = "Smith",
-          isAdmin = false,
-          socialId = None,
-          created = OffsetDateTime.now
-        )
-      )
-      assert(person.lastName == "Smith")
-
-  test("insertAllReturning"):
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != SQLite)
-    xa().connect:
-      val newPc = Vector(
-        Person(
-          id = 9L,
-          firstName = Some("Chandler"),
-          lastName = "Johnsored",
-          isAdmin = true,
-          socialId = Some(UUID.randomUUID()),
-          created = OffsetDateTime.now
-        ),
-        Person(
-          id = 10L,
-          firstName = None,
-          lastName = "Odysseus",
-          isAdmin = false,
-          socialId = None,
-          created = OffsetDateTime.now
-        ),
-        Person(
-          id = 11L,
-          firstName = Some("Jorge"),
-          lastName = "Masvidal",
-          isAdmin = true,
-          socialId = None,
-          created = OffsetDateTime.now
-        )
-      )
-      val people = personRepo.insertAllReturning(newPc)
-      assert(personRepo.count == 11L)
-      assert(people.size == 3)
-      assert(people.last.lastName == newPc.last.lastName)
-
   test("insert invalid"):
     intercept[SqlException]:
       xa().connect:
@@ -158,7 +101,6 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
         personRepo.insert(invalidP)
 
   test("update"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val p = personRepo.findById(1L).get
       val updated = p.copy(firstName = None, isAdmin = false)
@@ -166,7 +108,6 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
       assert(personRepo.findById(1L).get == updated)
 
   test("update invalid"):
-    assume(xa().databaseType != ClickHouse)
     intercept[SqlException]:
       xa().connect:
         val p = personRepo.findById(1L).get
@@ -208,7 +149,6 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
       )
 
   test("updateAll"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val newPeople = Vector(
         personRepo.findById(1L).get.copy(lastName = "Peterson"),
@@ -220,7 +160,6 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
       assert(personRepo.findById(2L).get == newPeople(1))
 
   test("transact"):
-    assume(xa().databaseType != ClickHouse)
     val count = xa().transact:
       val p = Person(
         id = 9L,
@@ -235,7 +174,6 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
     assert(count == 9L)
 
   test("transact failed"):
-    assume(xa().databaseType != ClickHouse)
     val transactor = xa()
     val p = Person(
       id = 9L,
@@ -304,10 +242,77 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
       assert(rowsUpdated == 1)
       assert(personRepo.findById(p.id).get.isAdmin == true)
 
+end repoTests
+
+def repoReturningTests[D <: SupportsMutations & SupportsReturning](suite: FunSuite, xa: () => Transactor[D])(using
+    munit.Location,
+    DbCodec[UUID],
+    DbCodec[Boolean],
+    DbCodec[OffsetDateTime]
+): Unit =
+  import suite.*
+
+  @Table(SqlNameMapper.CamelToSnakeCase)
+  case class Person(
+      id: Long,
+      firstName: Option[String],
+      lastName: String,
+      isAdmin: Boolean,
+      created: OffsetDateTime,
+      socialId: Option[UUID]
+  ) derives EntityMeta
+
+  val personRepo = Repo[Person, Person, Long]()
+  val person = TableInfo[Person, Person, Long]
+
+  test("insertReturning"):
+    xa().connect:
+      val person = personRepo.insertReturning(
+        Person(
+          id = 9L,
+          firstName = Some("John"),
+          lastName = "Smith",
+          isAdmin = false,
+          socialId = None,
+          created = OffsetDateTime.now
+        )
+      )
+      assert(person.lastName == "Smith")
+
+  test("insertAllReturning"):
+    xa().connect:
+      val newPc = Vector(
+        Person(
+          id = 9L,
+          firstName = Some("Chandler"),
+          lastName = "Johnsored",
+          isAdmin = true,
+          socialId = Some(UUID.randomUUID()),
+          created = OffsetDateTime.now
+        ),
+        Person(
+          id = 10L,
+          firstName = None,
+          lastName = "Odysseus",
+          isAdmin = false,
+          socialId = None,
+          created = OffsetDateTime.now
+        ),
+        Person(
+          id = 11L,
+          firstName = Some("Jorge"),
+          lastName = "Masvidal",
+          isAdmin = true,
+          socialId = None,
+          created = OffsetDateTime.now
+        )
+      )
+      val people = personRepo.insertAllReturning(newPc)
+      assert(personRepo.count == 11L)
+      assert(people.size == 3)
+      assert(people.last.lastName == newPc.last.lastName)
+
   test("custom returning a single column"):
-    assume(xa().databaseType != ClickHouse)
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != SQLite)
     xa().connect:
       val personId =
         if xa().databaseType == H2 then
@@ -328,11 +333,56 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
                 """.returning[Long].run().head
       assert(personRepo.findById(personId).get.lastName == "Senna")
 
+  test("custom returning with no rows updated"):
+    xa().connect:
+      val personIds =
+        if xa().databaseType == H2 || xa().databaseType == Oracle then
+          sql"update person set first_name = 'xxx' where last_name = 'Not Here'"
+            .returningKeys[Long](ColumnNames("id", IArray(person.id)))
+            .run()
+        else
+          sql"update person set first_name = 'xxx' where last_name = 'Not Here' returning id"
+            .returning[Long]
+            .run()
+      assert(personIds.isEmpty)
+
+  test("returning non primary key column"):
+    xa().connect:
+      val personFirstNames =
+        if xa().databaseType == H2 || xa().databaseType == Oracle then
+          sql"update person set last_name = 'xxx'"
+            .returningKeys[String](person.firstName)
+            .run()
+        else
+          sql"update person set last_name = 'xxx' returning first_name"
+            .returning[String]
+            .run()
+
+      assert(personFirstNames.nonEmpty)
+end repoReturningTests
+
+def repoMultiColReturningTests[D <: SupportsMutations & SupportsMultiColumnReturningKeys](suite: FunSuite, xa: () => Transactor[D])(using
+    munit.Location,
+    DbCodec[UUID],
+    DbCodec[Boolean],
+    DbCodec[OffsetDateTime]
+): Unit =
+  import suite.*
+
+  @Table(SqlNameMapper.CamelToSnakeCase)
+  case class Person(
+      id: Long,
+      firstName: Option[String],
+      lastName: String,
+      isAdmin: Boolean,
+      created: OffsetDateTime,
+      socialId: Option[UUID]
+  ) derives EntityMeta
+
+  val personRepo = Repo[Person, Person, Long]()
+  val person = TableInfo[Person, Person, Long]
+
   test("custom returning multiple columns"):
-    assume(xa().databaseType != ClickHouse)
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != SQLite)
-    assume(xa().databaseType != Oracle)
     xa().connect:
       val cols =
         if xa().databaseType == H2 then
@@ -353,37 +403,4 @@ def repoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
       val newLastNames =
         cols.map((id, _) => personRepo.findById(id).get.lastName)
       assert(newLastNames == Vector("Senna", "User"))
-
-  test("custom returning with no rows updated"):
-    assume(xa().databaseType != ClickHouse)
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != SQLite)
-    xa().connect:
-      val personIds =
-        if xa().databaseType == H2 || xa().databaseType == Oracle then
-          sql"update person set first_name = 'xxx' where last_name = 'Not Here'"
-            .returningKeys[Long](ColumnNames("id", IArray(person.id)))
-            .run()
-        else
-          sql"update person set first_name = 'xxx' where last_name = 'Not Here' returning id"
-            .returning[Long]
-            .run()
-      assert(personIds.isEmpty)
-
-  test("returning non primary key column"):
-    assume(xa().databaseType != ClickHouse)
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != SQLite)
-    xa().connect:
-      val personFirstNames =
-        if xa().databaseType == H2 || xa().databaseType == Oracle then
-          sql"update person set last_name = 'xxx'"
-            .returningKeys[String](person.firstName)
-            .run()
-        else
-          sql"update person set last_name = 'xxx' returning first_name"
-            .returning[String]
-            .run()
-
-      assert(personFirstNames.nonEmpty)
-end repoTests
+end repoMultiColReturningTests

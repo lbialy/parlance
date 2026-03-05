@@ -118,7 +118,7 @@ class QueryBuilderMutationTests extends QbTestBase:
   test("update() rejects nonexistent field"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      def test(using DbCon[?]): Unit =
+      def test(using DbCon[? <: SupportsMutations]): Unit =
         QueryBuilder.from[QbCounter].update((nonexistent = "x"))
     """)
     assert(errors.contains("does not exist on entity"), s"Expected 'does not exist on entity' in: $errors")
@@ -126,7 +126,7 @@ class QueryBuilderMutationTests extends QbTestBase:
   test("update() rejects type mismatch"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      def test(using DbCon[?]): Unit =
+      def test(using DbCon[? <: SupportsMutations]): Unit =
         QueryBuilder.from[QbCounter].update((name = 42))
     """)
     assert(errors.contains("Type mismatch") || errors.contains("type mismatch"), s"Expected type mismatch in: $errors")
@@ -186,7 +186,7 @@ class QueryBuilderMutationTests extends QbTestBase:
   test("increment on String column does not compile"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      def test(using DbCon[?]): Unit =
+      def test(using DbCon[? <: SupportsMutations]): Unit =
         QueryBuilder.from[QbCounter].increment(_.name, "x")
     """)
     assert(errors.contains("No given instance of type Numeric[String] was found"))
@@ -197,7 +197,7 @@ class QueryBuilderMutationTests extends QbTestBase:
       import java.time.Instant
       @Table(SqlNameMapper.CamelToSnakeCase)
       case class Timestamped(@Id id: Long, createdAt: Instant) derives EntityMeta
-      def test(using DbCon[?]): Unit =
+      def test(using DbCon[? <: SupportsMutations]): Unit =
         QueryBuilder.from[Timestamped].increment(_.createdAt, Instant.now())
     """)
     assert(errors.contains("No given instance of type Numeric[java.time.Instant] was found"))
@@ -205,7 +205,7 @@ class QueryBuilderMutationTests extends QbTestBase:
   test("decrement on String column does not compile"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      def test(using DbCon[?]): Unit =
+      def test(using DbCon[? <: SupportsMutations]): Unit =
         QueryBuilder.from[QbCounter].decrement(_.status, "x")
     """)
     assert(errors.contains("No given instance of type Numeric[String] was found"))

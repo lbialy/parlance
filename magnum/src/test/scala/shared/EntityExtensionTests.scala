@@ -6,7 +6,7 @@ import munit.FunSuite
 import java.time.OffsetDateTime
 import java.util.UUID
 
-def entityExtensionTests[D <: DatabaseType](
+def entityExtensionTests[D <: SupportsMutations](
     suite: FunSuite,
     xa: () => Transactor[D]
 )(using
@@ -32,7 +32,6 @@ def entityExtensionTests[D <: DatabaseType](
   // --- Group 1: Core lifecycle ---
 
   test("entity.save() on tracked entity"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val modified = original.copy(lastName = "ExtSaved")
@@ -42,14 +41,12 @@ def entityExtensionTests[D <: DatabaseType](
       assert(fetched.firstName == original.firstName)
 
   test("entity.delete()"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val p = personRepo.findById(1L).get
       p.delete()
       assert(personRepo.findById(1L).isEmpty)
 
   test("entity.refresh()"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       personRepo.update(original.copy(lastName = "Refreshed"))
@@ -79,20 +76,17 @@ def entityExtensionTests[D <: DatabaseType](
   // --- Group 3: Change tracking ---
 
   test("entity.isDirty on modified entity"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val modified = original.copy(lastName = "Dirty")
       assert(modified.isDirty)
 
   test("entity.isDirty on clean entity"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       assert(!original.isDirty)
 
   test("entity.isDirty on untracked entity"):
-    assume(xa().databaseType != ClickHouse)
     val t = xa()
     val person = t.connect:
       personRepo.findById(1L).get
@@ -101,7 +95,6 @@ def entityExtensionTests[D <: DatabaseType](
       assert(!person.isDirty)
 
   test("entity.isClean"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       assert(original.isClean)
@@ -109,7 +102,6 @@ def entityExtensionTests[D <: DatabaseType](
       assert(!modified.isClean)
 
   test("entity.getOriginal returns original snapshot"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val modified = original.copy(lastName = "Changed")
@@ -117,7 +109,6 @@ def entityExtensionTests[D <: DatabaseType](
       assert(retrieved.lastName == original.lastName)
 
   test("entity.getOriginal on untracked returns self"):
-    assume(xa().databaseType != ClickHouse)
     val t = xa()
     val person = t.connect:
       personRepo.findById(1L).get
@@ -126,7 +117,6 @@ def entityExtensionTests[D <: DatabaseType](
       assert(orig eq person)
 
   test("entity.getChanges with field changes"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val modified = original.copy(
@@ -139,7 +129,6 @@ def entityExtensionTests[D <: DatabaseType](
       assert(changes("isAdmin") == (original.isAdmin, !original.isAdmin))
 
   test("entity.getChanges with no changes"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val changes = original.getChanges

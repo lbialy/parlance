@@ -813,11 +813,11 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
   def update: QueryBuilder.UpdatePhase[E] =
     QueryBuilder.UpdatePhase(this)
 
-  def delete()(using DbCon[?]): Int =
+  def delete()(using DbCon[? <: SupportsMutations]): Int =
     val (whereSql, params, writer) = buildWhere
     Frag(s"DELETE FROM ${meta.tableName}$whereSql", params, writer).update.run()
 
-  def updateUnsafe(assignments: Frag)(using DbCon[?]): Int =
+  def updateUnsafe(assignments: Frag)(using DbCon[? <: SupportsMutations]): Int =
     val (whereSql, whereParams, whereWriter) = buildWhere
     val sql = s"UPDATE ${meta.tableName} SET ${assignments.sqlString}$whereSql"
     val allParams = assignments.params ++ whereParams
@@ -826,14 +826,14 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       whereWriter.write(ps, next)
     Frag(sql, allParams, combinedWriter).update.run()
 
-  def updateUnsafe(f: C => Frag)(using DbCon[?]): Int =
+  def updateUnsafe(f: C => Frag)(using DbCon[? <: SupportsMutations]): Int =
     updateUnsafe(f(cols))
 
   def increment[A](f: C => ColRef[A], amount: A | None.type = None)(using
       num: Numeric[A],
       codec: DbCodec[A],
       tt: TypeTest[A | None.type, A],
-      con: DbCon[?]
+      con: DbCon[? <: SupportsMutations]
   ): Int =
     val actual: A = amount match
       case None => num.one
@@ -844,7 +844,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       pos + codec.cols.length
     updateUnsafe(Frag(s"${col.queryRepr} = ${col.queryRepr} + ?", Seq(actual), writer))
 
-  def touch()(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon[?]): Int =
+  def touch()(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon[? <: SupportsMutations]): Int =
     val (whereSql, params, writer) = buildWhere
     Frag(
       s"UPDATE ${meta.tableName} SET ${hasUpdatedAt.column.sqlName} = CURRENT_TIMESTAMP$whereSql",
@@ -856,7 +856,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       num: Numeric[A],
       codec: DbCodec[A],
       tt: TypeTest[A | None.type, A],
-      con: DbCon[?]
+      con: DbCon[? <: SupportsMutations]
   ): Int =
     val actual: A = amount match
       case None => num.one
@@ -873,7 +873,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
     val pkName = meta.primaryKey.scalaName
     meta.columns.indexWhere(_.scalaName == pkName)
 
-  def updateEntity(entity: E)(using con: DbCon[?]): Unit =
+  def updateEntity(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val idx = pkIndex
     val elemCodecs = meta.elementCodecs
     val cols = meta.columns
@@ -895,7 +895,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
         timed(ps.executeUpdate())
   end updateEntity
 
-  def updateAllEntities(entities: Iterable[E])(using con: DbCon[?]): BatchUpdateResult =
+  def updateAllEntities(entities: Iterable[E])(using con: DbCon[? <: SupportsMutations]): BatchUpdateResult =
     val idx = pkIndex
     val elemCodecs = meta.elementCodecs
     val cols = meta.columns
@@ -919,7 +919,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
         timed(batchUpdateResult(ps.executeBatch()))
   end updateAllEntities
 
-  def updatePartial(original: E, current: E)(using con: DbCon[?]): Unit =
+  def updatePartial(original: E, current: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val idx = pkIndex
     val elemCodecs = meta.elementCodecs
     val cols = meta.columns
@@ -955,7 +955,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
         timed(ps.executeUpdate())
   end updatePartial
 
-  def deleteEntity(entity: E)(using con: DbCon[?]): Unit =
+  def deleteEntity(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val idx = pkIndex
     val idCodec = meta.elementCodecs(idx)
     val idCol = meta.columns(idx)
@@ -966,7 +966,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
       pos + idCodec.cols.length
     Frag(sql, Seq(id), writer).update.run()
 
-  def deleteAllEntities(entities: Iterable[E])(using con: DbCon[?]): BatchUpdateResult =
+  def deleteAllEntities(entities: Iterable[E])(using con: DbCon[? <: SupportsMutations]): BatchUpdateResult =
     val idx = pkIndex
     val idCodec = meta.elementCodecs(idx).asInstanceOf[DbCodec[Any]]
     val idCol = meta.columns(idx)
@@ -979,7 +979,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
           ps.addBatch()
         timed(batchUpdateResult(ps.executeBatch()))
 
-  def deleteAllById[ID](ids: Iterable[ID])(using idCodec: DbCodec[ID], con: DbCon[?]): BatchUpdateResult =
+  def deleteAllById[ID](ids: Iterable[ID])(using idCodec: DbCodec[ID], con: DbCon[? <: SupportsMutations]): BatchUpdateResult =
     val idx = pkIndex
     val idCol = meta.columns(idx)
     val sql = s"DELETE FROM ${meta.tableName} WHERE ${idCol.sqlName} = ${idCodec.queryRepr}"
@@ -988,11 +988,11 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[magnum] (
         idCodec.write(ids, ps)
         timed(batchUpdateResult(ps.executeBatch()))
 
-  def truncate()(using con: DbCon[?]): Unit =
+  def truncate()(using con: DbCon[? <: SupportsMutations]): Unit =
     val sql = con.databaseType.renderTruncate(meta.tableName)
     Frag(sql, Vector.empty, FragWriter.empty).update.run()
 
-  def upsertByPk(entity: E)(using con: DbCon[?]): Unit =
+  def upsertByPk(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val allCols = meta.columns.map(_.sqlName)
     val sql = con.databaseType.renderUpsertByPk(
       meta.tableName,
@@ -1357,7 +1357,7 @@ object QueryBuilder:
   class UpdatePhase[E] private[magnum] (
       private[magnum] val qb: QueryBuilder[?, E, ?]
   ):
-    inline def apply[P](inline assignments: P)(using inline con: DbCon[?]): Int =
+    inline def apply[P](inline assignments: P)(using inline con: DbCon[? <: SupportsMutations]): Int =
       ${ updateImpl[E, P]('this, 'assignments, 'con) }
 
   // --- update() macro implementation ---
@@ -1365,7 +1365,7 @@ object QueryBuilder:
   private def updateImpl[E: Type, P: Type](
       phaseExpr: Expr[UpdatePhase[E]],
       assignments: Expr[P],
-      conExpr: Expr[DbCon[?]]
+      conExpr: Expr[DbCon[? <: SupportsMutations]]
   )(using Quotes): Expr[Int] =
     import quotes.reflect.*
 

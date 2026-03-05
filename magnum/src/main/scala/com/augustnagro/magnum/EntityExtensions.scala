@@ -6,10 +6,13 @@ private def pkIndex(meta: TableMeta[?]): Int =
 private def extractPkValue(entity: Any, meta: TableMeta[?]): Any =
   entity.asInstanceOf[Product].productElement(pkIndex(meta))
 
-// --- Group 1: Core lifecycle ---
-extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[?])
+// --- Group 1a: Mutations ---
+extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[? <: SupportsMutations])
   def save(): Unit = repo.save(entity)
   def delete(): Unit = repo.delete(entity)
+
+// --- Group 1b: Reads ---
+extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[?])
   def refresh(): E = repo.refresh(entity)
 
 // --- Group 2: Identity comparison ---
@@ -55,7 +58,7 @@ end extension
 // --- Group 4: SoftDeletes extensions ---
 extension [EC, E, ID](entity: E)(using
     repo: Repo[EC, E, ID] & SoftDeletes[EC, E, ID],
-    con: DbCon[?]
+    con: DbCon[? <: SupportsMutations]
 )
   def forceDelete(): Unit = repo.forceDelete(entity)
   def restore(): Unit = repo.restore(entity)

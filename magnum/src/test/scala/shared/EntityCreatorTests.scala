@@ -6,7 +6,7 @@ import munit.{FunSuite, Location}
 
 import scala.util.Using
 
-def entityCreatorTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
+def entityCreatorTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(using
     Location
 ): Unit =
   import suite.*
@@ -20,7 +20,6 @@ def entityCreatorTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[
   val user = TableInfo[MyUserCreator, MyUser, Long]
 
   test("insert EntityCreator"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       userRepo.insert(MyUserCreator("Ash"))
       userRepo.insert(MyUserCreator("Steve"))
@@ -28,14 +27,12 @@ def entityCreatorTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[
       assert(userRepo.findAll.map(_.firstName).contains("Steve"))
 
   test("insert invalid EntityCreator"):
-    assume(xa().databaseType != ClickHouse)
     intercept[SqlException]:
       xa().connect:
         val invalidUser = MyUserCreator(null)
         userRepo.insert(invalidUser)
 
   test("insertAll EntityCreator"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val newUsers = Vector(
         MyUserCreator("Ash"),
@@ -49,7 +46,6 @@ def entityCreatorTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[
       )
 
   test("custom insert EntityCreator"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val u = MyUserCreator("Ash")
       val update =
@@ -64,7 +60,6 @@ def entityCreatorTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[
       assert(userRepo.findAll.exists(_.firstName == "Ash"))
 
   test("custom update EntityCreator"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val u = userRepo.findAll.head
       val newName = "Ash"
@@ -77,24 +72,6 @@ def entityCreatorTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[
       val rowsUpdated = update.run()
       assert(rowsUpdated == 1)
       assert(userRepo.findAll.exists(_.firstName == "Ash"))
-
-  test(".returning iterator"):
-    assume(xa().databaseType != ClickHouse)
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != SQLite)
-    xa().connect:
-      Using.Manager(implicit use =>
-        val it =
-          if xa().databaseType == H2 then
-            sql"INSERT INTO $user ${user.insertColumns} VALUES ('Bob')"
-              .returningKeys[Long](user.id)
-              .iterator()
-          else
-            sql"INSERT INTO $user ${user.insertColumns} VALUES ('Bob') RETURNING ${user.id}"
-              .returning[Long]
-              .iterator()
-        assert(it.size == 1)
-      )
 
 end entityCreatorTests
 
@@ -110,6 +87,7 @@ def entityCreatorReturningTests[D <: SupportsReturning](
   case class MyUser(firstName: String, id: Long) derives EntityMeta
 
   val userRepo = Repo[MyUserCreator, MyUser, Long]()
+  val user = TableInfo[MyUserCreator, MyUser, Long]
 
   test("insertReturning EntityCreator"):
     xa().connect:
@@ -127,5 +105,20 @@ def entityCreatorReturningTests[D <: SupportsReturning](
       assert(userRepo.count == 6L)
       assert(users.size == 3)
       assert(users.last.firstName == newUsers.last.firstName)
+
+  test(".returning iterator"):
+    xa().connect:
+      Using.Manager(implicit use =>
+        val it =
+          if xa().databaseType == H2 then
+            sql"INSERT INTO $user ${user.insertColumns} VALUES ('Bob')"
+              .returningKeys[Long](user.id)
+              .iterator()
+          else
+            sql"INSERT INTO $user ${user.insertColumns} VALUES ('Bob') RETURNING ${user.id}"
+              .returning[Long]
+              .iterator()
+        assert(it.size == 1)
+      )
 
 end entityCreatorReturningTests

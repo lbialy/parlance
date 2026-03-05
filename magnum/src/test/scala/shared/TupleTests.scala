@@ -53,28 +53,31 @@ def tupleTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(usin
     )
 
   test("large tuple select option"):
-    assume(xa().databaseType != Oracle)
     val tupleA = xa().connect:
       sql"select model, color, top_speed, id, vin from car where id = 1"
         .query[Option[(String, Color, Int, Long, Option[Int])]]
         .run()
         .head
     assert(tupleA.isDefined)
+    val isOracle = xa().databaseType == Oracle
     val someTuple = xa().connect:
-      sql"select 1, 1, 1, 1, 1, 1"
-        .query[Option[(Int, Int, Int, Int, Int, Int)]]
+      val q = if isOracle then sql"select 1, 1, 1, 1, 1, 1 FROM DUAL"
+              else sql"select 1, 1, 1, 1, 1, 1"
+      q.query[Option[(Int, Int, Int, Int, Int, Int)]]
         .run()
         .head
     assert(someTuple.isDefined)
     val noneTuple = xa().connect:
-      sql"select 1, 1, 1, 1, null, 1"
-        .query[Option[(Int, Int, Int, Int, Int, Int)]]
+      val q = if isOracle then sql"select 1, 1, 1, 1, null, 1 FROM DUAL"
+              else sql"select 1, 1, 1, 1, null, 1"
+      q.query[Option[(Int, Int, Int, Int, Int, Int)]]
         .run()
         .head
     assert(noneTuple.isEmpty)
     val optionTupleOption = xa().connect:
-      sql"select 1, 1, 1, 1, null, 1"
-        .query[Option[(Int, Int, Int, Int, Option[Int], Int)]]
+      val q = if isOracle then sql"select 1, 1, 1, 1, null, 1 FROM DUAL"
+              else sql"select 1, 1, 1, 1, null, 1"
+      q.query[Option[(Int, Int, Int, Int, Option[Int], Int)]]
         .run()
         .head
     assert(optionTupleOption.isDefined)
@@ -93,9 +96,10 @@ def tupleTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(usin
       assert(res.color == Color.Red)
 
   test("large tuple in large tuple"):
-    assume(xa().databaseType != Oracle)
     xa().connect:
-      val tuple = sql"select 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
+      val q = if xa().databaseType == Oracle then sql"select 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 FROM DUAL"
+              else sql"select 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
+      val tuple = q
         .query[(Int, Int, (Int, Int, Int, Int, Int, Int), Int, Int, Int, Int)]
         .run()
       assert(tuple.nonEmpty)

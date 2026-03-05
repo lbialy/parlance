@@ -34,6 +34,8 @@ class SqliteTests extends FunSuite:
     DbCodec[String].biMap(LocalDateTime.parse, _.toString)
 
   sharedTests(this, xa)
+  sharedMutationTests(this, xa)
+  sharedPartialJoinTests(this, xa)
 
   lazy val sqliteDbPath = Files.createTempFile(null, ".db").toAbsolutePath
 

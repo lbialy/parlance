@@ -61,7 +61,7 @@ class TouchTests extends QbTestBase:
       import com.augustnagro.magnum.*
       @Table(SqlNameMapper.CamelToSnakeCase)
       case class NoUpdatedAt(@Id id: Long, name: String) derives EntityMeta
-      def test(using DbCon[?]): Unit =
+      def test(using DbCon[? <: SupportsMutations]): Unit =
         QueryBuilder.from[NoUpdatedAt].touch()
     """)
     assert(errors.nonEmpty, "Expected compilation error for entity without @updatedAt")

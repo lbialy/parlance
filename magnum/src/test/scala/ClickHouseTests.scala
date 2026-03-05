@@ -20,6 +20,47 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
 
   sharedTests(this, xa)
 
+  test("repo.update disallowed on ClickHouse"):
+    val errors = compileErrors("""
+      import com.augustnagro.magnum.*
+      @Table()
+      case class Item(@Id id: Long, name: String) derives EntityMeta
+      val repo = Repo[Item, Item, Long]()
+      def test(using DbCon[ClickHouse.type]): Unit =
+        repo.update(Item(1L, "x"))
+    """)
+    assert(
+      errors.contains("SupportsMutations"),
+      s"Expected SupportsMutations compile error but got: $errors"
+    )
+
+  test("entity.save() disallowed on ClickHouse"):
+    val errors = compileErrors("""
+      import com.augustnagro.magnum.*
+      @Table()
+      case class Item(@Id id: Long, name: String) derives EntityMeta
+      given repo: Repo[Item, Item, Long] = Repo[Item, Item, Long]()
+      def test(using DbCon[ClickHouse.type]): Unit =
+        Item(1L, "x").save()
+    """)
+    assert(
+      errors.contains("SupportsMutations"),
+      s"Expected SupportsMutations compile error but got: $errors"
+    )
+
+  test("qb.upsertByPk disallowed on ClickHouse"):
+    val errors = compileErrors("""
+      import com.augustnagro.magnum.*
+      @Table()
+      case class Item(@Id id: Long, name: String) derives EntityMeta
+      def test(using DbCon[ClickHouse.type]): Unit =
+        QueryBuilder.from[Item].upsertByPk(Item(1L, "x"))
+    """)
+    assert(
+      errors.contains("SupportsMutations"),
+      s"Expected SupportsMutations compile error but got: $errors"
+    )
+
   test("insertReturning disallowed when EC != E on ClickHouse"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*

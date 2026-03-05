@@ -73,10 +73,6 @@ def immutableRepoTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[
       assert(carRepo.findById(4L) == None)
 
   test("findAllByIds"):
-    assume(xa().databaseType != ClickHouse)
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != Oracle)
-    assume(xa().databaseType != SQLite)
     xa().connect:
       val ids = carRepo.findAllById(Vector(1L, 3L)).map(_.id)
       assert(ids == Vector(1L, 3L))

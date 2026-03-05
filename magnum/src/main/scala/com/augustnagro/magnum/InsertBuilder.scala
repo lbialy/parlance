@@ -60,7 +60,7 @@ class InsertBuilder[EC, E] @scala.annotation.publicInBinary private[magnum] (
             val rs = use(ps.getGeneratedKeys)
             eCodec.read(rs)
 
-  def insertOnConflict(ec: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon[?]): Unit =
+  def insertOnConflict(ec: EC, target: ConflictTarget, action: ConflictAction)(using con: DbCon[? <: SupportsMutations]): Unit =
     action match
       case ConflictAction.DoNothing =>
         val keyColNames = target match
@@ -93,7 +93,7 @@ class InsertBuilder[EC, E] @scala.annotation.publicInBinary private[magnum] (
             ecCodec.writeSingle(ec, ps)
             timed(ps.executeUpdate())
 
-  def insertOnConflictUpdateAll(ec: EC, target: ConflictTarget)(using con: DbCon[?]): Unit =
+  def insertOnConflictUpdateAll(ec: EC, target: ConflictTarget)(using con: DbCon[? <: SupportsMutations]): Unit =
     val keyColumns = target match
       case ConflictTarget.Columns(cols*) if cols.nonEmpty => cols.map(_.sqlName).mkString(", ")
       case _                                              => pkColName
@@ -103,7 +103,7 @@ class InsertBuilder[EC, E] @scala.annotation.publicInBinary private[magnum] (
         ecCodec.writeSingle(ec, ps)
         timed(ps.executeUpdate())
 
-  def insertAllIgnoring(ecs: Iterable[EC])(using con: DbCon[?]): Int =
+  def insertAllIgnoring(ecs: Iterable[EC])(using con: DbCon[? <: SupportsMutations]): Int =
     val ecCols = ecColNames.mkString(", ")
     val sql =
       s"INSERT INTO $tableName ($ecCols) SELECT ${ecCodec.queryRepr} WHERE NOT EXISTS (SELECT 1 FROM $tableName WHERE $pkColName = ?)"

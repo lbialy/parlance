@@ -20,6 +20,8 @@ class MySqlTests extends FunSuite, TestContainersFixtures:
     )
 
   sharedTests(this, xa)
+  sharedMutationTests(this, xa)
+  sharedPartialJoinTests(this, xa)
 
   val mySqlContainer = ForAllContainerFixture(
     MySQLContainer

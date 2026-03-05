@@ -6,7 +6,7 @@ import munit.FunSuite
 import java.time.OffsetDateTime
 import java.util.UUID
 
-def partialUpdateTests[D <: DatabaseType](
+def partialUpdateTests[D <: SupportsMutations](
     suite: FunSuite,
     xa: () => Transactor[D]
 )(using
@@ -30,7 +30,6 @@ def partialUpdateTests[D <: DatabaseType](
   val personRepo = Repo[Person, Person, Long]()
 
   test("updatePartial single field changed"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val current = original.copy(lastName = "UpdatedLastName")
@@ -41,7 +40,6 @@ def partialUpdateTests[D <: DatabaseType](
       assert(fetched.isAdmin == original.isAdmin)
 
   test("updatePartial multiple fields changed"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val current =
@@ -53,7 +51,6 @@ def partialUpdateTests[D <: DatabaseType](
       assert(fetched.lastName == original.lastName)
 
   test("updatePartial no-op when nothing changed"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       personRepo.updatePartial(original, original)
@@ -61,7 +58,6 @@ def partialUpdateTests[D <: DatabaseType](
       assert(fetched == original)
 
   test("updatePartial rejects different PKs"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val p1 = personRepo.findById(1L).get
       val p2 = personRepo.findById(2L).get
@@ -69,7 +65,6 @@ def partialUpdateTests[D <: DatabaseType](
         personRepo.updatePartial(p1, p2)
 
   test("updatePartial Option field None to Some"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val newSocialId = UUID.randomUUID()
@@ -79,7 +74,6 @@ def partialUpdateTests[D <: DatabaseType](
       assert(fetched.socialId == Some(newSocialId))
 
   test("updatePartial Option field Some to None"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val withSocial = original.copy(socialId = Some(UUID.randomUUID()))

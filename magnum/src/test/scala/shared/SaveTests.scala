@@ -6,7 +6,7 @@ import munit.FunSuite
 import java.time.OffsetDateTime
 import java.util.UUID
 
-def saveTests[D <: DatabaseType](
+def saveTests[D <: SupportsMutations](
     suite: FunSuite,
     xa: () => Transactor[D]
 )(using
@@ -30,7 +30,6 @@ def saveTests[D <: DatabaseType](
   val personRepo = Repo[Person, Person, Long]()
 
   test("save tracked entity - single field"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val modified = original.copy(lastName = "SavedLastName")
@@ -41,7 +40,6 @@ def saveTests[D <: DatabaseType](
       assert(fetched.isAdmin == original.isAdmin)
 
   test("save tracked entity - multiple fields"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       val modified =
@@ -53,7 +51,6 @@ def saveTests[D <: DatabaseType](
       assert(fetched.lastName == original.lastName)
 
   test("save no-op when unchanged"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       personRepo.save(original)
@@ -61,7 +58,6 @@ def saveTests[D <: DatabaseType](
       assert(fetched == original)
 
   test("save untracked entity - falls back to full update"):
-    assume(xa().databaseType != ClickHouse)
     val t = xa()
     // Get a snapshot of the entity from one connect block
     val person = t.connect:
@@ -75,7 +71,6 @@ def saveTests[D <: DatabaseType](
       assert(fetched.lastName == "UntrackedSave")
 
   test("findAll tracks all entities"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val all = personRepo.findAll
       val target = all.find(_.id == 1L).get
@@ -85,9 +80,6 @@ def saveTests[D <: DatabaseType](
       assert(fetched.lastName == "FindAllTracked")
 
   test("findAllById tracks entities"):
-    assume(xa().databaseType != ClickHouse)
-    assume(xa().databaseType != MySQL)
-    assume(xa().databaseType != SQLite)
     xa().connect:
       val people = personRepo.findAllById(Vector(1L, 2L))
       val target = people.find(_.id == 1L).get
@@ -97,7 +89,6 @@ def saveTests[D <: DatabaseType](
       assert(fetched.lastName == "FindAllByIdTracked")
 
   test("identity map first-load-wins"):
-    assume(xa().databaseType != ClickHouse)
     xa().connect:
       val original = personRepo.findById(1L).get
       // Update directly — bypasses identity map
@@ -115,7 +106,6 @@ def saveTests[D <: DatabaseType](
       assert(final_.lastName == "DirectUpdate")
 
   test("identity map scoped to connection block"):
-    assume(xa().databaseType != ClickHouse)
     val t = xa()
     // Load and modify in first block
     t.connect:
@@ -134,7 +124,6 @@ def saveTests[D <: DatabaseType](
       assert(fetched.lastName == "ScopedBlock2")
 
   test("transact + save works"):
-    assume(xa().databaseType != ClickHouse)
     xa().transact:
       val original = personRepo.findById(1L).get
       val modified = original.copy(lastName = "TransactSave")

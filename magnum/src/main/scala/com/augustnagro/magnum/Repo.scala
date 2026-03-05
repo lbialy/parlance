@@ -56,14 +56,14 @@ open class Repo[EC, E, ID](
   // --- DELETE methods ---
 
   /** Deletes an entity using its id */
-  def delete(entity: E)(using DbCon[?]): Unit =
+  def delete(entity: E)(using DbCon[? <: SupportsMutations]): Unit =
     deleteById(extractPk(entity).asInstanceOf[ID])
 
   /** Deletes an entity using its id */
-  def deleteById(id: ID)(using con: DbCon[?]): Unit =
+  def deleteById(id: ID)(using con: DbCon[? <: SupportsMutations]): Unit =
     deleteByIdCount(id)
 
-  private def deleteByIdCount(id: ID)(using con: DbCon[?]): Int =
+  private def deleteByIdCount(id: ID)(using con: DbCon[? <: SupportsMutations]): Int =
     if _collectRewriteDelete.nonEmpty then
       // Rewrite DELETE as UPDATE SET <rewriteDelete clauses>, <onUpdate clauses>
       val allSetClauses = _collectRewriteDelete ++ _collectOnUpdate
@@ -83,12 +83,12 @@ open class Repo[EC, E, ID](
       Frag(sql, whereParams, whereWriter).update.run()
 
   /** Deletes ALL entities */
-  def truncate()(using con: DbCon[?]): Unit =
+  def truncate()(using con: DbCon[? <: SupportsMutations]): Unit =
     val sql = con.databaseType.renderTruncate(meta.tableName)
     Frag(sql, Vector.empty, FragWriter.empty).update.run()
 
   /** Delete all provided entities */
-  def deleteAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
+  def deleteAll(entities: Iterable[E])(using DbCon[? <: SupportsMutations]): BatchUpdateResult =
     var count = 0L
     entities.foreach { e =>
       count += deleteByIdCount(extractPk(e).asInstanceOf[ID])
@@ -96,7 +96,7 @@ open class Repo[EC, E, ID](
     BatchUpdateResult.Success(count)
 
   /** Deletes all entities with an Iterable of ids */
-  def deleteAllById(ids: Iterable[ID])(using DbCon[?]): BatchUpdateResult =
+  def deleteAllById(ids: Iterable[ID])(using DbCon[? <: SupportsMutations]): BatchUpdateResult =
     var count = 0L
     ids.foreach { id =>
       count += deleteByIdCount(id)
@@ -128,7 +128,7 @@ open class Repo[EC, E, ID](
   // --- UPDATE methods ---
 
   /** Update the entity */
-  def update(entity: E)(using con: DbCon[?]): Unit =
+  def update(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val entityProduct = entity.asInstanceOf[Product]
     val columns = meta.columns
     val codecs = meta.elementCodecs
@@ -179,7 +179,7 @@ open class Repo[EC, E, ID](
   end update
 
   /** Update all entities */
-  def updateAll(entities: Iterable[E])(using DbCon[?]): BatchUpdateResult =
+  def updateAll(entities: Iterable[E])(using DbCon[? <: SupportsMutations]): BatchUpdateResult =
     var count = 0L
     entities.foreach { e =>
       update(e); count += 1
@@ -187,7 +187,7 @@ open class Repo[EC, E, ID](
     BatchUpdateResult.Success(count)
 
   /** Update only the changed fields between original and current entity */
-  def updatePartial(original: E, current: E)(using con: DbCon[?]): Unit =
+  def updatePartial(original: E, current: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val origProduct = original.asInstanceOf[Product]
     val currProduct = current.asInstanceOf[Product]
     val origId = origProduct.productElement(pkIndex)
@@ -243,7 +243,7 @@ open class Repo[EC, E, ID](
   end updatePartial
 
   /** Save entity: partial update if tracked, upsert otherwise. */
-  def save(entity: E)(using con: DbCon[?]): Unit =
+  def save(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val pkValue = extractPk(entity)
     con.getOriginal(meta.tableName, pkValue) match
       case Some(original) =>
@@ -252,7 +252,7 @@ open class Repo[EC, E, ID](
         upsertByPk(entity)
 
   /** Upsert by primary key. Hook-aware: appends onUpdate SET clauses and scope conditions. */
-  private def upsertByPk(entity: E)(using con: DbCon[?]): Unit =
+  private def upsertByPk(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val dbType = con.databaseType
     val columns = meta.columns
     val codecs = meta.elementCodecs
@@ -295,15 +295,15 @@ open class Repo[EC, E, ID](
   end upsertByPk
 
   /** Insert with conflict handling. */
-  def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[?]): Unit =
+  def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[? <: SupportsMutations]): Unit =
     ib.insertOnConflict(entityCreator, target, action)
 
   /** Insert with conflict handling, updating all EC columns on conflict. */
-  def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon[?]): Unit =
+  def insertOnConflictUpdateAll(entityCreator: EC, target: ConflictTarget)(using DbCon[? <: SupportsMutations]): Unit =
     ib.insertOnConflictUpdateAll(entityCreator, target)
 
   /** Bulk insert, skipping rows that conflict. Returns the number of rows actually inserted. */
-  def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon[?]): Int =
+  def insertAllIgnoring(entityCreators: Iterable[EC])(using DbCon[? <: SupportsMutations]): Int =
     ib.insertAllIgnoring(entityCreators)
 
   /** Find an existing entity matching the predicate, or insert a new one. */
@@ -317,7 +317,7 @@ open class Repo[EC, E, ID](
       result
 
   /** Find and update an existing entity, or insert a new one. */
-  def updateOrCreate[D <: DatabaseType](predicate: WhereFrag, creator: => EC, updater: E => E)(using
+  def updateOrCreate[D <: SupportsMutations](predicate: WhereFrag, creator: => EC, updater: E => E)(using
       con: DbTx[D],
       cr: CanReturn[EC, E, D]
   ): E =
@@ -335,7 +335,7 @@ open class Repo[EC, E, ID](
         result
 
   /** Touch an entity, setting its @updatedAt column to CURRENT_TIMESTAMP. */
-  def touch(entity: E)(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon[?]): Unit =
+  def touch(entity: E)(using hasUpdatedAt: HasUpdatedAt[E], con: DbCon[? <: SupportsMutations]): Unit =
     val id = extractPk(entity)
     val conditions = _collectConditions
     val pkSql = s"${entityMeta.primaryKey.sqlName} = ?"

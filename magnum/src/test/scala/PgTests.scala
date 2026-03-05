@@ -19,6 +19,10 @@ class PgTests extends FunSuite, TestContainersFixtures:
     )
 
   sharedTests(this, xa)
+  sharedMutationTests(this, xa)
+  sharedPartialJoinTests(this, xa)
+  sharedReturningMutationTests(this, xa)
+  sharedMultiColReturningTests(this, xa)
   entityCreatorReturningTests(this, xa)
 
   val pgContainer = ForAllContainerFixture(

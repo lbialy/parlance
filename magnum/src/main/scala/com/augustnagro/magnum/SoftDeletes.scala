@@ -48,11 +48,11 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
   // --- new methods: force delete, restore, inspection ---
 
   /** Hard-delete an entity (real DELETE FROM). */
-  def forceDelete(entity: E)(using DbCon[?]): Unit =
+  def forceDelete(entity: E)(using DbCon[? <: SupportsMutations]): Unit =
     forceDeleteById(extractId(entity))
 
   /** Hard-delete by id (real DELETE FROM). */
-  def forceDeleteById(id: ID)(using DbCon[?]): Unit =
+  def forceDeleteById(id: ID)(using DbCon[? <: SupportsMutations]): Unit =
     Frag(
       s"DELETE FROM $tbl WHERE $pkSql = ?",
       Seq(id),
@@ -60,11 +60,11 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
     ).update.run()
 
   /** Restore a soft-deleted entity by clearing the deleted-at column. */
-  def restore(entity: E)(using DbCon[?]): Unit =
+  def restore(entity: E)(using DbCon[? <: SupportsMutations]): Unit =
     restoreById(extractId(entity))
 
   /** Restore a soft-deleted entity by id. */
-  def restoreById(id: ID)(using DbCon[?]): Unit =
+  def restoreById(id: ID)(using DbCon[? <: SupportsMutations]): Unit =
     Frag(
       s"UPDATE $tbl SET $sdColSql = NULL WHERE $pkSql = ?",
       Seq(id),
