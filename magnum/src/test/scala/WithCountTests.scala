@@ -4,11 +4,6 @@ class WithCountTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-where-has.sql")
 
-  val authorBooks =
-    Relationship.hasMany[ElAuthor, ElBook](_.id, _.authorId)
-
-  val userRoles =
-    Relationship.belongsToMany[PvUser, PvRole]("pv_user_role", "user_id", "role_id")
 
   // --- HasMany tests ---
 
@@ -16,7 +11,7 @@ class WithCountTests extends QbTestBase:
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[ElAuthor].orderBy(_.name).withCount(authorBooks).run()
+        QueryBuilder.from[ElAuthor].orderBy(_.name).withCount(ElAuthor.books).run()
       assertEquals(results.size, 4)
       val byName = results.map((a, c) => (a.name, c)).toMap
       assertEquals(byName("Tolkien"), 2L)
@@ -30,7 +25,7 @@ class WithCountTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Tolkien")
-        .withCount(authorBooks)
+        .withCount(ElAuthor.books)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.name, "Tolkien")
@@ -42,7 +37,7 @@ class WithCountTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .orderBy(_.name)
-        .withCount(authorBooks)(_.title.like("The%"))
+        .withCount(ElAuthor.books)(_.title.like("The%"))
         .run()
       assertEquals(results.size, 4)
       val byName = results.map((a, c) => (a.name, c)).toMap
@@ -57,7 +52,7 @@ class WithCountTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Rowling")
-        .withCount(authorBooks)
+        .withCount(ElAuthor.books)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._2, 0L)
@@ -69,7 +64,7 @@ class WithCountTests extends QbTestBase:
         .from[ElAuthor]
         .orderBy(_.name)
         .limit(2)
-        .withCount(authorBooks)
+        .withCount(ElAuthor.books)
         .run()
       assertEquals(results.size, 2)
       assertEquals(results(0)._1.name, "Asimov")
@@ -81,7 +76,7 @@ class WithCountTests extends QbTestBase:
       val result = QueryBuilder
         .from[ElAuthor]
         .orderBy(_.name)
-        .withCount(authorBooks)
+        .withCount(ElAuthor.books)
         .first()
       assert(result.isDefined)
       assertEquals(result.get._1.name, "Asimov")
@@ -95,7 +90,7 @@ class WithCountTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .orderBy(_.name)
-        .withCount(userRoles)
+        .withCount(PvUser.roles)
         .run()
       assertEquals(results.size, 4)
       val byName = results.map((u, c) => (u.name, c)).toMap
@@ -110,7 +105,7 @@ class WithCountTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .orderBy(_.name)
-        .withCount(userRoles)(_.name === "admin")
+        .withCount(PvUser.roles)(_.name === "admin")
         .run()
       assertEquals(results.size, 4)
       val byName = results.map((u, c) => (u.name, c)).toMap
@@ -125,7 +120,7 @@ class WithCountTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .where(_.name === "Dave")
-        .withCount(userRoles)(_.name === "admin")
+        .withCount(PvUser.roles)(_.name === "admin")
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.name, "Dave")
@@ -137,7 +132,7 @@ class WithCountTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .where(_.name === "Charlie")
-        .withCount(userRoles)
+        .withCount(PvUser.roles)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._2, 0L)
@@ -147,7 +142,7 @@ class WithCountTests extends QbTestBase:
   test("SQL verification: HasMany contains correlated COUNT subquery"):
     val frag = QueryBuilder
       .from[ElAuthor]
-      .withCount(authorBooks)
+      .withCount(ElAuthor.books)
       .buildWith(H2)
     assert(
       frag.sqlString.contains("(SELECT COUNT(*)"),
@@ -161,7 +156,7 @@ class WithCountTests extends QbTestBase:
   test("SQL verification: BelongsToMany contains correlated COUNT subquery"):
     val frag = QueryBuilder
       .from[PvUser]
-      .withCount(userRoles)
+      .withCount(PvUser.roles)
       .buildWith(H2)
     assert(
       frag.sqlString.contains("(SELECT COUNT(*)"),
@@ -175,7 +170,7 @@ class WithCountTests extends QbTestBase:
   test("SQL verification: BelongsToMany with condition contains JOIN"):
     val frag = QueryBuilder
       .from[PvUser]
-      .withCount(userRoles)(_.name === "admin")
+      .withCount(PvUser.roles)(_.name === "admin")
       .buildWith(H2)
     assert(
       frag.sqlString.contains("JOIN pv_role"),
@@ -190,7 +185,7 @@ class WithCountTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Nobody")
-        .withCount(authorBooks)
+        .withCount(ElAuthor.books)
         .run()
       assertEquals(results, Vector.empty[(ElAuthor, Long)])
 

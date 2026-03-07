@@ -9,26 +9,26 @@ case class RepoItem(
     status: String,
     amount: Int
 ) derives EntityMeta
+object RepoItem:
+  val repo = Repo[RepoItem, RepoItem, Long]()
 
 class RepoQueryTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/repo-query.sql", "/h2/soft-delete.sql")
-
-  val itemRepo = Repo[RepoItem, RepoItem, Long]()
 
   // --- query basics ---
 
   test("repo.query.run() returns all entities"):
     val t = xa()
     t.connect:
-      val results = itemRepo.query.run()
+      val results = RepoItem.repo.query.run()
       assertEquals(results.length, 5)
       assertEquals(results.map(_.id).sorted, Vector(1L, 2L, 3L, 4L, 5L))
 
   test("repo.query.where(_.field === value).run() type-safe column access"):
     val t = xa()
     t.connect:
-      val results = itemRepo.query
+      val results = RepoItem.repo.query
         .where(_.status === "active")
         .run()
       assertEquals(results.length, 3)
@@ -37,13 +37,13 @@ class RepoQueryTests extends QbTestBase:
   test("repo.query.where(_.field === value).first() returns Option[E]"):
     val t = xa()
     t.connect:
-      val result = itemRepo.query
+      val result = RepoItem.repo.query
         .where(_.name === "Alpha")
         .first()
       assert(result.isDefined)
       assertEquals(result.get.id, 1L)
 
-      val missing = itemRepo.query
+      val missing = RepoItem.repo.query
         .where(_.name === "NonExistent")
         .first()
       assert(missing.isEmpty)
@@ -53,34 +53,34 @@ class RepoQueryTests extends QbTestBase:
   test("repo.find(id) returns Some for existing entity"):
     val t = xa()
     t.connect:
-      val result = itemRepo.find(1L)
+      val result = RepoItem.repo.find(1L)
       assert(result.isDefined)
       assertEquals(result.get.name, "Alpha")
 
   test("repo.find(id) returns None for missing entity"):
     val t = xa()
     t.connect:
-      val result = itemRepo.find(999L)
+      val result = RepoItem.repo.find(999L)
       assert(result.isEmpty)
 
   test("repo.findOrFail(id) returns entity for existing id"):
     val t = xa()
     t.connect:
-      val result = itemRepo.findOrFail(2L)
+      val result = RepoItem.repo.findOrFail(2L)
       assertEquals(result.name, "Beta")
 
   test("repo.findOrFail(id) throws for missing id"):
     val t = xa()
     t.connect:
       intercept[QueryBuilderException]:
-        itemRepo.findOrFail(999L)
+        RepoItem.repo.findOrFail(999L)
 
   // --- queryUnscoped ---
 
   test("repo.queryUnscoped.run() returns all entities"):
     val t = xa()
     t.connect:
-      val results = itemRepo.queryUnscoped.run()
+      val results = RepoItem.repo.queryUnscoped.run()
       assertEquals(results.length, 5)
 
   // --- scoped repo ---
@@ -150,12 +150,12 @@ class RepoQueryTests extends QbTestBase:
   test("repo.refresh re-fetches entity from DB"):
     val t = xa()
     t.transact:
-      val original = itemRepo.findOrFail(1L)
+      val original = RepoItem.repo.findOrFail(1L)
       assertEquals(original.name, "Alpha")
 
       sql"UPDATE repo_item SET name = 'AlphaUpdated' WHERE id = 1".update.run()
 
-      val refreshed = itemRepo.refresh(original)
+      val refreshed = RepoItem.repo.refresh(original)
       assertEquals(refreshed.name, "AlphaUpdated")
 
       // Restore original state
@@ -164,12 +164,12 @@ class RepoQueryTests extends QbTestBase:
   test("repo.refresh throws for deleted entity"):
     val t = xa()
     t.transact:
-      val entity = itemRepo.findOrFail(1L)
+      val entity = RepoItem.repo.findOrFail(1L)
 
       sql"DELETE FROM repo_item WHERE id = 1".update.run()
 
       intercept[QueryBuilderException]:
-        itemRepo.refresh(entity)
+        RepoItem.repo.refresh(entity)
 
       // Restore
       sql"INSERT INTO repo_item VALUES (1, 'Alpha', 'active', 10)".update.run()

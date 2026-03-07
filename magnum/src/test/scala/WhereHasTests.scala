@@ -5,22 +5,26 @@ case class ClPerson(@Id id: Long, name: String) derives EntityMeta
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ClTrip(@Id id: Long, destination: String) derives EntityMeta
+object ClTrip:
+  val owners =
+    Relationship.belongsToMany[ClTrip, ClPerson]("cl_trip_owner", "trip_id", "person_id")
+  val users =
+    Relationship.belongsToMany[ClTrip, ClPerson]("cl_trip_user", "trip_id", "person_id")
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ClChecklist(@Id id: Long, tripId: Long, title: String) derives EntityMeta
+object ClChecklist:
+  val trip = Relationship.belongsTo[ClChecklist, ClTrip](_.tripId, _.id)
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ClChecklistItem(@Id id: Long, checklistId: Long, formId: Long, description: String) derives EntityMeta
+object ClChecklistItem:
+  val checklist = Relationship.belongsTo[ClChecklistItem, ClChecklist](_.checklistId, _.id)
 
 class WhereHasTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-where-has.sql")
 
-  val authorBooks =
-    Relationship.hasMany[ElAuthor, ElBook](_.id, _.authorId)
-
-  val userRoles =
-    Relationship.belongsToMany[PvUser, PvRole]("pv_user_role", "user_id", "role_id")
 
   // --- Relationship (HasMany) tests ---
 
@@ -28,7 +32,7 @@ class WhereHasTests extends QbTestBase:
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[ElAuthor].whereHas(authorBooks).orderBy(_.name).run()
+        QueryBuilder.from[ElAuthor].whereHas(ElAuthor.books).orderBy(_.name).run()
       assertEquals(results.size, 3)
       assertEquals(results.map(_.name), Vector("Asimov", "Herbert", "Tolkien"))
 
@@ -36,7 +40,7 @@ class WhereHasTests extends QbTestBase:
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[ElAuthor].doesntHave(authorBooks).run()
+        QueryBuilder.from[ElAuthor].doesntHave(ElAuthor.books).run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Rowling")
 
@@ -45,7 +49,7 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(_.title === "Dune")
+        .whereHas(ElAuthor.books)(_.title === "Dune")
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Herbert")
@@ -55,7 +59,7 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(_.title.like("The%"))
+        .whereHas(ElAuthor.books)(_.title.like("The%"))
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Tolkien")
@@ -66,7 +70,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Tolkien")
-        .whereHas(authorBooks)
+        .whereHas(ElAuthor.books)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Tolkien")
@@ -76,7 +80,7 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)
+        .whereHas(ElAuthor.books)
         .orderBy(_.name)
         .limit(2)
         .run()
@@ -87,7 +91,7 @@ class WhereHasTests extends QbTestBase:
   test("SQL verification: contains EXISTS subquery"):
     val frag = QueryBuilder
       .from[ElAuthor]
-      .whereHas(authorBooks)
+      .whereHas(ElAuthor.books)
       .buildWith(H2)
     assert(
       frag.sqlString.contains("EXISTS (SELECT 1 FROM"),
@@ -105,7 +109,7 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[PvUser]
-        .whereHas(userRoles)
+        .whereHas(PvUser.roles)
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 3)
@@ -116,7 +120,7 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[PvUser]
-        .doesntHave(userRoles)
+        .doesntHave(PvUser.roles)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Charlie")
@@ -126,7 +130,7 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[PvUser]
-        .whereHas(userRoles)(_.name === "admin")
+        .whereHas(PvUser.roles)(_.name === "admin")
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -137,7 +141,7 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[PvUser]
-        .doesntHave(userRoles)
+        .doesntHave(PvUser.roles)
         .where(_.name === "Charlie")
         .run()
       assertEquals(results.size, 1)
@@ -151,7 +155,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Rowling")
-        .orWhereHas(authorBooks)
+        .orWhereHas(ElAuthor.books)
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 4)
@@ -163,7 +167,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Rowling")
-        .orWhereHas(authorBooks)(_.title === "Dune")
+        .orWhereHas(ElAuthor.books)(_.title === "Dune")
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -175,7 +179,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .where(_.name === "Charlie")
-        .orWhereHas(userRoles)
+        .orWhereHas(PvUser.roles)
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 4)
@@ -187,7 +191,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .where(_.name === "Charlie")
-        .orWhereHas(userRoles)(_.name === "admin")
+        .orWhereHas(PvUser.roles)(_.name === "admin")
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 3)
@@ -199,7 +203,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Tolkien")
-        .orDoesntHave(authorBooks)
+        .orDoesntHave(ElAuthor.books)
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -211,7 +215,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .where(_.name === "Alice")
-        .orDoesntHave(userRoles)
+        .orDoesntHave(PvUser.roles)
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -221,7 +225,7 @@ class WhereHasTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .where(_.name === "Rowling")
-      .orWhereHas(authorBooks)
+      .orWhereHas(ElAuthor.books)
       .buildWith(H2)
     assert(
       frag.sqlString.contains("OR EXISTS (SELECT 1 FROM"),
@@ -234,8 +238,8 @@ class WhereHasTests extends QbTestBase:
       // authors who have books with title "Dune" OR have books with title starting "The"
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(_.title === "Dune")
-        .orWhereHas(authorBooks)(_.title.like("The%"))
+        .whereHas(ElAuthor.books)(_.title === "Dune")
+        .orWhereHas(ElAuthor.books)(_.title.like("The%"))
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -249,7 +253,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Nobody")
-        .whereHas(authorBooks)
+        .whereHas(ElAuthor.books)
         .run()
       assertEquals(results, Vector.empty[ElAuthor])
 
@@ -258,20 +262,17 @@ class WhereHasTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)
-        .doesntHave(authorBooks)
+        .whereHas(ElAuthor.books)
+        .doesntHave(ElAuthor.books)
         .run()
       assertEquals(results, Vector.empty[ElAuthor])
 
   // --- Nested EXISTS tests ---
 
-  val bookReviews =
-    Relationship.hasMany[ElBook, ElReview](_.id, _.bookId)
-
   test("SQL verification: nested EXISTS"):
     val frag = QueryBuilder
       .from[ElAuthor]
-      .whereHas(authorBooks)(_.whereHas(bookReviews)(_.score >= 4))
+      .whereHas(ElAuthor.books)(_.whereHas(ElBook.reviews)(_.score >= 4))
       .buildWith(H2)
     assert(
       frag.sqlString.contains("EXISTS (SELECT 1 FROM el_book"),
@@ -290,7 +291,7 @@ class WhereHasTests extends QbTestBase:
       // The Silmarillion has score 3, so still Tolkien qualifies via The Hobbit
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(_.whereHas(bookReviews)(_.score >= 4))
+        .whereHas(ElAuthor.books)(_.whereHas(ElBook.reviews)(_.score >= 4))
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 3)
@@ -303,7 +304,7 @@ class WhereHasTests extends QbTestBase:
       // Tolkien: The Hobbit(5), Herbert: Dune(5)
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(_.whereHas(bookReviews)(_.score >= 5))
+        .whereHas(ElAuthor.books)(_.whereHas(ElBook.reviews)(_.score >= 5))
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -317,7 +318,7 @@ class WhereHasTests extends QbTestBase:
       // The Silmarillion has score 3 -> doesn't qualify
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(sq => sq.title.like("The%") && sq.whereHas(bookReviews)(_.score >= 4))
+        .whereHas(ElAuthor.books)(sq => sq.title.like("The%") && sq.whereHas(ElBook.reviews)(_.score >= 4))
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 1)
@@ -330,7 +331,7 @@ class WhereHasTests extends QbTestBase:
       // Herbert: Dune (also score 5), Tolkien: The Hobbit score 5
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(sq => (sq.title === "Dune") || sq.whereHas(bookReviews)(_.score >= 5))
+        .whereHas(ElAuthor.books)(sq => (sq.title === "Dune") || sq.whereHas(ElBook.reviews)(_.score >= 5))
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -343,7 +344,7 @@ class WhereHasTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Tolkien")
-        .whereHas(authorBooks)(_.whereHas(bookReviews)(_.body === "Great"))
+        .whereHas(ElAuthor.books)(_.whereHas(ElBook.reviews)(_.body === "Great"))
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Tolkien")
@@ -357,18 +358,6 @@ class WhereHasTests extends QbTestBase:
   //           $q->whereHas('owners', fn($q) => $q->where('id', $user->id))
   //             ->orWhereHas('users', fn($q) => $q->where('id', $user->id)))))
   //     ->exists();
-
-  val itemChecklist =
-    Relationship.belongsTo[ClChecklistItem, ClChecklist](_.checklistId, _.id)
-
-  val checklistTrip =
-    Relationship.belongsTo[ClChecklist, ClTrip](_.tripId, _.id)
-
-  val tripOwners =
-    Relationship.belongsToMany[ClTrip, ClPerson]("cl_trip_owner", "trip_id", "person_id")
-
-  val tripUsers =
-    Relationship.belongsToMany[ClTrip, ClPerson]("cl_trip_user", "trip_id", "person_id")
 
   test("Eloquent pattern: checklist items accessible by user as owner OR user"):
     val t = xa()
@@ -385,8 +374,8 @@ class WhereHasTests extends QbTestBase:
         QueryBuilder
           .from[ClChecklistItem]
           .where(_.formId === formId)
-          .whereHas(itemChecklist)(sq =>
-            sq.whereHas(checklistTrip)(sq2 => sq2.whereHas(tripOwners)(_.id === userId) || sq2.whereHas(tripUsers)(_.id === userId))
+          .whereHas(ClChecklistItem.checklist)(sq =>
+            sq.whereHas(ClChecklist.trip)(sq2 => sq2.whereHas(ClTrip.owners)(_.id === userId) || sq2.whereHas(ClTrip.users)(_.id === userId))
           )
           .exists()
 
@@ -410,9 +399,9 @@ class WhereHasTests extends QbTestBase:
       val hasAccess = QueryBuilder
         .from[ClChecklistItem]
         .where(_.formId === formId)
-        .whereHas(itemChecklist)(sq =>
-          sq.whereHas(checklistTrip)(sq2 =>
-            sq2.whereHas(tripOwners)(_.id === nonExistentUserId) || sq2.whereHas(tripUsers)(_.id === nonExistentUserId)
+        .whereHas(ClChecklistItem.checklist)(sq =>
+          sq.whereHas(ClChecklist.trip)(sq2 =>
+            sq2.whereHas(ClTrip.owners)(_.id === nonExistentUserId) || sq2.whereHas(ClTrip.users)(_.id === nonExistentUserId)
           )
         )
         .exists()
@@ -427,8 +416,8 @@ class WhereHasTests extends QbTestBase:
       val hasAccess = QueryBuilder
         .from[ClChecklistItem]
         .where(_.formId === nonExistentFormId)
-        .whereHas(itemChecklist)(sq =>
-          sq.whereHas(checklistTrip)(sq2 => sq2.whereHas(tripOwners)(_.id === 1L) || sq2.whereHas(tripUsers)(_.id === 1L))
+        .whereHas(ClChecklistItem.checklist)(sq =>
+          sq.whereHas(ClChecklist.trip)(sq2 => sq2.whereHas(ClTrip.owners)(_.id === 1L) || sq2.whereHas(ClTrip.users)(_.id === 1L))
         )
         .exists()
 
@@ -441,8 +430,8 @@ class WhereHasTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ClChecklistItem]
       .where(_.formId === formId)
-      .whereHas(itemChecklist)(sq =>
-        sq.whereHas(checklistTrip)(sq2 => sq2.whereHas(tripOwners)(_.id === userId) || sq2.whereHas(tripUsers)(_.id === userId))
+      .whereHas(ClChecklistItem.checklist)(sq =>
+        sq.whereHas(ClChecklist.trip)(sq2 => sq2.whereHas(ClTrip.owners)(_.id === userId) || sq2.whereHas(ClTrip.users)(_.id === userId))
       )
       .buildWith(H2)
 

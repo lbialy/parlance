@@ -5,17 +5,17 @@ case class JnAuthor(@Id id: Long, name: String) derives EntityMeta
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class JnBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
+object JnBook:
+  val author = Relationship.belongsTo[JnBook, JnAuthor](_.authorId, _.id)
 
 class JoinedQueryTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-join.sql")
 
-  val bookAuthor = Relationship.belongsTo[JnBook, JnAuthor](_.authorId, _.id)
-
   test("join returns all tuples"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder.from[JnBook].join(bookAuthor).run()
+      val results = QueryBuilder.from[JnBook].join(JnBook.author).run()
       assertEquals(results.size, 5)
       val dune = results.find(_._1.title == "Dune")
       assert(dune.isDefined)
@@ -26,7 +26,7 @@ class JoinedQueryTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .where(sql"title = ${"Dune"}".unsafeAsWhere)
         .run()
       assertEquals(results.size, 1)
@@ -38,7 +38,7 @@ class JoinedQueryTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .orderBy(Col("title", "title"), SortOrder.Asc)
         .limit(2)
         .run()
@@ -49,7 +49,7 @@ class JoinedQueryTests extends QbTestBase:
   test("build produces correct SQL"):
     val frag = QueryBuilder
       .from[JnBook]
-      .join(bookAuthor)
+      .join(JnBook.author)
       .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.matches(".*\\bt0\\.\\w+.*"), s"Expected t0.<col> alias in: $sql")
@@ -63,7 +63,7 @@ class JoinedQueryTests extends QbTestBase:
   test("count with join"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[JnBook].join(bookAuthor).count()
+      val result = QueryBuilder.from[JnBook].join(JnBook.author).count()
       assertEquals(result, 5L)
 
   test("count with join + where"):
@@ -71,7 +71,7 @@ class JoinedQueryTests extends QbTestBase:
     t.connect:
       val result = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .where(sql"name = ${"Tolkien"}".unsafeAsWhere)
         .count()
       assertEquals(result, 2L)
@@ -79,11 +79,11 @@ class JoinedQueryTests extends QbTestBase:
   test("exists with join"):
     val t = xa()
     t.connect:
-      assert(QueryBuilder.from[JnBook].join(bookAuthor).exists())
+      assert(QueryBuilder.from[JnBook].join(JnBook.author).exists())
       assert(
         !QueryBuilder
           .from[JnBook]
-          .join(bookAuthor)
+          .join(JnBook.author)
           .where(sql"name = ${"Nobody"}".unsafeAsWhere)
           .exists()
       )
@@ -93,7 +93,7 @@ class JoinedQueryTests extends QbTestBase:
     t.connect:
       val (book, author) = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .where(sql"title = ${"Foundation"}".unsafeAsWhere)
         .firstOrFail()
       assertEquals(book.title, "Foundation")
@@ -104,7 +104,7 @@ class JoinedQueryTests extends QbTestBase:
   test("whereJoined with typed operator"):
     val t = xa()
     t.connect:
-      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val qb = QueryBuilder.from[JnBook].join(JnBook.author)
       val results = qb.where(qb.of[JnAuthor].name === "Tolkien").run()
       assertEquals(results.size, 2)
       assert(results.forall(_._2.name == "Tolkien"))
@@ -112,7 +112,7 @@ class JoinedQueryTests extends QbTestBase:
   test("whereRoot with typed operator"):
     val t = xa()
     t.connect:
-      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val qb = QueryBuilder.from[JnBook].join(JnBook.author)
       val results = qb.where(qb.of[JnBook].title === "Dune").run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "Dune")
@@ -121,7 +121,7 @@ class JoinedQueryTests extends QbTestBase:
   test("combined root + joined where"):
     val t = xa()
     t.connect:
-      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val qb = QueryBuilder.from[JnBook].join(JnBook.author)
       val results = qb
         .where(qb.of[JnAuthor].name === "Tolkien")
         .where(qb.of[JnBook].title === "The Hobbit")
@@ -132,7 +132,7 @@ class JoinedQueryTests extends QbTestBase:
   test("ambiguous column with qualification"):
     val t = xa()
     t.connect:
-      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val qb = QueryBuilder.from[JnBook].join(JnBook.author)
       val results = qb.where(qb.of[JnBook].id === 5L).run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "Dune")
@@ -144,7 +144,7 @@ class JoinedQueryTests extends QbTestBase:
   test("orderBy with BoundCol"):
     val t = xa()
     t.connect:
-      val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+      val qb = QueryBuilder.from[JnBook].join(JnBook.author)
       val results = qb.orderBy(qb.of[JnAuthor].name).run()
       // Asimov < Herbert < Tolkien
       assertEquals(results(0)._2.name, "Asimov")
@@ -154,7 +154,7 @@ class JoinedQueryTests extends QbTestBase:
       assertEquals(results(4)._2.name, "Tolkien")
 
   test("build SQL shows qualified WHERE columns"):
-    val qb = QueryBuilder.from[JnBook].join(bookAuthor)
+    val qb = QueryBuilder.from[JnBook].join(JnBook.author)
     val frag = qb
       .where(qb.of[JnBook].title === "Dune")
       .where(qb.of[JnAuthor].name === "Tolkien")

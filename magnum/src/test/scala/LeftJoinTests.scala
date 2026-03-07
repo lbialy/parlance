@@ -5,21 +5,22 @@ case class LjCountry(@Id id: Long, name: String) derives EntityMeta
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class LjAuthor(@Id id: Long, name: String, countryId: Option[Long]) derives EntityMeta
+object LjAuthor:
+  val country = Relationship.belongsTo[LjAuthor, LjCountry](_.countryId, _.id)
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class LjBook(@Id id: Long, authorId: Option[Long], title: String) derives EntityMeta
+object LjBook:
+  val author = Relationship.belongsTo[LjBook, LjAuthor](_.authorId, _.id)
 
 class LeftJoinTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-left-join.sql")
 
-  val bookAuthor = Relationship.belongsTo[LjBook, LjAuthor](_.authorId, _.id)
-  val authorCountry = Relationship.belongsTo[LjAuthor, LjCountry](_.countryId, _.id)
-
   test("leftJoin returns all books with Option[Author]"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder.from[LjBook].leftJoin(bookAuthor).run()
+      val results = QueryBuilder.from[LjBook].leftJoin(LjBook.author).run()
       assertEquals(results.size, 3)
       val hobbit = results.find(_._1.title == "The Hobbit")
       assert(hobbit.isDefined)
@@ -33,7 +34,7 @@ class LeftJoinTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[LjBook]
-        .leftJoin(bookAuthor)
+        .leftJoin(LjBook.author)
         .where(sql"title = ${"Anonymous Tales"}".unsafeAsWhere)
         .run()
       assertEquals(results.size, 1)
@@ -43,7 +44,7 @@ class LeftJoinTests extends QbTestBase:
   test("leftJoin with ofLeft WHERE on joined table"):
     val t = xa()
     t.connect:
-      val qb = QueryBuilder.from[LjBook].leftJoin(bookAuthor)
+      val qb = QueryBuilder.from[LjBook].leftJoin(LjBook.author)
       val results = qb.where(qb.ofLeft[LjAuthor].name === "Tolkien").run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "The Hobbit")
@@ -52,13 +53,13 @@ class LeftJoinTests extends QbTestBase:
   test("leftJoin count includes all root rows"):
     val t = xa()
     t.connect:
-      val result = QueryBuilder.from[LjBook].leftJoin(bookAuthor).count()
+      val result = QueryBuilder.from[LjBook].leftJoin(LjBook.author).count()
       assertEquals(result, 3L)
 
   test("leftJoin first returns correct Option"):
     val t = xa()
     t.connect:
-      val qb = QueryBuilder.from[LjBook].leftJoin(bookAuthor)
+      val qb = QueryBuilder.from[LjBook].leftJoin(LjBook.author)
       val result = qb.where(sql"title = ${"Foundation"}".unsafeAsWhere).first()
       assert(result.isDefined)
       assertEquals(result.get._2, Some(LjAuthor(2, "Asimov", Some(2L))))
@@ -66,7 +67,7 @@ class LeftJoinTests extends QbTestBase:
   test("build SQL contains LEFT JOIN"):
     val frag = QueryBuilder
       .from[LjBook]
-      .leftJoin(bookAuthor)
+      .leftJoin(LjBook.author)
       .buildWith(H2)
     val sql = frag.sqlString
     assert(sql.contains("LEFT JOIN"), s"Expected LEFT JOIN in: $sql")
@@ -77,8 +78,8 @@ class LeftJoinTests extends QbTestBase:
     t.connect:
       // Book INNER JOIN Author LEFT JOIN Country
       // Tolkien has country UK, Asimov has country USA, Lonely has no country
-      // But since inner join on bookAuthor, only matched books come through
-      val qb = QueryBuilder.from[LjBook].join(bookAuthor).leftJoin(authorCountry)
+      // But since inner join on LjBook.author, only matched books come through
+      val qb = QueryBuilder.from[LjBook].join(LjBook.author).leftJoin(LjAuthor.country)
       val results = qb.run()
       // Only books with authors (inner join filters Anonymous Tales)
       assertEquals(results.size, 2)
@@ -91,7 +92,7 @@ class LeftJoinTests extends QbTestBase:
     val t = xa()
     t.connect:
       // Query books where author doesn't match — all get None
-      val qb = QueryBuilder.from[LjBook].leftJoin(bookAuthor)
+      val qb = QueryBuilder.from[LjBook].leftJoin(LjBook.author)
       val results = qb.where(qb.ofLeft[LjAuthor].name === "Nobody").run()
       assertEquals(results.size, 0)
 

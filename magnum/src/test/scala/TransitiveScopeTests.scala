@@ -18,13 +18,6 @@ class TransitiveScopeTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-where-has.sql")
 
-  // --- Relationships ---
-
-  val authorBooks =
-    Relationship.hasMany[ElAuthor, ElBook](_.id, _.authorId)
-
-  val userRoles =
-    Relationship.belongsToMany[PvUser, PvRole]("pv_user_role", "user_id", "role_id")
 
   // --- Scoped book repo that excludes book id=4 ("I, Robot") ---
 
@@ -52,7 +45,7 @@ class TransitiveScopeTests extends QbTestBase:
       // Without scope: Tolkien(2), Asimov(2), Herbert(1) have books → 3 authors
       // With scope excluding "I, Robot": Asimov now has only "Foundation" → still 3 authors
       val results =
-        QueryBuilder.from[ElAuthor].whereHas(authorBooks).orderBy(_.name).run()
+        QueryBuilder.from[ElAuthor].whereHas(ElAuthor.books).orderBy(_.name).run()
       assertEquals(results.size, 3)
       assertEquals(results.map(_.name), Vector("Asimov", "Herbert", "Tolkien"))
 
@@ -62,7 +55,7 @@ class TransitiveScopeTests extends QbTestBase:
       // Looking for authors with books titled "I, Robot" — but scope excludes it
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(_.title === "I, Robot")
+        .whereHas(ElAuthor.books)(_.title === "I, Robot")
         .run()
       assertEquals(results.size, 0)
 
@@ -72,7 +65,7 @@ class TransitiveScopeTests extends QbTestBase:
       // "Foundation" (id=3) is not excluded by scope
       val results = QueryBuilder
         .from[ElAuthor]
-        .whereHas(authorBooks)(_.title === "Foundation")
+        .whereHas(ElAuthor.books)(_.title === "Foundation")
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Asimov")
@@ -86,7 +79,7 @@ class TransitiveScopeTests extends QbTestBase:
       // With scope excluding "I, Robot": Rowling still has no books → 1 author
       // (Asimov still has Foundation, so he's not included)
       val results =
-        QueryBuilder.from[ElAuthor].doesntHave(authorBooks).run()
+        QueryBuilder.from[ElAuthor].doesntHave(ElAuthor.books).run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Rowling")
 
@@ -99,7 +92,7 @@ class TransitiveScopeTests extends QbTestBase:
       // With admin-only scope: Alice(admin), Dave(admin) → 2 users
       val results = QueryBuilder
         .from[PvUser]
-        .whereHas(userRoles)
+        .whereHas(PvUser.roles)
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -111,7 +104,7 @@ class TransitiveScopeTests extends QbTestBase:
       // With admin-only scope: Bob and Charlie don't have admin role
       val results = QueryBuilder
         .from[PvUser]
-        .doesntHave(userRoles)
+        .doesntHave(PvUser.roles)
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 2)
@@ -125,7 +118,7 @@ class TransitiveScopeTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .orderBy(_.name)
-        .withRelated(authorBooks)
+        .withRelated(ElAuthor.books)
         .run()
       assertEquals(results.size, 4)
       // Asimov: only "Foundation" (not "I, Robot")
@@ -144,7 +137,7 @@ class TransitiveScopeTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .orderBy(_.name)
-        .withRelated(userRoles)
+        .withRelated(PvUser.roles)
         .run()
       assertEquals(results.size, 4)
       // Alice: only admin (not editor)
@@ -166,7 +159,7 @@ class TransitiveScopeTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .orderBy(_.name)
-        .withCount(authorBooks)
+        .withCount(ElAuthor.books)
         .run()
       assertEquals(results.size, 4)
       val byName = results.map((a, c) => (a.name, c)).toMap
@@ -181,7 +174,7 @@ class TransitiveScopeTests extends QbTestBase:
       val results = QueryBuilder
         .from[PvUser]
         .orderBy(_.name)
-        .withCount(userRoles)
+        .withCount(PvUser.roles)
         .run()
       assertEquals(results.size, 4)
       val byName = results.map((u, c) => (u.name, c)).toMap
@@ -199,7 +192,7 @@ class TransitiveScopeTests extends QbTestBase:
       // asking for authors with >= 2 books: only Tolkien
       val results = QueryBuilder
         .from[ElAuthor]
-        .has(authorBooks)(_ >= 2)
+        .has(ElAuthor.books)(_ >= 2)
         .orderBy(_.name)
         .run()
       assertEquals(results.size, 1)
@@ -212,7 +205,7 @@ class TransitiveScopeTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[ElAuthor]
-        .join(authorBooks)
+        .join(ElAuthor.books)
         .run()
       // Without scope: 5 rows (Tolkien×2, Asimov×2, Herbert×1)
       // With scope: 4 rows (Tolkien×2, Asimov×1, Herbert×1) — "I, Robot" excluded
@@ -226,7 +219,7 @@ class TransitiveScopeTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[ElAuthor]
-        .leftJoin(authorBooks)
+        .leftJoin(ElAuthor.books)
         .run()
       // 5 rows: Tolkien×2, Asimov×1 (Foundation only), Herbert×1, Rowling×1 (None)
       assertEquals(results.size, 5)
@@ -239,7 +232,7 @@ class TransitiveScopeTests extends QbTestBase:
   test("SQL verification: whereHas with scope includes scope condition in EXISTS"):
     val frag = QueryBuilder
       .from[ElAuthor]
-      .whereHas(authorBooks)
+      .whereHas(ElAuthor.books)
       .buildWith(H2)
     assert(
       frag.sqlString.contains("el_book.id <> 4"),
@@ -249,7 +242,7 @@ class TransitiveScopeTests extends QbTestBase:
   test("SQL verification: withCount with scope includes scope condition"):
     val frag = QueryBuilder
       .from[ElAuthor]
-      .withCount(authorBooks)
+      .withCount(ElAuthor.books)
       .buildWith(H2)
     val sql = frag.sqlString
     assert(

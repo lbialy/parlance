@@ -2,9 +2,13 @@ import com.augustnagro.magnum.*
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ElAuthor(@Id id: Long, name: String) derives EntityMeta
+object ElAuthor:
+  val books = Relationship.hasMany[ElAuthor, ElBook](_.id, _.authorId)
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ElBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
+object ElBook:
+  val reviews = Relationship.hasMany[ElBook, ElReview](_.id, _.bookId)
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ElReview(@Id id: Long, bookId: Long, score: Int, body: String) derives EntityMeta
@@ -13,17 +17,11 @@ class EagerLoadTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-eager-load.sql")
 
-  val authorBooks =
-    Relationship.hasMany[ElAuthor, ElBook](_.id, _.authorId)
-
-  val bookReviews =
-    Relationship.hasMany[ElBook, ElReview](_.id, _.bookId)
-
   test("basic eager load returns all authors with books"):
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[ElAuthor].withRelated(authorBooks).run()
+        QueryBuilder.from[ElAuthor].withRelated(ElAuthor.books).run()
       assertEquals(results.size, 4)
       val tolkien = results.find(_._1.name == "Tolkien").get
       assertEquals(tolkien._2.size, 2)
@@ -37,7 +35,7 @@ class EagerLoadTests extends QbTestBase:
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[ElAuthor].withRelated(authorBooks).run()
+        QueryBuilder.from[ElAuthor].withRelated(ElAuthor.books).run()
       val rowling = results.find(_._1.name == "Rowling").get
       assertEquals(rowling._2, Vector.empty[ElBook])
 
@@ -45,7 +43,7 @@ class EagerLoadTests extends QbTestBase:
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[ElAuthor].withRelated(authorBooks).run()
+        QueryBuilder.from[ElAuthor].withRelated(ElAuthor.books).run()
       val tolkien = results.find(_._1.name == "Tolkien").get
       val titles = tolkien._2.map(_.title).toSet
       assertEquals(titles, Set("The Hobbit", "The Silmarillion"))
@@ -59,7 +57,7 @@ class EagerLoadTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Tolkien")
-        .withRelated(authorBooks)
+        .withRelated(ElAuthor.books)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.name, "Tolkien")
@@ -71,7 +69,7 @@ class EagerLoadTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Nobody")
-        .withRelated(authorBooks)
+        .withRelated(ElAuthor.books)
         .run()
       assertEquals(results, Vector.empty)
 
@@ -81,7 +79,7 @@ class EagerLoadTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .orderBy(_.name)
-        .withRelated(authorBooks)
+        .withRelated(ElAuthor.books)
         .run()
       assertEquals(results.size, 4)
       assertEquals(results(0)._1.name, "Asimov")
@@ -96,7 +94,7 @@ class EagerLoadTests extends QbTestBase:
         .from[ElAuthor]
         .orderBy(_.name)
         .limit(2)
-        .withRelated(authorBooks)
+        .withRelated(ElAuthor.books)
         .run()
       assertEquals(results.size, 2)
       assertEquals(results(0)._1.name, "Asimov")
@@ -110,7 +108,7 @@ class EagerLoadTests extends QbTestBase:
       val result = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Herbert")
-        .withRelated(authorBooks)
+        .withRelated(ElAuthor.books)
         .first()
       assert(result.isDefined)
       val (author, books) = result.get
@@ -140,7 +138,7 @@ class EagerLoadTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Tolkien")
-        .withRelated(authorBooks)(_.title === "The Hobbit")
+        .withRelated(ElAuthor.books)(_.title === "The Hobbit")
         .run()
       assertEquals(results.size, 1)
       val (author, books) = results.head
@@ -154,7 +152,7 @@ class EagerLoadTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElAuthor]
         .where(_.name === "Tolkien")
-        .withRelated(authorBooks)(_.title === "Nonexistent")
+        .withRelated(ElAuthor.books)(_.title === "Nonexistent")
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._2, Vector.empty[ElBook])
@@ -164,7 +162,7 @@ class EagerLoadTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[ElAuthor]
-        .withRelated(authorBooks)(_.title like "The%")
+        .withRelated(ElAuthor.books)(_.title like "The%")
         .run()
       assertEquals(results.size, 4)
       val tolkien = results.find(_._1.name == "Tolkien").get
@@ -182,7 +180,7 @@ class EagerLoadTests extends QbTestBase:
       val results = QueryBuilder
         .from[ElBook]
         .where(_.title === "The Hobbit")
-        .withRelated(bookReviews)
+        .withRelated(ElBook.reviews)
         .run()
       assertEquals(results.size, 1)
       val (book, reviews) = results.head

@@ -4,12 +4,12 @@ import java.time.OffsetDateTime
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class TouchableItem(@Id id: Long, name: String, status: String, @updatedAt updatedAt: OffsetDateTime) derives EntityMeta
+object TouchableItem:
+  val repo = Repo[TouchableItem, TouchableItem, Long]()
 
 class TouchTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-touch.sql")
-
-  val repo = Repo[TouchableItem, TouchableItem, Long]()
 
   val epoch = OffsetDateTime.parse("2025-01-01T00:00:00Z")
 
@@ -45,13 +45,13 @@ class TouchTests extends QbTestBase:
   test("Repo touch(entity) updates single entity"):
     val t = xa()
     t.connect:
-      val entity = repo.findById(1L).get
+      val entity = TouchableItem.repo.findById(1L).get
       assertEquals(entity.updatedAt, epoch)
-      repo.touch(entity)
-      val refreshed = repo.findById(1L).get
+      TouchableItem.repo.touch(entity)
+      val refreshed = TouchableItem.repo.findById(1L).get
       assert(refreshed.updatedAt.isAfter(epoch), s"Expected ${refreshed.updatedAt} to be after $epoch")
       // others unchanged
-      val gamma = repo.findById(3L).get
+      val gamma = TouchableItem.repo.findById(3L).get
       assertEquals(gamma.updatedAt, epoch)
 
   // --- Compile-time safety ---

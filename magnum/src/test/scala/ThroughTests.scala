@@ -2,6 +2,9 @@ import com.augustnagro.magnum.*
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ThCountry(@Id id: Long, name: String) derives EntityMeta
+object ThCountry:
+  val posts =
+    Relationship.hasManyThrough[ThCountry, ThUser, ThPost](_.countryId, _.userId)
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ThUser(@Id id: Long, countryId: Long, name: String) derives EntityMeta
@@ -11,6 +14,9 @@ case class ThPost(@Id id: Long, userId: Long, title: String) derives EntityMeta
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ThMechanic(@Id id: Long, name: String) derives EntityMeta
+object ThMechanic:
+  val owner =
+    Relationship.hasOneThrough[ThMechanic, ThCar, ThOwner](_.mechanicId, _.carId)
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ThCar(@Id id: Long, mechanicId: Long, model: String) derives EntityMeta
@@ -22,21 +28,13 @@ class ThroughTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-through.sql")
 
-  // Country → User → Post (hasManyThrough)
-  val countryPosts =
-    Relationship.hasManyThrough[ThCountry, ThUser, ThPost](_.countryId, _.userId)
-
-  // Mechanic → Car → Owner (hasOneThrough)
-  val mechanicOwner =
-    Relationship.hasOneThrough[ThMechanic, ThCar, ThOwner](_.mechanicId, _.carId)
-
   // --- hasManyThrough tests ---
 
   test("hasManyThrough: all countries with posts"):
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[ThCountry].withRelated(countryPosts).run()
+        QueryBuilder.from[ThCountry].withRelated(ThCountry.posts).run()
       assertEquals(results.size, 4)
       val uk = results.find(_._1.name == "UK").get
       assertEquals(uk._2.size, 3)
@@ -53,7 +51,7 @@ class ThroughTests extends QbTestBase:
       val results = QueryBuilder
         .from[ThCountry]
         .where(_.name === "UK")
-        .withRelated(countryPosts)
+        .withRelated(ThCountry.posts)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.name, "UK")
@@ -65,7 +63,7 @@ class ThroughTests extends QbTestBase:
       val results = QueryBuilder
         .from[ThCountry]
         .where(_.name === "France")
-        .withRelated(countryPosts)
+        .withRelated(ThCountry.posts)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._2, Vector.empty[ThPost])
@@ -76,7 +74,7 @@ class ThroughTests extends QbTestBase:
       val results = QueryBuilder
         .from[ThCountry]
         .where(_.name === "Japan")
-        .withRelated(countryPosts)
+        .withRelated(ThCountry.posts)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._2, Vector.empty[ThPost])
@@ -88,7 +86,7 @@ class ThroughTests extends QbTestBase:
         .from[ThCountry]
         .orderBy(_.name)
         .limit(2)
-        .withRelated(countryPosts)
+        .withRelated(ThCountry.posts)
         .run()
       assertEquals(results.size, 2)
       // Ordered: France, Japan — both have 0 posts
@@ -103,7 +101,7 @@ class ThroughTests extends QbTestBase:
       val result = QueryBuilder
         .from[ThCountry]
         .where(_.name === "US")
-        .withRelated(countryPosts)
+        .withRelated(ThCountry.posts)
         .first()
       assert(result.isDefined)
       val (country, posts) = result.get
@@ -117,7 +115,7 @@ class ThroughTests extends QbTestBase:
     val t = xa()
     t.connect:
       val results =
-        QueryBuilder.from[ThMechanic].withRelated(mechanicOwner).run()
+        QueryBuilder.from[ThMechanic].withRelated(ThMechanic.owner).run()
       assertEquals(results.size, 3)
       val mech1 = results.find(_._1.name == "Mech1").get
       assertEquals(mech1._2.size, 1)
@@ -133,7 +131,7 @@ class ThroughTests extends QbTestBase:
       val results = QueryBuilder
         .from[ThMechanic]
         .where(_.name === "Mech1")
-        .withRelated(mechanicOwner)
+        .withRelated(ThMechanic.owner)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.name, "Mech1")
@@ -146,7 +144,7 @@ class ThroughTests extends QbTestBase:
       val results = QueryBuilder
         .from[ThMechanic]
         .where(_.name === "Mech3")
-        .withRelated(mechanicOwner)
+        .withRelated(ThMechanic.owner)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._2, Vector.empty[ThOwner])
@@ -157,7 +155,7 @@ class ThroughTests extends QbTestBase:
       val results = QueryBuilder
         .from[ThMechanic]
         .where(_.name === "Mech2")
-        .withRelated(mechanicOwner)
+        .withRelated(ThMechanic.owner)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._2, Vector.empty[ThOwner])
@@ -168,7 +166,7 @@ class ThroughTests extends QbTestBase:
       val result = QueryBuilder
         .from[ThMechanic]
         .where(_.name === "Mech1")
-        .withRelated(mechanicOwner)
+        .withRelated(ThMechanic.owner)
         .first()
       assert(result.isDefined)
       val (mechanic, owners) = result.get
@@ -181,7 +179,7 @@ class ThroughTests extends QbTestBase:
   test("SQL verification: hasManyThrough queries use correct structure"):
     val tq = QueryBuilder
       .from[ThCountry]
-      .withRelated(countryPosts)
+      .withRelated(ThCountry.posts)
     val queries = tq.buildQueriesWith(H2)
     assertEquals(queries.size, 3)
     assert(queries(0).sqlString.contains("SELECT"), "Root should be a SELECT")
@@ -194,7 +192,7 @@ class ThroughTests extends QbTestBase:
   test("SQL verification: hasOneThrough queries use correct structure"):
     val tq = QueryBuilder
       .from[ThMechanic]
-      .withRelated(mechanicOwner)
+      .withRelated(ThMechanic.owner)
     val queries = tq.buildQueriesWith(H2)
     assertEquals(queries.size, 3)
     assert(queries(0).sqlString.contains("SELECT"), "Root should be a SELECT")
@@ -211,7 +209,7 @@ class ThroughTests extends QbTestBase:
       val results = QueryBuilder
         .from[ThCountry]
         .where(_.name === "Nobody")
-        .withRelated(countryPosts)
+        .withRelated(ThCountry.posts)
         .run()
       assertEquals(results, Vector.empty)
 

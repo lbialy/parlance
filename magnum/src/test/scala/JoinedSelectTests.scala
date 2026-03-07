@@ -4,14 +4,12 @@ class JoinedSelectTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-join.sql")
 
-  val bookAuthor = Relationship.belongsTo[JnBook, JnAuthor](_.authorId, _.id)
-
   test("join select: columns from both tables"):
     val t = xa()
     t.connect:
       val results = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .select(jq =>
           (
             title = jq.of[JnBook].title,
@@ -29,7 +27,7 @@ class JoinedSelectTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .select(jq =>
           (
             author = jq.of[JnAuthor].name,
@@ -52,7 +50,7 @@ class JoinedSelectTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .select(jq =>
           (
             author = jq.of[JnAuthor].name,
@@ -71,7 +69,7 @@ class JoinedSelectTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .select(jq =>
           (
             author = jq.of[JnAuthor].name,
@@ -90,7 +88,7 @@ class JoinedSelectTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .select(jq =>
           (
             title = jq.of[JnBook].title,
@@ -111,7 +109,7 @@ class JoinedSelectTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[JnBook]
-        .join(bookAuthor)
+        .join(JnBook.author)
         .select(jq =>
           (
             author = jq.of[JnAuthor].name
@@ -124,7 +122,7 @@ class JoinedSelectTests extends QbTestBase:
   test("join select + WHERE (frozen from before select)"):
     val t = xa()
     t.connect:
-      val jq = QueryBuilder.from[JnBook].join(bookAuthor)
+      val jq = QueryBuilder.from[JnBook].join(JnBook.author)
       val results = jq
         .where(jq.of[JnAuthor].name === "Tolkien")
         .select(jq2 =>
@@ -141,7 +139,7 @@ class JoinedSelectTests extends QbTestBase:
   test("join select build SQL verification"):
     val frag = QueryBuilder
       .from[JnBook]
-      .join(bookAuthor)
+      .join(JnBook.author)
       .select(jq =>
         (
           title = jq.of[JnBook].title,
@@ -160,7 +158,7 @@ class JoinedSelectTests extends QbTestBase:
   test("join select + GROUP BY + HAVING build SQL verification"):
     val frag = QueryBuilder
       .from[JnBook]
-      .join(bookAuthor)
+      .join(JnBook.author)
       .select(jq =>
         (
           author = jq.of[JnAuthor].name,
@@ -182,14 +180,12 @@ class LeftJoinSelectTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-left-join.sql")
 
-  val bookAuthor = Relationship.belongsTo[LjBook, LjAuthor](_.authorId, _.id)
-
   test("left join select: columns from both tables"):
     val t = xa()
     t.connect:
       val results = QueryBuilder
         .from[LjBook]
-        .leftJoin(bookAuthor)
+        .leftJoin(LjBook.author)
         .select(jq =>
           (
             title = jq.of[LjBook].title,
@@ -209,7 +205,7 @@ class LeftJoinSelectTests extends QbTestBase:
   test("left join select build SQL contains LEFT JOIN"):
     val frag = QueryBuilder
       .from[LjBook]
-      .leftJoin(bookAuthor)
+      .leftJoin(LjBook.author)
       .select(jq =>
         (
           title = jq.of[LjBook].title,
@@ -227,16 +223,13 @@ class MultiJoinSelectTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-multi-join.sql")
 
-  val bookAuthor = Relationship.belongsTo[MjBook, MjAuthor](_.authorId, _.id)
-  val authorCountry = Relationship.belongsTo[MjAuthor, MjCountry](_.countryId, _.id)
-
   test("3-table join select: columns from all 3 tables"):
     val t = xa()
     t.connect:
       val results = QueryBuilder
         .from[MjBook]
-        .join(bookAuthor)
-        .join(authorCountry)
+        .join(MjBook.author)
+        .join(MjAuthor.country)
         .select(jq =>
           (
             title = jq.of[MjBook].title,
@@ -257,8 +250,8 @@ class MultiJoinSelectTests extends QbTestBase:
     t.connect:
       val results = QueryBuilder
         .from[MjBook]
-        .join(bookAuthor)
-        .join(authorCountry)
+        .join(MjBook.author)
+        .join(MjAuthor.country)
         .select(jq =>
           (
             country = jq.of[MjCountry].name,

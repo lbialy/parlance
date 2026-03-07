@@ -2,12 +2,18 @@ import com.augustnagro.magnum.*
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class BgUser(@Id id: Long, name: String) derives EntityMeta
+object BgUser:
+  val roles =
+    Relationship.belongsToMany[BgUser, BgRole]("bg_user_role", "user_id", "role_id")
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class BgRole(@Id id: Long, name: String) derives EntityMeta
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class BgCountry(@Id id: Long, name: String) derives EntityMeta
+object BgCountry:
+  val articles =
+    Relationship.hasManyThrough[BgCountry, BgPerson, BgArticle](_.countryId, _.personId)
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class BgPerson(@Id id: Long, countryId: Long, name: String) derives EntityMeta
@@ -21,9 +27,6 @@ class BugTests extends QbTestBase:
 
   // ===== Bug 1a: first() skips stitching in PivotEagerQuery =====
 
-  val userRoles =
-    Relationship.belongsToMany[BgUser, BgRole]("bg_user_role", "user_id", "role_id")
-
   test("BUG 1a-pivot: first() result count should match run() for duplicate pivot entries"):
     // Eve is linked to alpha twice in the pivot table (no unique constraint).
     // run() stitches through pivot pairs and includes alpha twice.
@@ -34,12 +37,12 @@ class BugTests extends QbTestBase:
       val runResult = QueryBuilder
         .from[BgUser]
         .where(_.id === 1L)
-        .withRelated(userRoles)
+        .withRelated(BgUser.roles)
         .run()
       val firstResult = QueryBuilder
         .from[BgUser]
         .where(_.id === 1L)
-        .withRelated(userRoles)
+        .withRelated(BgUser.roles)
         .first()
       assert(firstResult.isDefined)
       val runTargets = runResult.head._2
@@ -51,9 +54,6 @@ class BugTests extends QbTestBase:
       )
 
   // ===== Bug 1a: first() skips stitching in ThroughQuery =====
-
-  val countryArticles =
-    Relationship.hasManyThrough[BgCountry, BgPerson, BgArticle](_.countryId, _.personId)
 
   test("BUG 1a-through: first() target ordering should match run()"):
     // Testland has Person Alice (id=10) with articles 10 and 30,
@@ -69,12 +69,12 @@ class BugTests extends QbTestBase:
       val runResult = QueryBuilder
         .from[BgCountry]
         .where(_.id === 1L)
-        .withRelated(countryArticles)
+        .withRelated(BgCountry.articles)
         .run()
       val firstResult = QueryBuilder
         .from[BgCountry]
         .where(_.id === 1L)
-        .withRelated(countryArticles)
+        .withRelated(BgCountry.articles)
         .first()
       assert(firstResult.isDefined)
       val runTitles = runResult.head._2.map(_.title)

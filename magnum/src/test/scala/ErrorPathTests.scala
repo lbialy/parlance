@@ -32,15 +32,13 @@ class ErrorPathTests extends QbTestBase:
 
   // --- joined query firstOrFail() on empty ---
 
-  val bookAuthor = Relationship.belongsTo[JnBook, JnAuthor](_.authorId, _.id)
-
   test("joined firstOrFail() throws QueryBuilderException on empty"):
     val t = xa()
     t.connect:
       intercept[QueryBuilderException]:
         QueryBuilder
           .from[JnBook]
-          .join(bookAuthor)
+          .join(JnBook.author)
           .where(sql"title = ${"NonExistent"}".unsafeAsWhere)
           .firstOrFail()
 

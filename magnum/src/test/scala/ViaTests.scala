@@ -2,9 +2,15 @@ import com.augustnagro.magnum.*
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ViaAuthor(@Id id: Long, name: String) derives EntityMeta
+object ViaAuthor:
+  val contacts = Relationship.hasMany[ViaAuthor, ViaContact](_.id, _.authorId)
+  val books = Relationship.hasMany[ViaAuthor, ViaBook](_.id, _.authorId)
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ViaPost(@Id id: Long, authorId: Long, title: String) derives EntityMeta
+object ViaPost:
+  val author = Relationship.belongsTo[ViaPost, ViaAuthor](_.authorId, _.id)
+  val contacts = ViaAuthor.contacts via author
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ViaBook(@Id id: Long, authorId: Long, title: String) derives EntityMeta
@@ -16,24 +22,13 @@ class ViaTests extends QbTestBase:
 
   val h2Ddls = Seq("/h2/qb-via.sql")
 
-  val postAuthor =
-    Relationship.belongsTo[ViaPost, ViaAuthor](_.authorId, _.id)
-
-  val authorContacts =
-    Relationship.hasMany[ViaAuthor, ViaContact](_.id, _.authorId)
-
-  val authorBooks =
-    Relationship.hasMany[ViaAuthor, ViaBook](_.id, _.authorId)
-
-  val contactsViaPostAuthor = authorContacts via postAuthor
-
   test("basic via: posts get their author's contacts"):
     val t = xa()
     t.connect:
       val results = QueryBuilder
         .from[ViaPost]
         .orderBy(_.id)
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 3)
       // Alice Post 1 -> Alice's 2 contacts
@@ -56,7 +51,7 @@ class ViaTests extends QbTestBase:
       val results = QueryBuilder
         .from[ViaPost]
         .where(_.authorId === 1L)
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 2)
       val emails1 = results(0)._2.map(_.email).toSet
@@ -78,7 +73,7 @@ class ViaTests extends QbTestBase:
       val results = QueryBuilder
         .from[ViaPost]
         .where(_.title === "Nonexistent")
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results, Vector.empty)
 
@@ -89,7 +84,7 @@ class ViaTests extends QbTestBase:
         .from[ViaPost]
         .where(_.authorId === 1L)
         .orderBy(_.id)
-        .withRelated(authorContacts via postAuthor)(_.active === true)
+        .withRelated(ViaAuthor.contacts via ViaPost.author)(_.active === true)
         .run()
       assertEquals(results.size, 2)
       // Alice has 2 contacts but only 1 active
@@ -104,7 +99,7 @@ class ViaTests extends QbTestBase:
       val results = QueryBuilder
         .from[ViaPost]
         .where(_.title === "Bob Post 1")
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 1)
       assertEquals(results.head._1.title, "Bob Post 1")
@@ -117,7 +112,7 @@ class ViaTests extends QbTestBase:
       val results = QueryBuilder
         .from[ViaPost]
         .where(_.title === "Nobody")
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results, Vector.empty)
 
@@ -127,7 +122,7 @@ class ViaTests extends QbTestBase:
       val result = QueryBuilder
         .from[ViaPost]
         .where(_.title === "Bob Post 1")
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .first()
       assert(result.isDefined)
       val (post, contacts) = result.get
@@ -138,12 +133,11 @@ class ViaTests extends QbTestBase:
   test("chaining via with another withRelated"):
     val t = xa()
     t.connect:
-      val postAuthorRel = Relationship.belongsTo[ViaPost, ViaAuthor](_.authorId, _.id)
-      val postBooks = authorBooks via postAuthorRel
+      val postBooks = ViaAuthor.books via ViaPost.author
       val results = QueryBuilder
         .from[ViaPost]
         .where(_.title === "Bob Post 1")
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .withRelated(postBooks)
         .run()
       assertEquals(results.size, 1)
@@ -158,7 +152,7 @@ class ViaTests extends QbTestBase:
   test("buildQueries returns root + 2 composed queries"):
     val eq = QueryBuilder
       .from[ViaPost]
-      .withRelated(contactsViaPostAuthor)
+      .withRelated(ViaPost.contacts)
     val queries = eq.buildQueriesWith(H2)
     // root + intermediate query + target query = 3
     assertEquals(queries.size, 3)
@@ -178,7 +172,7 @@ class ViaTests extends QbTestBase:
       val results = QueryBuilder
         .from[ViaPost]
         .orderBy(_.id)
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 3)
       // Alice's posts → Alice passes scope → her 2 contacts visible
@@ -202,7 +196,7 @@ class ViaTests extends QbTestBase:
       val results = QueryBuilder
         .from[ViaPost]
         .orderBy(_.id)
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 3)
       // Alice's posts → Alice passes scope → only 1 active contact
@@ -220,7 +214,7 @@ class ViaTests extends QbTestBase:
       val results = QueryBuilder
         .from[ViaPost]
         .orderBy(_.id)
-        .withRelated(contactsViaPostAuthor)
+        .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 3)
       // Alice's posts → 1 active contact each
