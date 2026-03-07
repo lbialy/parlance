@@ -21,8 +21,8 @@ def entityCreatorTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transa
 
   test("insert EntityCreator"):
     xa().connect:
-      userRepo.insert(MyUserCreator("Ash"))
-      userRepo.insert(MyUserCreator("Steve"))
+      userRepo.rawInsert(MyUserCreator("Ash"))
+      userRepo.rawInsert(MyUserCreator("Steve"))
       assert(userRepo.count == 5L)
       assert(userRepo.findAll.map(_.firstName).contains("Steve"))
 
@@ -30,7 +30,7 @@ def entityCreatorTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transa
     intercept[SqlException]:
       xa().connect:
         val invalidUser = MyUserCreator(null)
-        userRepo.insert(invalidUser)
+        userRepo.rawInsert(invalidUser)
 
   test("insertAll EntityCreator"):
     xa().connect:
@@ -39,7 +39,7 @@ def entityCreatorTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transa
         MyUserCreator("Steve"),
         MyUserCreator("Josh")
       )
-      userRepo.insertAll(newUsers)
+      userRepo.rawInsertAll(newUsers)
       assert(userRepo.count == 6L)
       assert(
         userRepo.findAll.map(_.firstName).contains(newUsers.last.firstName)
@@ -91,7 +91,7 @@ def entityCreatorReturningTests[D <: SupportsReturning](
 
   test("insertReturning EntityCreator"):
     xa().connect:
-      val user = userRepo.insertReturning(MyUserCreator("Ash"))
+      val user = userRepo.create(MyUserCreator("Ash"))
       assert(user.firstName == "Ash")
 
   test("insertAllReturning EntityCreator"):
@@ -101,7 +101,7 @@ def entityCreatorReturningTests[D <: SupportsReturning](
         MyUserCreator("Steve"),
         MyUserCreator("Josh")
       )
-      val users = userRepo.insertAllReturning(newUsers)
+      val users = userRepo.rawInsertAllReturning(newUsers)
       assert(userRepo.count == 6L)
       assert(users.size == 3)
       assert(users.last.firstName == newUsers.last.firstName)

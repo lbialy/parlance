@@ -42,14 +42,38 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
   override def finalScopes: Vector[Scope[E]] =
     self.injectedScopes :+ softDeleteScope
 
+  // --- observer dispatch overrides ---
+
+  override protected def fireDeleted(entity: E)(using DbCon[?]): Unit =
+    if self.observers.nonEmpty then
+      self.observers.foreach(_.trashed(entity))
+      self.observers.foreach(_.deleted(entity))
+
   // --- new methods: force delete, restore, inspection ---
 
   /** Hard-delete an entity (real DELETE FROM). */
   def forceDelete(entity: E)(using DbCon[? <: SupportsMutations]): Unit =
-    forceDeleteById(extractId(entity))
+    if self.observers.nonEmpty then
+      self.observers.foreach(_.forceDeleting(entity))
+      self.observers.foreach(_.deleting(entity))
+    forceDeleteByIdInternal(extractId(entity))
+    if self.observers.nonEmpty then
+      self.observers.foreach(_.deleted(entity))
+      self.observers.foreach(_.forceDeleted(entity))
 
   /** Hard-delete by id (real DELETE FROM). */
-  def forceDeleteById(id: ID)(using DbCon[? <: SupportsMutations]): Unit =
+  def forceDeleteById(id: ID)(using con: DbCon[? <: SupportsMutations]): Unit =
+    if self.observers.nonEmpty then
+      fetchEntityById(id).foreach: e =>
+        self.observers.foreach(_.forceDeleting(e))
+        self.observers.foreach(_.deleting(e))
+        forceDeleteByIdInternal(id)
+        self.observers.foreach(_.deleted(e))
+        self.observers.foreach(_.forceDeleted(e))
+    else
+      forceDeleteByIdInternal(id)
+
+  private def forceDeleteByIdInternal(id: ID)(using DbCon[? <: SupportsMutations]): Unit =
     Frag(
       s"DELETE FROM $tbl WHERE $pkSql = ?",
       Seq(id),
@@ -58,15 +82,42 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
 
   /** Restore a soft-deleted entity by clearing the deleted-at column. */
   def restore(entity: E)(using DbCon[? <: SupportsMutations]): Unit =
-    restoreById(extractId(entity))
+    if self.observers.nonEmpty then
+      self.observers.foreach(_.restoring(entity))
+      self.observers.foreach(_.updating(entity))
+    restoreByIdInternal(extractId(entity))
+    if self.observers.nonEmpty then
+      self.observers.foreach(_.updated(entity))
+      self.observers.foreach(_.restored(entity))
 
   /** Restore a soft-deleted entity by id. */
-  def restoreById(id: ID)(using DbCon[? <: SupportsMutations]): Unit =
+  def restoreById(id: ID)(using con: DbCon[? <: SupportsMutations]): Unit =
+    if self.observers.nonEmpty then
+      fetchEntityById(id).foreach: e =>
+        self.observers.foreach(_.restoring(e))
+        self.observers.foreach(_.updating(e))
+        restoreByIdInternal(id)
+        self.observers.foreach(_.updated(e))
+        self.observers.foreach(_.restored(e))
+    else
+      restoreByIdInternal(id)
+
+  private def restoreByIdInternal(id: ID)(using DbCon[? <: SupportsMutations]): Unit =
     Frag(
       s"UPDATE $tbl SET $sdColSql = NULL WHERE $pkSql = ?",
       Seq(id),
       FragWriter.fromKeys(Vector(id.asInstanceOf[Any]))
     ).update.run()
+
+  /** Fetch entity by id without scope filtering (needed for observer hooks on soft-deleted entities). */
+  private def fetchEntityById(id: ID)(using DbCon[?]): Option[E] =
+    val codec = self.entityCodec
+    val selectCols = self.entityMeta.columns.map(_.sqlName).mkString(", ")
+    Frag(
+      s"SELECT $selectCols FROM $tbl WHERE $pkSql = ?",
+      Seq(id),
+      FragWriter.fromKeys(Vector(id.asInstanceOf[Any]))
+    ).query[E](using codec).run().headOption
 
   /** Check whether an entity is soft-deleted (deletedAt is not None). */
   def isTrashed(entity: E): Boolean =

@@ -70,7 +70,7 @@ def repoTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(
 
   test("insert"):
     xa().connect:
-      personRepo.insert(
+      personRepo.rawInsert(
         Person(
           id = 9L,
           firstName = Some("John"),
@@ -80,7 +80,7 @@ def repoTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(
           created = OffsetDateTime.now
         )
       )
-      personRepo.insert(
+      personRepo.rawInsert(
         Person(
           id = 10L,
           firstName = None,
@@ -98,7 +98,7 @@ def repoTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(
       xa().connect:
         val invalidP =
           Person(9L, None, null, false, OffsetDateTime.now, None)
-        personRepo.insert(invalidP)
+        personRepo.rawInsert(invalidP)
 
   test("update"):
     xa().connect:
@@ -142,7 +142,7 @@ def repoTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(
           created = OffsetDateTime.now
         )
       )
-      personRepo.insertAll(newPeople)
+      personRepo.rawInsertAll(newPeople)
       assert(personRepo.count == 11L)
       assert(
         personRepo.findAll.map(_.lastName).contains(newPeople.last.lastName)
@@ -169,7 +169,7 @@ def repoTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(
         created = OffsetDateTime.now,
         socialId = None
       )
-      personRepo.insert(p)
+      personRepo.rawInsert(p)
       personRepo.count
     assert(count == 9L)
 
@@ -185,7 +185,7 @@ def repoTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(
     )
     try
       transactor.transact:
-        personRepo.insert(p)
+        personRepo.rawInsert(p)
         throw RuntimeException()
       fail("should not reach")
     catch
@@ -230,7 +230,7 @@ def repoTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(
         socialId = Some(UUID.randomUUID()),
         created = OffsetDateTime.now
       )
-      personRepo.insert(p)
+      personRepo.rawInsert(p)
       val newIsAdmin = true
       val update =
         sql"update $person set ${person.isAdmin} = $newIsAdmin where ${person.id} = ${p.id}".update
@@ -267,7 +267,7 @@ def repoReturningTests[D <: SupportsMutations & SupportsReturning](suite: FunSui
 
   test("insertReturning"):
     xa().connect:
-      val person = personRepo.insertReturning(
+      val person = personRepo.create(
         Person(
           id = 9L,
           firstName = Some("John"),
@@ -307,7 +307,7 @@ def repoReturningTests[D <: SupportsMutations & SupportsReturning](suite: FunSui
           created = OffsetDateTime.now
         )
       )
-      val people = personRepo.insertAllReturning(newPc)
+      val people = personRepo.rawInsertAllReturning(newPc)
       assert(personRepo.count == 11L)
       assert(people.size == 3)
       assert(people.last.lastName == newPc.last.lastName)

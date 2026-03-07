@@ -14,7 +14,8 @@ import scala.util.Using
   *   id type of E
   */
 open class Repo[EC, E, ID](
-    injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]]
+    injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]],
+    val observers: Vector[RepoObserver[EC, E]] = Vector.empty[RepoObserver[EC, E]]
 )(using
     meta: EntityMeta[E],
     ib: InsertBuilder[EC, E]
@@ -38,6 +39,14 @@ open class Repo[EC, E, ID](
   private lazy val _hookColumnNames: Set[String] =
     (_collectOnUpdate ++ _collectRewriteDelete).map(_.col.sqlName.toLowerCase).toSet
 
+  // --- observer dispatch ---
+
+  protected def fireDeleting(entity: E)(using DbCon[?]): Unit =
+    if observers.nonEmpty then observers.foreach(_.deleting(entity))
+
+  protected def fireDeleted(entity: E)(using DbCon[?]): Unit =
+    if observers.nonEmpty then observers.foreach(_.deleted(entity))
+
   /** Build WHERE sql + params + writer from pk id and scope conditions */
   private def buildMutationWhere(id: ID): (String, Seq[Any], FragWriter) =
     val conditions = _collectConditions
@@ -57,11 +66,19 @@ open class Repo[EC, E, ID](
 
   /** Deletes an entity using its id */
   def delete(entity: E)(using DbCon[? <: SupportsMutations]): Unit =
-    deleteById(extractPk(entity).asInstanceOf[ID])
+    fireDeleting(entity)
+    deleteByIdCount(extractPk(entity).asInstanceOf[ID])
+    fireDeleted(entity)
 
   /** Deletes an entity using its id */
   def deleteById(id: ID)(using con: DbCon[? <: SupportsMutations]): Unit =
-    deleteByIdCount(id)
+    if observers.nonEmpty then
+      findById(id).foreach: entity =>
+        fireDeleting(entity)
+        deleteByIdCount(id)
+        fireDeleted(entity)
+    else
+      deleteByIdCount(id)
 
   private def deleteByIdCount(id: ID)(using con: DbCon[? <: SupportsMutations]): Int =
     if _collectRewriteDelete.nonEmpty then
@@ -105,20 +122,26 @@ open class Repo[EC, E, ID](
 
   // --- INSERT methods ---
 
-  /** Insert and return entity E */
-  def insert(entityCreator: EC)(using DbCon[?]): Unit =
+  /** Insert entity without returning or firing observer events. */
+  def rawInsert(entityCreator: EC)(using DbCon[?]): Unit =
     ib.insert(entityCreator)
 
-  /** Insert and return all new entities */
-  def insertAll(entityCreators: Iterable[EC])(using DbCon[?]): Unit =
+  /** Insert all entities without returning or firing observer events. */
+  def rawInsertAll(entityCreators: Iterable[EC])(using DbCon[?]): Unit =
     ib.insertAll(entityCreators)
 
-  def insertReturning[D <: DatabaseType](entityCreator: EC)(using con: DbCon[D], cr: CanReturn[EC, E, D]): E =
+  /** Insert and return entity, firing creating/created observer events. */
+  def create[D <: DatabaseType](entityCreator: EC)(using con: DbCon[D], cr: CanReturn[EC, E, D]): E =
+    if observers.nonEmpty then
+      observers.foreach(_.creating(entityCreator))
     val result = ib.insertReturning(entityCreator)
     con.trackLoaded(meta.tableName, extractPk(result), result)
+    if observers.nonEmpty then
+      observers.foreach(_.created(result))
     result
 
-  def insertAllReturning[D <: DatabaseType](
+  /** Insert all and return entities without firing observer events. */
+  def rawInsertAllReturning[D <: DatabaseType](
       entityCreators: Iterable[EC]
   )(using con: DbCon[D], cr: CanReturn[EC, E, D]): Vector[E] =
     val results = ib.insertAllReturning(entityCreators)
@@ -129,6 +152,14 @@ open class Repo[EC, E, ID](
 
   /** Update the entity */
   def update(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
+    if observers.nonEmpty then
+      observers.foreach(_.updating(entity))
+    updateInternal(entity)
+    if observers.nonEmpty then
+      observers.foreach(_.updated(entity))
+  end update
+
+  private def updateInternal(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val entityProduct = entity.asInstanceOf[Product]
     val columns = meta.columns
     val codecs = meta.elementCodecs
@@ -176,18 +207,26 @@ open class Repo[EC, E, ID](
         // Write WHERE params
         whereWriter.write(ps, p)
     ).update.run()
-  end update
+  end updateInternal
 
   /** Update all entities */
   def updateAll(entities: Iterable[E])(using DbCon[? <: SupportsMutations]): BatchUpdateResult =
     var count = 0L
     entities.foreach { e =>
-      update(e); count += 1
+      updateInternal(e); count += 1
     }
     BatchUpdateResult.Success(count)
 
   /** Update only the changed fields between original and current entity */
   def updatePartial(original: E, current: E)(using con: DbCon[? <: SupportsMutations]): Unit =
+    if observers.nonEmpty then
+      observers.foreach(_.updating(current))
+    updatePartialInternal(original, current)
+    if observers.nonEmpty then
+      observers.foreach(_.updated(current))
+  end updatePartial
+
+  private def updatePartialInternal(original: E, current: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val origProduct = original.asInstanceOf[Product]
     val currProduct = current.asInstanceOf[Product]
     val origId = origProduct.productElement(pkIndex)
@@ -240,59 +279,53 @@ open class Repo[EC, E, ID](
         for c <- hookClauses do p = c.writer.write(ps, p)
         whereWriter.write(ps, p)
     ).update.run()
-  end updatePartial
+  end updatePartialInternal
 
-  /** Save entity: partial update if tracked, upsert otherwise. */
+  /** Save entity: partial update if tracked, check DB if untracked, insert if not found. */
   def save(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val pkValue = extractPk(entity)
     con.getOriginal(meta.tableName, pkValue) match
       case Some(original) =>
-        updatePartial(original.asInstanceOf[E], entity)
+        // Tracked — surgical update
+        if observers.nonEmpty then observers.foreach(_.updating(entity))
+        updatePartialInternal(original.asInstanceOf[E], entity)
+        if observers.nonEmpty then observers.foreach(_.updated(entity))
       case None =>
-        upsertByPk(entity)
+        // Untracked — check DB
+        findById(pkValue.asInstanceOf[ID]) match
+          case Some(existing) =>
+            // Found in DB — update
+            if observers.nonEmpty then observers.foreach(_.updating(entity))
+            updatePartialInternal(existing, entity)
+            if observers.nonEmpty then observers.foreach(_.updated(entity))
+          case None =>
+            // Not in DB — insert
+            if observers.nonEmpty then observers.foreach(_.creating(entity))
+            insertByEntity(entity)
+            con.trackLoaded(meta.tableName, pkValue, entity)
+            if observers.nonEmpty then observers.foreach(_.created(entity))
 
-  /** Upsert by primary key. Hook-aware: appends onUpdate SET clauses and scope conditions. */
-  private def upsertByPk(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
-    val dbType = con.databaseType
+  /** Insert a full entity (including PK) without conflict handling. */
+  private def insertByEntity(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val columns = meta.columns
     val codecs = meta.elementCodecs
-    val allCols = IArray.from(columns.map(_.sqlName))
-    val allColsQueryRepr = codecs.map(_.queryRepr).mkString(", ")
-    val pkCol = meta.primaryKey.sqlName
-
-    val hookClauses = _collectOnUpdate
-    val conditions = _collectConditions
-
-    val sql = dbType.renderUpsertByPkWithHooks(
-      meta.tableName,
-      allCols,
-      allColsQueryRepr,
-      pkCol,
-      hookClauses,
-      conditions
-    )
-
+    val colNames = columns.map(_.sqlName).mkString(", ")
+    val placeholders = codecs.map(_.queryRepr).mkString(", ")
+    val sql = s"INSERT INTO ${meta.tableName} ($colNames) VALUES ($placeholders)"
     val entityProduct = entity.asInstanceOf[Product]
-
     Frag(
       sql,
-      Seq.empty, // params managed by writer
+      Seq.empty,
       (ps, pos) =>
         var p = pos
-        // Write entity fields
         var i = 0
         while i < columns.length do
           val codec = codecs(i).asInstanceOf[DbCodec[Any]]
           codec.writeSingle(entityProduct.productElement(i), ps, p)
           p += codec.cols.length
           i += 1
-        // Write hook params
-        for c <- hookClauses do p = c.writer.write(ps, p)
-        // Write condition params
-        for c <- conditions do p = c.writer.write(ps, p)
         p
     ).update.run()
-  end upsertByPk
 
   /** Insert with conflict handling. */
   def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[? <: SupportsMutations]): Unit =
@@ -311,10 +344,18 @@ open class Repo[EC, E, ID](
     val found = applyScopes(
       QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
     ).where(predicate).first()
-    found.getOrElse:
-      val result = ib.insertReturning(creator)
-      con.trackLoaded(meta.tableName, extractPk(result), result)
-      result
+    found match
+      case Some(entity) =>
+        entity
+      case None =>
+        val ec = creator
+        if observers.nonEmpty then
+          observers.foreach(_.creating(ec))
+        val result = ib.insertReturning(ec)
+        con.trackLoaded(meta.tableName, extractPk(result), result)
+        if observers.nonEmpty then
+          observers.foreach(_.created(result))
+        result
 
   /** Find and update an existing entity, or insert a new one. */
   def updateOrCreate[D <: SupportsMutations](predicate: WhereFrag, creator: => EC, updater: E => E)(using
@@ -330,8 +371,13 @@ open class Repo[EC, E, ID](
         update(updated)
         updated
       case None =>
-        val result = ib.insertReturning(creator)
+        val ec = creator
+        if observers.nonEmpty then
+          observers.foreach(_.creating(ec))
+        val result = ib.insertReturning(ec)
         con.trackLoaded(meta.tableName, extractPk(result), result)
+        if observers.nonEmpty then
+          observers.foreach(_.created(result))
         result
 
   /** Touch an entity, setting its @updatedAt column to CURRENT_TIMESTAMP. */

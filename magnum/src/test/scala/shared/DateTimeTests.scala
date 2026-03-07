@@ -54,7 +54,7 @@ def dateTimeTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(u
         c = LocalTime.parse("05:20:04"),
         d = LocalDateTime.parse("2025-04-02T20:17:38")
       )
-      myTimeRepo.insert(newTime)
+      myTimeRepo.rawInsert(newTime)
       val res = sql"SELECT * FROM my_time ORDER BY a".query[MyTime].run()
       assertEquals(all :+ newTime, res)
 

@@ -1,0 +1,24 @@
+DROP TABLE IF EXISTS obs_user CASCADE;
+CREATE TABLE obs_user (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR NOT NULL
+);
+INSERT INTO obs_user (id, name) VALUES (1, 'Alice');
+INSERT INTO obs_user (id, name) VALUES (2, 'Bob');
+ALTER TABLE obs_user ALTER COLUMN id RESTART WITH 100;
+
+DROP TABLE IF EXISTS obs_audit CASCADE;
+CREATE TABLE obs_audit (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  event VARCHAR NOT NULL
+);
+
+DROP TABLE IF EXISTS obs_sd_user CASCADE;
+CREATE TABLE obs_sd_user (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+  deleted_at TIMESTAMP WITH TIME ZONE
+);
+INSERT INTO obs_sd_user (id, name, deleted_at) VALUES (1, 'Active', NULL);
+INSERT INTO obs_sd_user (id, name, deleted_at) VALUES (2, 'Trashed', TIMESTAMP WITH TIME ZONE '2025-01-01T00:00:00Z');
+ALTER TABLE obs_sd_user ALTER COLUMN id RESTART WITH 100;

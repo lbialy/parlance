@@ -34,7 +34,8 @@ open class ImmutableRepo[E, ID](
     entity
 
   private def trackAll(entities: Vector[E])(using con: DbCon[?]): Vector[E] =
-    entities.foreach(e => con.trackLoaded(meta.tableName, extractPk(e), e))
+    entities.foreach: e =>
+      con.trackLoaded(meta.tableName, extractPk(e), e)
     entities
 
   /** Internal scoped query builder using build0 (no structural typing needed). */

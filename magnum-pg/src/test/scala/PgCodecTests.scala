@@ -139,7 +139,7 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
           UUID.fromString("00000000-0000-0003-0000-000000000001")
         )
       )
-      userRepo.insert(u)
+      userRepo.rawInsert(u)
       val dbU = userRepo.findById(3L).get
       assert(dbU == u)
 
@@ -168,7 +168,7 @@ class PgCodecTests extends FunSuite, TestContainersFixtures:
         myJsonB = None,
         myXml = None
       )
-      carRepo.insert(c)
+      carRepo.rawInsert(c)
       val dbC = carRepo.findById(3L).get
       assert(dbC == c)
 

@@ -70,7 +70,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
       case class User(id: UUID, name: String) derives EntityMeta
       val repo = Repo[UserCreator, User, UUID]()
       def test(using DbCon[ClickHouse.type]): Unit =
-        repo.insertReturning(UserCreator("test"))
+        repo.create(UserCreator("test"))
     """)
     assert(
       errors.contains("No given instance of type com.augustnagro.magnum.CanReturn[UserCreator, User, D] was found"),

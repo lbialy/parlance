@@ -23,6 +23,6 @@ def noIdTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
   test("insert NoId entities"):
     xa().connect:
       val entity = NoId(OffsetDateTime.now, "Dan", "Fishing")
-      noIdRepo.insert(entity)
+      noIdRepo.rawInsert(entity)
       assert(noIdRepo.findAll.exists(_.userName == "Dan"))
 end noIdTests

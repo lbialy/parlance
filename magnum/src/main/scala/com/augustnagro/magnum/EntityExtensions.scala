@@ -52,6 +52,11 @@ extension [E](entity: E)(using meta: TableMeta[E], con: DbCon[?])
       case None => Map.empty
 end extension
 
+// --- Group 5: Creator extensions ---
+extension [EC, E, ID](creator: EC)(using repo: Repo[EC, E, ID])
+  def create[D <: DatabaseType]()(using con: DbCon[D], cr: CanReturn[EC, E, D]): E =
+    repo.create(creator)
+
 // --- Group 4: SoftDeletes extensions ---
 extension [EC, E, ID](entity: E)(using
     repo: Repo[EC, E, ID] & SoftDeletes[EC, E, ID],
