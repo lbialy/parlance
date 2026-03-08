@@ -1,0 +1,28 @@
+package shared
+
+import ma.chinespirit.parlance.*
+import munit.{FunSuite, Location}
+
+import java.time.OffsetDateTime
+
+def noIdTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(using
+    Location,
+    DbCodec[OffsetDateTime]
+): Unit =
+  import suite.*
+
+  @Table(SqlNameMapper.CamelToSnakeCase)
+  case class NoId(
+      createdAt: OffsetDateTime,
+      userName: String,
+      userAction: String
+  ) derives EntityMeta
+
+  val noIdRepo = Repo[NoId, NoId, Null]()
+
+  test("insert NoId entities"):
+    xa().connect:
+      val entity = NoId(OffsetDateTime.now, "Dan", "Fishing")
+      noIdRepo.rawInsert(entity)
+      assert(noIdRepo.findAll.exists(_.userName == "Dan"))
+end noIdTests

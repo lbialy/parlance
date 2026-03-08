@@ -1,0 +1,256 @@
+import com.dimafeng.testcontainers.PostgreSQLContainer
+import com.dimafeng.testcontainers.munit.fixtures.TestContainersFixtures
+import munit.{AnyFixture, FunSuite}
+import org.testcontainers.utility.DockerImageName
+import org.postgresql.ds.PGSimpleDataSource
+import org.postgresql.geometric.*
+import ma.chinespirit.parlance.*
+import ma.chinespirit.parlance.pg.PgCodec.given
+import ma.chinespirit.parlance.pg.enums.PgEnumToScalaEnumSqlArrayCodec
+import org.postgresql.util.PGInterval
+
+import java.nio.file.{Files, Path}
+import java.time.{LocalDate, OffsetDateTime, ZoneOffset}
+import java.util.Objects
+import java.util.UUID
+import javax.sql.DataSource
+import scala.util.Using.Manager
+
+class PgCodecTests extends FunSuite, TestContainersFixtures:
+  val userRepo = Repo[MagUser, MagUser, Long]()
+
+  val allUsers = Vector(
+    MagUser(
+      id = 1L,
+      name = "Abby",
+      friends = Vector("Jane", "Mary"),
+      matrix = IArray(IArray(1, 2), IArray(3, 4), IArray(5, 6)),
+      test = IArray(1),
+      dates = IArray(
+        OffsetDateTime.parse("2023-07-30T12:21:36Z"),
+        OffsetDateTime.parse("2023-07-30T12:21:37Z")
+      ),
+      bx = PGbox(1, 2, 3, 4),
+      c = PGcircle(1, 2, 3),
+      iv = PGInterval("1 hour"),
+      l = PGline(1, 1, 1),
+      lSeg = PGlseg(1, 1, 2, 2),
+      p = PGpath(Array(PGpoint(1, 1), PGpoint(2, 2)), true),
+      pnt = PGpoint(1, 1),
+      poly = PGpolygon(Array(PGpoint(0, 0), PGpoint(-1, 1), PGpoint(1, 1))),
+      colors = List(Color.RedOrange, Color.Green),
+      colorMap = List(
+        Vector(Color.RedOrange, Color.RedOrange),
+        Vector(Color.Green, Color.Green)
+      ),
+      color = Color.Blue,
+      idUuid = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+      uuids = List(
+        UUID.fromString("00000000-0000-0001-0000-000000000000"),
+        UUID.fromString("00000000-0000-0001-0000-000000000001")
+      )
+    ),
+    MagUser(
+      id = 2L,
+      name = "Jacob",
+      friends = Vector("Grace", "Aubrey"),
+      matrix = IArray(IArray(7, 8), IArray(9, 10)),
+      test = IArray.emptyIntIArray,
+      dates = IArray.empty,
+      bx = PGbox(5, 6, 7, 8),
+      c = PGcircle(4, 5, 6),
+      iv = PGInterval("2 days"),
+      l = PGline(2, 2, 2),
+      lSeg = PGlseg(2, 2, 3, 3),
+      p = PGpath(Array(PGpoint(2, 2), PGpoint(3, 3)), true),
+      pnt = PGpoint(2, 2),
+      poly = PGpolygon(Array(PGpoint(0, 0), PGpoint(-1, -1), PGpoint(1, -1))),
+      colors = List(Color.Green, Color.Blue),
+      colorMap = List(
+        Vector(Color.RedOrange, Color.Green),
+        Vector(Color.Green, Color.Blue)
+      ),
+      color = Color.Blue,
+      idUuid = UUID.fromString("00000000-0000-0000-0000-000000000002"),
+      uuids = List(
+        UUID.fromString("00000000-0000-0002-0000-000000000000")
+      )
+    )
+  )
+
+  val carRepo = Repo[MagCar, MagCar, Long]()
+
+  val allCars = Vector(
+    MagCar(
+      id = 1,
+      textColors = Seq(Color.RedOrange, Color.Green),
+      textColorMap = Vector(
+        List(Color.RedOrange, Color.RedOrange),
+        List(Color.Green, Color.Green)
+      ),
+      lastService = Some(LastService("Bob", LocalDate.of(2024, 5, 4))),
+      myJsonB = Some(MyJsonB(Vector(1, 2, 3), "hello world")),
+      myXml = Some(MyXml(<color>blue</color>))
+    ),
+    MagCar(
+      id = 2,
+      textColors = Seq(Color.Green, Color.Blue),
+      textColorMap = Vector(
+        List(Color.RedOrange, Color.Green),
+        List(Color.Green, Color.Blue)
+      ),
+      lastService = None,
+      myJsonB = None,
+      myXml = None
+    )
+  )
+
+  test("select all MagUser"):
+    connect(Transactor(Postgres, ds())):
+      assert(userRepo.findAll == allUsers)
+
+  test("select all MagCar"):
+    connect(Transactor(Postgres, ds())):
+      assert(carRepo.findAll == allCars)
+
+  test("insert MagUser"):
+    connect(Transactor(Postgres, ds())):
+      val u = MagUser(
+        id = 3L,
+        name = "Matt",
+        friends = Vector.empty,
+        matrix = IArray(IArray(1, 2), IArray(3, 4)),
+        test = IArray(4),
+        dates = IArray(OffsetDateTime.parse("2023-07-30T13:57:29.059335Z")),
+        bx = PGbox(1, 2, 3, 4),
+        c = PGcircle(1, 1, 1),
+        iv = PGInterval("1 minute"),
+        l = PGline(3, 4, 5),
+        lSeg = PGlseg(0, 0, -1, -1),
+        p = PGpath(Array(PGpoint(3, 3), PGpoint(4, 4)), true),
+        pnt = PGpoint(3, 4),
+        poly = PGpolygon(Array(PGpoint(0, 0), PGpoint(-1, 1), PGpoint(1, 1))),
+        colors = List(Color.Blue),
+        colorMap = List(Vector(Color.Blue), Vector(Color.Green)),
+        color = Color.Green,
+        idUuid = UUID.fromString("00000000-0000-0000-0000-000000000003"),
+        uuids = List(
+          UUID.fromString("00000000-0000-0003-0000-000000000000"),
+          UUID.fromString("00000000-0000-0003-0000-000000000001")
+        )
+      )
+      userRepo.rawInsert(u)
+      val dbU = userRepo.findById(3L).get
+      assert(dbU == u)
+
+  test("select MagUser where uuid in set"):
+    connect(Transactor(Postgres, ds())):
+      val ids = Vector(
+        UUID.fromString("00000000-0000-0000-0000-000000000001"),
+        UUID.fromString("00000000-0000-0000-0000-000000000002")
+      )
+      val users =
+        sql"SELECT * FROM mag_user WHERE idUuid = ANY($ids)"
+          .query[MagUser]
+          .run()
+      assert(users == allUsers)
+
+  test("insert MagCar"):
+    connect(Transactor(Postgres, ds())):
+      val c = MagCar(
+        id = 3L,
+        textColors = Vector(Color.RedOrange, Color.RedOrange),
+        textColorMap = Vector(
+          List(Color.RedOrange, Color.RedOrange),
+          List(Color.RedOrange, Color.RedOrange)
+        ),
+        lastService = Some(LastService("James", LocalDate.of(1970, 4, 22))),
+        myJsonB = None,
+        myXml = None
+      )
+      carRepo.rawInsert(c)
+      val dbC = carRepo.findById(3L).get
+      assert(dbC == c)
+
+  test("update MagUser arrays"):
+    connect(Transactor(Postgres, ds())):
+      val newMatrix = IArray(IArray(0, 0), IArray(0, 9))
+      sql"UPDATE mag_user SET matrix = $newMatrix WHERE id = 2".update
+        .run()
+      val newUser = userRepo.findById(2L).get
+      assert(Objects.deepEquals(newUser.matrix, newMatrix))
+
+  test("update MagCar arrays"):
+    connect(Transactor(Postgres, ds())):
+      val newTextColorMap =
+        Vector(List(Color.Blue, Color.Blue), List(Color.Blue, Color.Blue))
+      sql"UPDATE mag_car SET text_color_map = $newTextColorMap WHERE id = 2".update
+        .run()
+      val newCar = carRepo.findById(2L).get
+      assert(newCar.textColorMap == newTextColorMap)
+
+  test("MagCar xml string values"):
+    connect(Transactor(Postgres, ds())):
+      val found =
+        sql"SELECT my_xml FROM mag_car"
+          .query[Option[MyXml]]
+          .run()
+          .flatten
+          .map(_.elem.toString)
+      val expected = allCars.flatMap(_.myXml).map(_.elem.toString)
+      assert(found == expected)
+
+  test("where = ANY()"):
+    connect(Transactor(Postgres, ds())):
+      val ids = Vector(1L, 2L)
+      val cars =
+        sql"SELECT * FROM mag_car WHERE id = ANY($ids)".query[MagCar].run()
+      assert(cars == allCars)
+
+  test("insert MagServiceList interpolated"):
+    connect(Transactor(Postgres, ds())):
+      val service = LastService("James", LocalDate.of(1970, 4, 22))
+      val frag = sql"INSERT INTO mag_service_list (service) VALUES ($service)"
+      assertEquals(
+        frag.sqlString,
+        "INSERT INTO mag_service_list (service) VALUES (?)"
+      )
+      frag.update.run()
+      assertEquals(
+        sql"SELECT service FROM mag_service_list".query[LastService].run().head,
+        service
+      )
+
+  val pgContainer = ForAllContainerFixture(
+    PostgreSQLContainer
+      .Def(dockerImageName = DockerImageName.parse("postgres:17.0"))
+      .createContainer()
+  )
+
+  override def munitFixtures: Seq[AnyFixture[?]] =
+    super.munitFixtures :+ pgContainer
+
+  def ds(): DataSource =
+    val ds = PGSimpleDataSource()
+    val pg = pgContainer()
+    ds.setUrl(pg.jdbcUrl)
+    ds.setUser(pg.username)
+    ds.setPassword(pg.password)
+    val userSql =
+      Files.readString(Path.of(getClass.getResource("/pg-user.sql").toURI))
+    val carSql =
+      Files.readString(Path.of(getClass.getResource("/pg-car.sql").toURI))
+    val serviceListSql =
+      Files.readString(
+        Path.of(getClass.getResource("/pg-service-list.sql").toURI)
+      )
+    Manager { use =>
+      val con = use(ds.getConnection)
+      val stmt = use(con.createStatement)
+      stmt.execute(userSql)
+      stmt.execute(carSql)
+      stmt.execute(serviceListSql)
+    }.get
+    ds
+  end ds
+end PgCodecTests

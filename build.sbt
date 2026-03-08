@@ -1,9 +1,9 @@
-ThisBuild / organization := "com.augustnagro"
+ThisBuild / organization := "ma.chinespirit"
 ThisBuild / version := "2.0.0-M2"
 ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / scalaVersion := "3.8.2"
 ThisBuild / scalacOptions ++= Seq("-deprecation")
-ThisBuild / homepage := Some(url("https://github.com/AugustNagro/magnum"))
+ThisBuild / homepage := Some(url("https://github.com/lbialy/parlance"))
 ThisBuild / licenses += (
   "Apache-2.0",
   url(
@@ -12,17 +12,17 @@ ThisBuild / licenses += (
 )
 ThisBuild / scmInfo := Some(
   ScmInfo(
-    url("https://github.com/AugustNagro/magnum"),
-    "scm:git:git@github.com:augustnagro/magnum.git",
-    Some("scm:git:git@github.com:augustnagro/magnum.git")
+    url("https://github.com/lbialy/parlance"),
+    "scm:git:git@github.com:lbialy/parlance.git",
+    Some("scm:git:git@github.com:lbialy/parlance.git")
   )
 )
 ThisBuild / developers := List(
   Developer(
-    id = "augustnagro@gmail.com",
-    name = "August Nagro",
-    email = "augustnagro@gmail.com",
-    url = url("https://augustnagro.com")
+    id = "lbialy",
+    name = "Lukasz Bialy",
+    email = "lukasz@chinespirit.ma",
+    url = url("https://chinespirit.ma")
   )
 )
 ThisBuild / publishMavenStyle := true
@@ -47,10 +47,10 @@ val postgresDriverVersion = "42.7.4"
 
 lazy val root = project
   .in(file("."))
-  .aggregate(magnum, magnumPg, magnumMigrate)
+  .aggregate(parlance, parlancePg, parlanceMigrate)
 
-lazy val magnum = project
-  .in(file("magnum"))
+lazy val parlance = project
+  .in(file("parlance"))
   .settings(
     Test / fork := true,
     publish / skip := false,
@@ -70,11 +70,11 @@ lazy val magnum = project
     )
   )
 
-lazy val magnumMigrate = project
-  .in(file("magnum-migrate"))
-  .dependsOn(magnum)
+lazy val parlanceMigrate = project
+  .in(file("parlance-migrate"))
+  .dependsOn(parlance)
   .settings(
-    name := "magnum-migrate",
+    name := "parlance-migrate",
     Test / fork := true,
     libraryDependencies ++= Seq(
       "org.scalameta" %% "munit" % munitVersion % Test,
@@ -82,9 +82,9 @@ lazy val magnumMigrate = project
     )
   )
 
-lazy val magnumPg = project
-  .in(file("magnum-pg"))
-  .dependsOn(magnum)
+lazy val parlancePg = project
+  .in(file("parlance-pg"))
+  .dependsOn(parlance)
   .settings(
     Test / fork := true,
     publish / skip := false,

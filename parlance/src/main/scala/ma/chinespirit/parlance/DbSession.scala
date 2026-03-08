@@ -1,0 +1,28 @@
+package ma.chinespirit.parlance
+
+import java.sql.Connection
+import scala.collection.mutable
+
+class DbSession[D <: DatabaseType] private[parlance] (
+    val connection: Connection,
+    val sqlLogger: SqlLogger,
+    val databaseType: D
+):
+  private[parlance] val identityMap: mutable.HashMap[(String, Any), Any] =
+    mutable.HashMap.empty
+
+  /** Track an entity. First-load-wins: re-fetching does NOT overwrite. */
+  private[parlance] def trackLoaded(
+      tableName: String,
+      pkValue: Any,
+      entity: Any
+  ): Unit =
+    identityMap.getOrElseUpdate((tableName, pkValue), entity)
+
+  /** Look up the original snapshot. */
+  private[parlance] def getOriginal(
+      tableName: String,
+      pkValue: Any
+  ): Option[Any] =
+    identityMap.get((tableName, pkValue))
+end DbSession
