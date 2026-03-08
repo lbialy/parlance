@@ -65,9 +65,9 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
     val errors = compileErrors("""
       import ma.chinespirit.parlance.*
       import java.util.UUID
-      case class UserCreator(name: String) derives DbCodec
       @Table()
       case class User(id: UUID, name: String) derives EntityMeta
+      case class UserCreator(name: String) extends CreatorOf[User] derives DbCodec
       val repo = Repo[UserCreator, User, UUID]()
       def test(using DbCon[ClickHouse]): Unit =
         repo.create(UserCreator("test"))

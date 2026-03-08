@@ -11,7 +11,7 @@ def entityCreatorTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transa
 ): Unit =
   import suite.*
 
-  case class MyUserCreator(firstName: String) derives DbCodec
+  case class MyUserCreator(firstName: String) extends CreatorOf[MyUser] derives DbCodec
 
   @Table(SqlNameMapper.CamelToSnakeCase)
   case class MyUser(firstName: String, id: Long) derives EntityMeta
@@ -81,7 +81,7 @@ def entityCreatorReturningTests[D <: SupportsReturning](
 )(using Location): Unit =
   import suite.*
 
-  case class MyUserCreator(firstName: String) derives DbCodec
+  case class MyUserCreator(firstName: String) extends CreatorOf[MyUser] derives DbCodec
 
   @Table(SqlNameMapper.CamelToSnakeCase)
   case class MyUser(firstName: String, id: Long) derives EntityMeta

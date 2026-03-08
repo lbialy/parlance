@@ -127,8 +127,8 @@ def id(name: String): ColumnDef[Long] =
   column[Long](name).primaryKey.autoIncrement
 
 def timestamps(): List[ColumnDef[?]] = List(
-  column[java.time.Instant]("created_at"),
-  column[java.time.Instant]("updated_at")
+  column[java.time.Instant]("created_at").defaultExpression("CURRENT_TIMESTAMP"),
+  column[java.time.Instant]("updated_at").defaultExpression("CURRENT_TIMESTAMP")
 )
 
 def softDelete(): ColumnDef[Option[java.time.Instant]] =

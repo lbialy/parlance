@@ -230,16 +230,32 @@ private def assertECIsSubsetOfE[EC: Type, E: Type](using Quotes): Unit =
   val eFields = eRepr.typeSymbol.caseFields
   val ecFields = ecRepr.typeSymbol.caseFields
 
-  for ecField <- ecFields do
-    if !eFields.exists(f =>
-        f.name == ecField.name &&
-          f.signature.resultSig == ecField.signature.resultSig
-      )
-    then
-      report.error(
-        s"""${ecRepr.show} must be an effective subset of ${eRepr.show}.
-           |Are there any fields on ${ecRepr.show} you forgot to update on ${eRepr.show}?
-           |""".stripMargin
+  val mismatched = ecFields.filterNot(ecField =>
+    eFields.exists(f =>
+      f.name == ecField.name &&
+        f.signature.resultSig == ecField.signature.resultSig
+    )
+  )
+  if mismatched.nonEmpty then
+    val fieldList = mismatched.map(_.name).mkString(", ")
+    report.errorAndAbort(
+      s"""${ecRepr.show} must be an effective subset of ${eRepr.show}.
+         |Fields not found or type-mismatched in ${eRepr.show}: $fieldList
+         |Are there any fields on ${ecRepr.show} you forgot to update on ${eRepr.show}?
+         |""".stripMargin
+    )
+
+private def assertCreatorExtendsCreatorOf[EC: Type, E: Type](using
+    Quotes
+): Unit =
+  import quotes.reflect.*
+  val ecRepr = TypeRepr.of[EC]
+  val eRepr = TypeRepr.of[E]
+  if !(ecRepr =:= eRepr) then
+    val creatorOfE = TypeRepr.of[CreatorOf[E]]
+    if !(ecRepr <:< creatorOfE) then
+      report.errorAndAbort(
+        s"${ecRepr.show} must extend CreatorOf[${eRepr.show}] to enable entity extension methods like .create()"
       )
 
 private def tableExprs[EC: Type, E: Type, ID: Type](using
@@ -247,6 +263,7 @@ private def tableExprs[EC: Type, E: Type, ID: Type](using
 ): TableExprs =
   import quotes.reflect.*
   assertECIsSubsetOfE[EC, E]
+  assertCreatorOmitsAutoManaged[EC, E]
 
   val idIndex = idAnnotIndex[E]
   val table: Expr[Table] =
@@ -310,6 +327,33 @@ private def tableExprs[EC: Type, E: Type, ID: Type](using
       )
   end match
 end tableExprs
+
+private[parlance] def autoManagedFieldNames[E: Type](using q: Quotes): Set[String] =
+  import q.reflect.*
+  val annotations = List(
+    TypeRepr.of[Id].typeSymbol,
+    TypeRepr.of[createdAt].typeSymbol,
+    TypeRepr.of[updatedAt].typeSymbol,
+    TypeRepr.of[deletedAt].typeSymbol
+  )
+  val params = TypeRepr.of[E].typeSymbol.primaryConstructor.paramSymss.head
+  params
+    .filter(sym => annotations.exists(sym.hasAnnotation))
+    .map(_.name)
+    .toSet
+
+private[parlance] def assertCreatorOmitsAutoManaged[EC: Type, E: Type](using q: Quotes): Unit =
+  import q.reflect.*
+  if TypeRepr.of[EC] =:= TypeRepr.of[E] then return
+  val managed = autoManagedFieldNames[E]
+  val ecFields = TypeRepr.of[EC].typeSymbol.caseFields.map(_.name).toSet
+  val overlap = ecFields.intersect(managed)
+  if overlap.nonEmpty then
+    val fieldList = overlap.toList.sorted.mkString(", ")
+    report.errorAndAbort(
+      s"Creator type ${TypeRepr.of[EC].show} should not contain auto-managed fields: $fieldList. " +
+        s"These fields are managed by Parlance annotations on ${TypeRepr.of[E].show} and should be omitted from the creator type."
+    )
 
 private[parlance] def idAnnotIndex[E: Type](using q: Quotes): Expr[Int] =
   import q.reflect.*

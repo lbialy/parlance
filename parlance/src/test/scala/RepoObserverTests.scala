@@ -6,7 +6,7 @@ import scala.collection.mutable
 // --- entities ---
 
 @Table(SqlNameMapper.CamelToSnakeCase)
-case class ObsUserCreator(name: String) derives DbCodec
+case class ObsUserCreator(name: String) extends CreatorOf[ObsUser] derives DbCodec
 
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ObsUser(@Id id: Long, name: String) derives EntityMeta

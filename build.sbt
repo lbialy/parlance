@@ -47,7 +47,7 @@ val postgresDriverVersion = "42.7.4"
 
 lazy val root = project
   .in(file("."))
-  .aggregate(parlance, parlancePg, parlanceMigrate)
+  .aggregate(parlance, parlancePg, parlanceMigrate, parlanceExamples)
 
 lazy val parlance = project
   .in(file("parlance"))
@@ -79,6 +79,21 @@ lazy val parlanceMigrate = project
     libraryDependencies ++= Seq(
       "org.scalameta" %% "munit" % munitVersion % Test,
       "com.h2database" % "h2" % "2.3.232" % Test
+    )
+  )
+
+lazy val parlanceExamples = project
+  .in(file("parlance-examples"))
+  .dependsOn(parlance, parlancePg, parlanceMigrate)
+  .settings(
+    name := "parlance-examples",
+    publish / skip := true,
+    Test / fork := true,
+    libraryDependencies ++= Seq(
+      "org.scalameta" %% "munit" % munitVersion % Test,
+      "com.dimafeng" %% "testcontainers-scala-munit" % testcontainersVersion % Test,
+      "com.dimafeng" %% "testcontainers-scala-postgresql" % testcontainersVersion % Test,
+      "org.postgresql" % "postgresql" % postgresDriverVersion % Test
     )
   )
 

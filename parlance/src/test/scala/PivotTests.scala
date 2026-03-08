@@ -33,7 +33,8 @@ case class PvUserRoleExtCreator(
     roleId: Long,
     assignedBy: String,
     assignedAt: LocalDateTime
-) derives DbCodec
+) extends CreatorOf[PvUserRoleExt]
+    derives DbCodec
 
 trait PivotTestsDefs:
   self: QbTestBase[?] =>

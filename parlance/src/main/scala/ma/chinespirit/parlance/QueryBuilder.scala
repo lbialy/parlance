@@ -1063,6 +1063,9 @@ object QueryBuilder:
             }
           } =>
         val ecFieldNames = elemNames[ecMels]()
+        assertECIsSubsetOfE[EC, E]
+        assertCreatorExtendsCreatorOf[EC, E]
+        assertCreatorOmitsAutoManaged[EC, E]
         val ecFieldNamesSql: List[Expr[String]] = ecFieldNames.map { name =>
           sqlNameAnnot[E](name) match
             case Some(sqlName) => '{ $sqlName.name }

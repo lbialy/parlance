@@ -290,6 +290,9 @@ object Verify:
 
   private def isTypeCompatible(jdbcType: Int, dbDataType: String): Boolean =
     val dt = dbDataType.toLowerCase.trim
+    // PG arrays and user-defined types (enums) are permissively compatible
+    // with the element/underlying JDBC type reported by the codec
+    if dt == "array" || dt == "user-defined" then return true
     jdbcType match
       case Types.BOOLEAN | Types.BIT =>
         dt == "boolean"
@@ -323,7 +326,7 @@ object Verify:
         dt == "timestamp with time zone"
       case Types.OTHER | Types.JAVA_OBJECT =>
         // Permissive for UUIDs, JSON, custom types
-        dt == "uuid" || dt == "user-defined" || dt == "other" ||
+        dt == "uuid" || dt == "other" ||
         dt == "json" || dt == "jsonb"
       case _ =>
         false

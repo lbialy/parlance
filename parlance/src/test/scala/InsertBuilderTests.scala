@@ -4,7 +4,7 @@ import ma.chinespirit.parlance.*
 case class QbMutItem(@Id id: Long, name: String, amount: Int) derives EntityMeta
 
 @Table(SqlNameMapper.CamelToSnakeCase)
-case class QbMutItemCreator(name: String, amount: Int) derives DbCodec
+case class QbMutItemCreator(name: String, amount: Int) extends CreatorOf[QbMutItem] derives DbCodec
 
 trait InsertBuilderTestsDefs:
   self: QbTestBase[? <: SupportsMutations & SupportsReturning] =>

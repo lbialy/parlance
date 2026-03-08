@@ -15,7 +15,7 @@ open class ImmutableRepo[E, ID](
     val injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]]
 )(using
     meta: EntityMeta[E]
-) extends Scoped[E]:
+):
 
   /** Expose table metadata for traits with self-type. */
   protected def entityMeta: TableMeta[E] = meta
@@ -112,8 +112,6 @@ open class ImmutableRepo[E, ID](
     */
   def finalScopes: Vector[Scope[E]] = injectedScopes
 
-  /** Implements Scoped[E] — delegates to finalScopes. */
-  def scopes: Vector[Scope[E]] = finalScopes
 
   /** Apply all finalScopes to a QueryBuilder. */
   final def applyScopes[C <: Selectable](
