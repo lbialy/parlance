@@ -1,7 +1,31 @@
 package com.augustnagro.magnum
 
+import scala.util.Using
+
 private def extractPkValue(entity: Any, meta: TableMeta[?]): Any =
   entity.asInstanceOf[Product].productElement(meta.pkIndex)
+
+private def queryScalarColumn(sql: String, params: Vector[Any])(using con: DbCon[?]): Vector[Any] =
+  Using.resource(con.connection.prepareStatement(sql)): ps =>
+    FragWriter.fromKeys(params).write(ps, 1)
+    Using.resource(ps.executeQuery()): rs =>
+      val builder = Vector.newBuilder[Any]
+      while rs.next() do builder += rs.getObject(1)
+      builder.result()
+
+private def selectCols(tm: TableMeta[?]): String =
+  tm.columns.map(_.sqlName).mkString(", ")
+
+private def queryByColumn[T](value: Any, colSqlName: String, tm: EntityMeta[T])(using DbCon[?]): Vector[T] =
+  val sql = s"SELECT ${selectCols(tm)} FROM ${tm.tableName} WHERE $colSqlName = ?"
+  Frag(sql, Seq(value), FragWriter.fromKeys(Vector(value)))
+    .query[T](using tm).run()
+
+private def queryByColumnIn[T](keys: Vector[Any], colSqlName: String, tm: EntityMeta[T])(using DbCon[?]): Vector[T] =
+  if keys.isEmpty then return Vector.empty
+  val placeholders = keys.map(_ => "?").mkString(", ")
+  val sql = s"SELECT ${selectCols(tm)} FROM ${tm.tableName} WHERE $colSqlName IN ($placeholders)"
+  Frag(sql, keys, FragWriter.fromKeys(keys)).query[T](using tm).run()
 
 // --- Group 1a: Mutations ---
 extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[? <: SupportsMutations])
@@ -65,3 +89,61 @@ extension [EC, E, ID](entity: E)(using
   def forceDelete(): Unit = repo.forceDelete(entity)
   def restore(): Unit = repo.restore(entity)
   def trashed: Boolean = repo.isTrashed(entity)
+
+// --- Group 6: Relationship loading ---
+extension [E](entity: E)(using sm: TableMeta[E], con: DbCon[?])
+
+  def load[T](rel: Relationship[E, T])(using tm: EntityMeta[T]): Vector[T] =
+    val fkIdx = sm.columnIndex(rel.fk.scalaName)
+    val rawValue = entity.asInstanceOf[Product].productElement(fkIdx)
+    rawValue match
+      case None    => Vector.empty
+      case Some(v) => queryByColumn(v, rel.pk.sqlName, tm)
+      case v       => queryByColumn(v, rel.pk.sqlName, tm)
+
+  def load[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(using tm: EntityMeta[T]): Vector[T] =
+    val pkIdx = sm.columnIndex(rel.sourcePk.scalaName)
+    val pkValue = entity.asInstanceOf[Product].productElement(pkIdx)
+    val pivotSql = s"SELECT ${rel.targetFk} FROM ${rel.pivotTable} WHERE ${rel.sourceFk} = ?"
+    val targetKeys = queryScalarColumn(pivotSql, Vector(pkValue))
+    queryByColumnIn(targetKeys, rel.targetPk.sqlName, tm)
+
+  def load[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(using tm: EntityMeta[T]): Vector[T] =
+    val pkIdx = sm.columnIndex(rel.sourcePk.scalaName)
+    val pkValue = entity.asInstanceOf[Product].productElement(pkIdx)
+    val intSql = s"SELECT ${rel.intermediatePk.sqlName} FROM ${rel.intermediateTable} WHERE ${rel.sourceFk} = ?"
+    val intKeys = queryScalarColumn(intSql, Vector(pkValue))
+    queryByColumnIn(intKeys, rel.targetFk.sqlName, tm)
+
+  def load[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(using tm: EntityMeta[T]): Vector[T] =
+    val pkIdx = sm.columnIndex(rel.sourcePk.scalaName)
+    val pkValue = entity.asInstanceOf[Product].productElement(pkIdx)
+    val intSql = s"SELECT ${rel.intermediatePk.sqlName} FROM ${rel.intermediateTable} WHERE ${rel.sourceFk} = ?"
+    val intKeys = queryScalarColumn(intSql, Vector(pkValue))
+    queryByColumnIn(intKeys, rel.targetFk.sqlName, tm)
+
+  def load[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(using
+      im: EntityMeta[I],
+      tm: EntityMeta[T]
+  ): Vector[T] =
+    val intermediates = load(rel.inner)(using im)
+    given TableMeta[I] = im
+    intermediates.flatMap(_.load(rel.outer)(using tm))
+
+  def loadOne[T](rel: Relationship[E, T])(using EntityMeta[T]): Option[T] =
+    load(rel).headOption
+
+  def loadOne[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(using EntityMeta[T]): Option[T] =
+    load(rel).headOption
+
+  def loadOne[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(using EntityMeta[T]): Option[T] =
+    load(rel).headOption
+
+  def loadOne[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(using EntityMeta[T]): Option[T] =
+    load(rel).headOption
+
+  def loadOne[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(using
+      EntityMeta[I],
+      EntityMeta[T]
+  ): Option[T] =
+    load(rel).headOption
