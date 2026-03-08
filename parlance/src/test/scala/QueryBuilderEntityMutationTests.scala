@@ -135,8 +135,6 @@ end QueryBuilderEntityMutationTestsDefs
 
 class QueryBuilderEntityMutationTests extends QbH2TestBase, QueryBuilderEntityMutationTestsDefs:
   val h2Ddls = Seq("/h2/qb-entity-mutations.sql")
-end QueryBuilderEntityMutationTests
 
 class PgQueryBuilderEntityMutationTests extends QbPgTestBase, QueryBuilderEntityMutationTestsDefs:
   val pgDdls = Seq("/pg/qb-entity-mutations.sql")
-end PgQueryBuilderEntityMutationTests

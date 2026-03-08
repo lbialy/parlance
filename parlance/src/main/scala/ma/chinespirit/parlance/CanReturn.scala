@@ -5,8 +5,8 @@ package ma.chinespirit.parlance
   * When EC =:= E, no generated keys are needed (works on all databases). When EC != E, the database must support generated keys
   * (SupportsReturning).
   *
-  * EC and E are invariant to prevent the compiler from unifying via Nothing.
-  * D is contravariant so that givens work with erased/existential database types.
+  * EC and E are invariant to prevent the compiler from unifying via Nothing. D is contravariant so that givens work with erased/existential
+  * database types.
   */
 sealed trait CanReturn[EC, E, -D <: DatabaseType]
 

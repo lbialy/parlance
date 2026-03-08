@@ -161,7 +161,6 @@ class RelationshipLoadTests extends QbH2TestBase, RelationshipLoadTestsDefs:
     "/h2/qb-through.sql",
     "/h2/qb-via.sql"
   )
-end RelationshipLoadTests
 
 class PgRelationshipLoadTests extends QbPgTestBase, RelationshipLoadTestsDefs:
   val pgDdls = Seq(
@@ -170,4 +169,3 @@ class PgRelationshipLoadTests extends QbPgTestBase, RelationshipLoadTestsDefs:
     "/pg/qb-through.sql",
     "/pg/qb-via.sql"
   )
-end PgRelationshipLoadTests

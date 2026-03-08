@@ -163,8 +163,6 @@ end BugTestsDefs
 
 class BugTests extends QbH2TestBase, BugTestsDefs:
   val h2Ddls = Seq("/h2/qb-bugs.sql")
-end BugTests
 
 class PgBugTests extends QbPgTestBase, BugTestsDefs:
   val pgDdls = Seq("/pg/qb-bugs.sql")
-end PgBugTests

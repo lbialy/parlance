@@ -373,7 +373,9 @@ trait WhereHasTestsDefs:
           .from[ClChecklistItem]
           .where(_.formId === formId)
           .whereHas(ClChecklistItem.checklist)(sq =>
-            sq.whereHas(ClChecklist.trip)(sq2 => sq2.whereHas(ClTrip.owners)(_.id === userId) || sq2.whereHas(ClTrip.users)(_.id === userId))
+            sq.whereHas(ClChecklist.trip)(sq2 =>
+              sq2.whereHas(ClTrip.owners)(_.id === userId) || sq2.whereHas(ClTrip.users)(_.id === userId)
+            )
           )
           .exists()
 
@@ -445,8 +447,6 @@ end WhereHasTestsDefs
 
 class WhereHasTests extends QbH2TestBase, WhereHasTestsDefs:
   val h2Ddls = Seq("/h2/qb-where-has.sql")
-end WhereHasTests
 
 class PgWhereHasTests extends QbPgTestBase, WhereHasTestsDefs:
   val pgDdls = Seq("/pg/qb-where-has.sql")
-end PgWhereHasTests

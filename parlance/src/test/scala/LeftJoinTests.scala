@@ -110,8 +110,6 @@ end LeftJoinTestsDefs
 
 class LeftJoinTests extends QbH2TestBase with LeftJoinTestsDefs:
   val h2Ddls = Seq("/h2/qb-left-join.sql")
-end LeftJoinTests
 
 class PgLeftJoinTests extends QbPgTestBase with LeftJoinTestsDefs:
   val pgDdls = Seq("/pg/qb-left-join.sql")
-end PgLeftJoinTests

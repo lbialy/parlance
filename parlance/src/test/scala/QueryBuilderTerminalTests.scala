@@ -55,8 +55,6 @@ end QueryBuilderTerminalTestsDefs
 
 class QueryBuilderTerminalTests extends QbH2TestBase, QueryBuilderTerminalTestsDefs:
   val h2Ddls = Seq("/h2/qb-user.sql")
-end QueryBuilderTerminalTests
 
 class PgQueryBuilderTerminalTests extends QbPgTestBase, QueryBuilderTerminalTestsDefs:
   val pgDdls = Seq("/pg/qb-user.sql")
-end PgQueryBuilderTerminalTests

@@ -270,8 +270,6 @@ end QueryBuilderBasicTestsDefs
 
 class QueryBuilderBasicTests extends QbH2TestBase, QueryBuilderBasicTestsDefs:
   val h2Ddls = Seq("/h2/qb-user.sql", "/h2/qb-product.sql")
-end QueryBuilderBasicTests
 
 class PgQueryBuilderBasicTests extends QbPgTestBase, QueryBuilderBasicTestsDefs:
   val pgDdls = Seq("/pg/qb-user.sql", "/pg/qb-product.sql")
-end PgQueryBuilderBasicTests

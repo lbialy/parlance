@@ -51,8 +51,10 @@ class ECommerceTests extends FunSuite, TestContainersFixtures:
     assertEquals(status.applied.size, 5)
     assertEquals(status.pending.size, 0)
     xa().connect:
-      Database.verifySchema().foreach: result =>
-        assert(!result.hasErrors, s"Schema mismatch for ${result.entityName}:\n${result.prettyPrint}")
+      Database
+        .verifySchema()
+        .foreach: result =>
+          assert(!result.hasErrors, s"Schema mismatch for ${result.entityName}:\n${result.prettyPrint}")
 
   test("2 - seed data"):
     xa().connect:
@@ -197,7 +199,9 @@ class ECommerceTests extends FunSuite, TestContainersFixtures:
       val (order, items) = orders.placeOrder(
         customerId = 2L,
         items = Seq((3L, 1, BigDecimal("899.99"))),
-        shippingStreet = "456 Oak Ave", shippingCity = "LA", shippingCountry = "US"
+        shippingStreet = "456 Oak Ave",
+        shippingCity = "LA",
+        shippingCountry = "US"
       )
       assertEquals(order.status, OrderStatus.Pending)
       assertEquals(items.size, 1)

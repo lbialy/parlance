@@ -198,8 +198,6 @@ end PaginationTestsDefs
 
 class PaginationTests extends QbH2TestBase, PaginationTestsDefs:
   val h2Ddls = Seq("/h2/qb-pagination.sql")
-end PaginationTests
 
 class PgPaginationTests extends QbPgTestBase, PaginationTestsDefs:
   val pgDdls = Seq("/pg/qb-pagination.sql")
-end PgPaginationTests

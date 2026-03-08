@@ -77,8 +77,6 @@ end NullOrderTestsDefs
 
 class NullOrderTests extends QbH2TestBase, NullOrderTestsDefs:
   val h2Ddls = Seq("/h2/qb-user.sql")
-end NullOrderTests
 
 class PgNullOrderTests extends QbPgTestBase, NullOrderTestsDefs:
   val pgDdls = Seq("/pg/qb-user.sql")
-end PgNullOrderTests

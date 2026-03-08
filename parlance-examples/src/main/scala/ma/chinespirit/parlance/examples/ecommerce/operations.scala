@@ -20,9 +20,16 @@ object Database:
 
   def verifySchema()(using DbCon[Postgres]): List[VerifyResult] =
     List(
-      verify[Customer], verify[Category], verify[Product], verify[ProductVariant],
-      verify[Order], verify[OrderItem], verify[Review], verify[Wishlist]
+      verify[Customer],
+      verify[Category],
+      verify[Product],
+      verify[ProductVariant],
+      verify[Order],
+      verify[OrderItem],
+      verify[Review],
+      verify[Wishlist]
     )
+end Database
 
 // ===== Account management =====
 
@@ -42,7 +49,8 @@ class AccountController(using AppContext):
 
   /** Update profile */
   def updateProfile(customerId: Long, newLastName: String, newEmail: String)(using DbCon[Postgres]): Customer =
-    val customer = Customer.repo.findById(customerId)
+    val customer = Customer.repo
+      .findById(customerId)
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found"))
     val updated = customer.copy(lastName = newLastName, email = newEmail)
     updated.save()
@@ -50,28 +58,35 @@ class AccountController(using AppContext):
 
   /** Deactivate account (soft delete) */
   def deactivateAccount(customerId: Long)(using DbCon[Postgres]): Unit =
-    Customer.repo.findById(customerId)
+    Customer.repo
+      .findById(customerId)
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found"))
       .delete()
 
   /** Reactivate a previously deactivated account */
   def reactivateAccount(customerId: Long)(using DbCon[Postgres]): Customer =
-    val deactivated = Customer.repo.withTrashed.run().find(_.id == customerId)
+    val deactivated = Customer.repo.withTrashed
+      .run()
+      .find(_.id == customerId)
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found"))
     require(deactivated.trashed, "Account is not deactivated")
     deactivated.restore()
-    Customer.repo.findById(customerId)
+    Customer.repo
+      .findById(customerId)
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found after restore"))
 
   /** Permanently delete account — GDPR "right to be forgotten" */
   def deleteAccountPermanently(customerId: Long)(using DbCon[Postgres]): Unit =
-    val customer = Customer.repo.withTrashed.run().find(_.id == customerId)
+    val customer = Customer.repo.withTrashed
+      .run()
+      .find(_.id == customerId)
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found"))
     Customer.repo.forceDelete(customer)
 
   /** Customer dashboard: profile, orders, wishlisted products */
   def dashboard(customerId: Long)(using DbCon[Postgres]): (Customer, Vector[Order], Vector[Product]) =
-    val customer = Customer.repo.findById(customerId)
+    val customer = Customer.repo
+      .findById(customerId)
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found"))
     val orders = customer.load(Customer.orders)
     val wishlist = customer.load(Customer.wishlistedProducts)
@@ -88,6 +103,7 @@ class AccountController(using AppContext):
 
   def allAccounts()(using DbCon[Postgres]): Vector[Customer] =
     Customer.repo.withTrashed.run()
+end AccountController
 
 // ===== Product catalog =====
 
@@ -114,10 +130,12 @@ class CatalogController(using AppContext):
 
   /** Product detail page: product with its variants and reviews */
   def productDetail(productId: Long)(using DbCon[Postgres]): Option[(Product, Vector[ProductVariant], Vector[Review])] =
-    Product.repo.findById(productId).map: product =>
-      val variants = product.load(Product.variants)
-      val reviews = product.load(Product.reviews)
-      (product, variants, reviews)
+    Product.repo
+      .findById(productId)
+      .map: product =>
+        val variants = product.load(Product.variants)
+        val reviews = product.load(Product.reviews)
+        (product, variants, reviews)
 
   /** Product detail by name — e.g. for SEO-friendly URLs */
   def productByName(name: String)(using DbCon[Postgres]): Option[(Product, Vector[ProductVariant])] =
@@ -144,6 +162,7 @@ class CatalogController(using AppContext):
     sql"SELECT * FROM reviews WHERE rating >= $minRating ORDER BY rating DESC"
       .query[Review]
       .run()
+end CatalogController
 
 // ===== Category management =====
 
@@ -153,7 +172,8 @@ class CategoryController(using AppContext):
     CategoryCreator(name, parentId).create()
 
   def remove(categoryId: Long)(using DbCon[Postgres]): Unit =
-    Category.repo.findById(categoryId)
+    Category.repo
+      .findById(categoryId)
       .getOrElse(throw java.util.NoSuchElementException(s"Category $categoryId not found"))
       .delete()
 
@@ -168,6 +188,7 @@ class CategoryController(using AppContext):
 
   def listAll()(using DbCon[Postgres]): Vector[Category] =
     Category.repo.findAll
+end CategoryController
 
 // ===== Order management =====
 
@@ -183,43 +204,61 @@ class OrderController(using AppContext):
   )(using DbTx[Postgres]): (Order, Vector[OrderItem]) =
     val total = items.map((_, qty, price) => price * qty).sum
     val order = OrderCreator(
-      customerId, OrderStatus.Pending, total,
-      shippingStreet, shippingCity, shippingCountry,
-      shippingStreet, shippingCity, shippingCountry
+      customerId,
+      OrderStatus.Pending,
+      total,
+      shippingStreet,
+      shippingCity,
+      shippingCountry,
+      shippingStreet,
+      shippingCity,
+      shippingCountry
     ).create()
 
     val orderItems = items.map: (variantId, quantity, unitPrice) =>
       // Lock the variant row to prevent overselling
-      val locked = ProductVariant.repo.query.where(_.id === variantId).lockForUpdate.run()
-        .headOption.getOrElse(throw java.util.NoSuchElementException(s"Variant $variantId not found"))
+      val locked = ProductVariant.repo.query
+        .where(_.id === variantId)
+        .lockForUpdate
+        .run()
+        .headOption
+        .getOrElse(throw java.util.NoSuchElementException(s"Variant $variantId not found"))
       require(locked.stockQuantity >= quantity, s"Insufficient stock for variant $variantId")
       ProductVariant.repo.query.where(_.id === variantId).decrement(_.stockQuantity, quantity)
       OrderItemCreator(order.id, variantId, quantity, unitPrice).create()
 
     (order, orderItems.toVector)
+  end placeOrder
 
   /** View order with all line items */
   def orderDetails(orderId: Long)(using DbCon[Postgres]): Option[(Order, Customer, Vector[OrderItem])] =
-    Order.repo.findById(orderId).map: order =>
-      val customer = order.loadOne(Order.customer)
-        .getOrElse(throw java.util.NoSuchElementException(s"Order ${order.id} has no customer"))
-      val items = order.load(Order.items)
-      (order, customer, items)
+    Order.repo
+      .findById(orderId)
+      .map: order =>
+        val customer = order
+          .loadOne(Order.customer)
+          .getOrElse(throw java.util.NoSuchElementException(s"Order ${order.id} has no customer"))
+        val items = order.load(Order.items)
+        (order, customer, items)
 
   /** Check if a customer owns a given order (authorization) */
   def isOrderOwner(orderId: Long, customerId: Long)(using DbCon[Postgres]): Boolean =
-    val order = Order.repo.findById(orderId)
+    val order = Order.repo
+      .findById(orderId)
       .getOrElse(throw java.util.NoSuchElementException(s"Order $orderId not found"))
-    val orderOwner = order.loadOne(Order.customer)
+    val orderOwner = order
+      .loadOne(Order.customer)
       .getOrElse(throw java.util.NoSuchElementException(s"Order $orderId has no customer"))
-    val requestingUser = Customer.repo.findById(customerId)
+    val requestingUser = Customer.repo
+      .findById(customerId)
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found"))
     orderOwner.is(requestingUser)
 
   /** Restock a variant (e.g. new shipment arrived) */
   def restockVariant(variantId: Long, quantity: Int)(using DbCon[Postgres]): ProductVariant =
     ProductVariant.repo.query.where(_.id === variantId).increment(_.stockQuantity, quantity)
-    ProductVariant.repo.findById(variantId)
+    ProductVariant.repo
+      .findById(variantId)
       .getOrElse(throw java.util.NoSuchElementException(s"Variant $variantId not found"))
       .refresh()
 
@@ -257,6 +296,7 @@ class OrderController(using AppContext):
       .select(o => (status = o.status, count = Expr.count))
       .groupBy(_.status)
       .run()
+end OrderController
 
 // ===== Wishlist =====
 

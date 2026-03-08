@@ -26,3 +26,4 @@ trait TableMeta[E]:
   /** Index of a column by its Scala name, or -1 if not found. */
   def columnIndex(scalaName: String): Int =
     columns.indexWhere(_.scalaName == scalaName)
+end TableMeta

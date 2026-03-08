@@ -22,7 +22,6 @@ def sharedTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(usi
   bigDecTests(suite, xa)
   dateTimeTests(suite, xa)
   tupleTests(suite, xa)
-end sharedTests
 
 def sharedMutationTests[D <: SupportsMutations](suite: FunSuite, xa: () => Transactor[D])(using
     Location,
@@ -37,7 +36,6 @@ def sharedMutationTests[D <: SupportsMutations](suite: FunSuite, xa: () => Trans
   saveTests(suite, xa)
   entityCreatorTests(suite, xa)
   entityExtensionTests(suite, xa)
-end sharedMutationTests
 
 def sharedReturningMutationTests[D <: SupportsMutations & SupportsReturning](suite: FunSuite, xa: () => Transactor[D])(using
     Location,

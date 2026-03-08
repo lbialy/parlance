@@ -70,8 +70,7 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
         forceDeleteByIdInternal(id)
         self.observers.foreach(_.deleted(e))
         self.observers.foreach(_.forceDeleted(e))
-    else
-      forceDeleteByIdInternal(id)
+    else forceDeleteByIdInternal(id)
 
   private def forceDeleteByIdInternal(id: ID)(using DbCon[? <: SupportsMutations]): Unit =
     Frag(
@@ -99,8 +98,7 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
         restoreByIdInternal(id)
         self.observers.foreach(_.updated(e))
         self.observers.foreach(_.restored(e))
-    else
-      restoreByIdInternal(id)
+    else restoreByIdInternal(id)
 
   private def restoreByIdInternal(id: ID)(using DbCon[? <: SupportsMutations]): Unit =
     Frag(

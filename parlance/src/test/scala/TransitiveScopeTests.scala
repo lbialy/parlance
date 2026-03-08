@@ -17,7 +17,6 @@ import ma.chinespirit.parlance.*
 trait TransitiveScopeTestsDefs:
   self: QbTestBase[?] =>
 
-
   // --- Scoped book repo that excludes book id=4 ("I, Robot") ---
 
   val excludeIRobotScope = new Scope[ElBook]:
@@ -252,8 +251,6 @@ end TransitiveScopeTestsDefs
 
 class TransitiveScopeTests extends QbH2TestBase with TransitiveScopeTestsDefs:
   val h2Ddls = Seq("/h2/qb-where-has.sql")
-end TransitiveScopeTests
 
 class PgTransitiveScopeTests extends QbPgTestBase with TransitiveScopeTestsDefs:
   val pgDdls = Seq("/pg/qb-where-has.sql")
-end PgTransitiveScopeTests

@@ -114,8 +114,6 @@ end InsertBuilderTestsDefs
 
 class InsertBuilderTests extends QbH2TestBase, InsertBuilderTestsDefs:
   val h2Ddls = Seq("/h2/qb-entity-mutations.sql")
-end InsertBuilderTests
 
 class PgInsertBuilderTests extends QbPgTestBase, InsertBuilderTestsDefs:
   val pgDdls = Seq("/pg/qb-entity-mutations.sql")
-end PgInsertBuilderTests

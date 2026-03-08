@@ -129,8 +129,6 @@ end ColumnCompareTestsDefs
 
 class ColumnCompareTests extends QbH2TestBase, ColumnCompareTestsDefs:
   val h2Ddls = Seq("/h2/qb-score.sql")
-end ColumnCompareTests
 
 class PgColumnCompareTests extends QbPgTestBase, ColumnCompareTestsDefs:
   val pgDdls = Seq("/pg/qb-score.sql")
-end PgColumnCompareTests

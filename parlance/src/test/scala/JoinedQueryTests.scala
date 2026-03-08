@@ -166,8 +166,6 @@ end JoinedQueryTestsDefs
 
 class JoinedQueryTests extends QbH2TestBase with JoinedQueryTestsDefs:
   val h2Ddls = Seq("/h2/qb-join.sql")
-end JoinedQueryTests
 
 class PgJoinedQueryTests extends QbPgTestBase with JoinedQueryTestsDefs:
   val pgDdls = Seq("/pg/qb-join.sql")
-end PgJoinedQueryTests

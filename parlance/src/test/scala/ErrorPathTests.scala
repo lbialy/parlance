@@ -107,8 +107,6 @@ end ErrorPathTestsDefs
 
 class ErrorPathTests extends QbH2TestBase, ErrorPathTestsDefs:
   val h2Ddls = Seq("/h2/qb-user.sql", "/h2/qb-join.sql")
-end ErrorPathTests
 
 class PgErrorPathTests extends QbPgTestBase, ErrorPathTestsDefs:
   val pgDdls = Seq("/pg/qb-user.sql", "/pg/qb-join.sql")
-end PgErrorPathTests

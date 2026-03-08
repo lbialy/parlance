@@ -244,6 +244,7 @@ private def assertECIsSubsetOfE[EC: Type, E: Type](using Quotes): Unit =
          |Are there any fields on ${ecRepr.show} you forgot to update on ${eRepr.show}?
          |""".stripMargin
     )
+end assertECIsSubsetOfE
 
 private def assertCreatorExtendsCreatorOf[EC: Type, E: Type](using
     Quotes

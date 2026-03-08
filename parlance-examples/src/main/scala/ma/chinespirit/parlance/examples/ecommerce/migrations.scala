@@ -33,6 +33,7 @@ object V1_Foundation extends MigrationDef:
     dropTable("customers"),
     dropEnumType("order_status")
   )
+end V1_Foundation
 
 object V2_Products extends MigrationDef:
   val version = 2L
@@ -60,6 +61,7 @@ object V2_Products extends MigrationDef:
     dropTable("product_variants"),
     dropTable("products")
   )
+end V2_Products
 
 object V3_Orders extends MigrationDef:
   val version = 3L
@@ -90,6 +92,7 @@ object V3_Orders extends MigrationDef:
     dropTable("order_items"),
     dropTable("orders")
   )
+end V3_Orders
 
 object V4_Social extends MigrationDef:
   val version = 4L
@@ -119,6 +122,7 @@ object V4_Social extends MigrationDef:
     dropTable("wishlists"),
     dropTable("reviews")
   )
+end V4_Social
 
 object V5_Indexes extends MigrationDef:
   val version = 5L
@@ -150,3 +154,4 @@ object V5_Indexes extends MigrationDef:
     )
   )
   val down = List.empty
+end V5_Indexes

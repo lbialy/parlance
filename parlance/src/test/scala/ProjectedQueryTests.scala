@@ -193,8 +193,6 @@ end ProjectedQueryTestsDefs
 
 class ProjectedQueryTests extends QbH2TestBase, ProjectedQueryTestsDefs:
   val h2Ddls = Seq("/h2/qb-projected.sql")
-end ProjectedQueryTests
 
 class PgProjectedQueryTests extends QbPgTestBase, ProjectedQueryTestsDefs:
   val pgDdls = Seq("/pg/qb-projected.sql")
-end PgProjectedQueryTests

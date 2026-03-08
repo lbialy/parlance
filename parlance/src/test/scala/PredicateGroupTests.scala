@@ -108,8 +108,6 @@ end PredicateGroupTestsDefs
 
 class PredicateGroupTests extends QbH2TestBase, PredicateGroupTestsDefs:
   val h2Ddls = Seq("/h2/qb-user.sql")
-end PredicateGroupTests
 
 class PgPredicateGroupTests extends QbPgTestBase, PredicateGroupTestsDefs:
   val pgDdls = Seq("/pg/qb-user.sql")
-end PgPredicateGroupTests

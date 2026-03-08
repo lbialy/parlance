@@ -3,7 +3,6 @@ import ma.chinespirit.parlance.*
 trait WithCountTestsDefs:
   self: QbTestBase[?] =>
 
-
   // --- HasMany tests ---
 
   test("withCount returns all authors with book counts"):
@@ -192,8 +191,6 @@ end WithCountTestsDefs
 
 class WithCountTests extends QbH2TestBase with WithCountTestsDefs:
   val h2Ddls = Seq("/h2/qb-where-has.sql")
-end WithCountTests
 
 class PgWithCountTests extends QbPgTestBase with WithCountTestsDefs:
   val pgDdls = Seq("/pg/qb-where-has.sql")
-end PgWithCountTests

@@ -100,8 +100,6 @@ end ChunkTestsDefs
 
 class ChunkTests extends QbH2TestBase, ChunkTestsDefs:
   val h2Ddls = Seq("/h2/qb-chunk.sql")
-end ChunkTests
 
 class PgChunkTests extends QbPgTestBase, ChunkTestsDefs:
   val pgDdls = Seq("/pg/qb-chunk.sql")
-end PgChunkTests

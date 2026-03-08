@@ -216,8 +216,6 @@ end ThroughTestsDefs
 
 class ThroughTests extends QbH2TestBase with ThroughTestsDefs:
   val h2Ddls = Seq("/h2/qb-through.sql")
-end ThroughTests
 
 class PgThroughTests extends QbPgTestBase with ThroughTestsDefs:
   val pgDdls = Seq("/pg/qb-through.sql")
-end PgThroughTests

@@ -106,8 +106,6 @@ end LockingTestsDefs
 
 class LockingTests extends QbH2TestBase, LockingTestsDefs[H2]:
   val h2Ddls = Seq("/h2/qb-user.sql")
-end LockingTests
 
 class PgLockingTests extends QbPgTestBase, LockingTestsDefs[Postgres]:
   val pgDdls = Seq("/pg/qb-user.sql")
-end PgLockingTests

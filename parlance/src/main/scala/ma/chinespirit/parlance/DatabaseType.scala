@@ -11,7 +11,6 @@ trait DatabaseType:
 
   /** Whether this database supports INSERT ... RETURNING via getGeneratedKeys. */
   def supportsInsertReturning: Boolean = false
-end DatabaseType
 
 trait SupportsMutations extends DatabaseType:
   /** SQL for MERGE/upsert by primary key. Entity type E columns. */
@@ -36,16 +35,23 @@ trait SupportsRowLocks extends DatabaseType
 trait SupportsForShare extends SupportsRowLocks
 trait SupportsILike extends DatabaseType
 trait SupportsArrayTypes extends DatabaseType:
-  /** Map a JDBC type code to the SQL type name for Connection.createArrayOf.
-    * Returns None if the type cannot be used in arrays, in which case
-    * findAllById falls back to IN expansion.
+  /** Map a JDBC type code to the SQL type name for Connection.createArrayOf. Returns None if the type cannot be used in arrays, in which
+    * case findAllById falls back to IN expansion.
     */
   def arrayTypeName(jdbcType: Int): Option[String]
 trait SupportsReturning extends DatabaseType
 trait SupportsPartialJoins extends DatabaseType
 trait SupportsMultiColumnReturningKeys extends SupportsReturning
 
-sealed trait Postgres extends DatabaseType, SupportsMutations, SupportsForShare, SupportsILike, SupportsReturning, SupportsArrayTypes, SupportsPartialJoins, SupportsMultiColumnReturningKeys
+sealed trait Postgres
+    extends DatabaseType,
+      SupportsMutations,
+      SupportsForShare,
+      SupportsILike,
+      SupportsReturning,
+      SupportsArrayTypes,
+      SupportsPartialJoins,
+      SupportsMultiColumnReturningKeys
 object Postgres extends Postgres:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
     val limitSql = limit.fold("")(n => s" LIMIT $n")
@@ -79,19 +85,19 @@ object Postgres extends Postgres:
   override val supportsInsertReturning: Boolean = true
 
   def arrayTypeName(jdbcType: Int): Option[String] = jdbcType match
-    case Types.BIGINT                    => Some("bigint")
-    case Types.INTEGER                   => Some("integer")
-    case Types.SMALLINT                  => Some("smallint")
-    case Types.TINYINT                   => Some("smallint")
-    case Types.VARCHAR                   => Some("varchar")
-    case Types.BOOLEAN                   => Some("boolean")
-    case Types.DOUBLE                    => Some("float8")
-    case Types.REAL                      => Some("float4")
-    case Types.NUMERIC                   => Some("numeric")
-    case Types.DATE                      => Some("date")
-    case Types.TIMESTAMP                 => Some("timestamp")
-    case Types.TIMESTAMP_WITH_TIMEZONE   => Some("timestamptz")
-    case _                               => None
+    case Types.BIGINT                  => Some("bigint")
+    case Types.INTEGER                 => Some("integer")
+    case Types.SMALLINT                => Some("smallint")
+    case Types.TINYINT                 => Some("smallint")
+    case Types.VARCHAR                 => Some("varchar")
+    case Types.BOOLEAN                 => Some("boolean")
+    case Types.DOUBLE                  => Some("float8")
+    case Types.REAL                    => Some("float4")
+    case Types.NUMERIC                 => Some("numeric")
+    case Types.DATE                    => Some("date")
+    case Types.TIMESTAMP               => Some("timestamp")
+    case Types.TIMESTAMP_WITH_TIMEZONE => Some("timestamptz")
+    case _                             => None
 end Postgres
 
 sealed trait MySQL extends DatabaseType, SupportsMutations, SupportsRowLocks, SupportsPartialJoins
@@ -165,7 +171,15 @@ object SQLite extends SQLite:
     s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet$extraSetSql$wherePart"
 end SQLite
 
-sealed trait H2 extends DatabaseType, SupportsMutations, SupportsForShare, SupportsILike, SupportsArrayTypes, SupportsReturning, SupportsPartialJoins, SupportsMultiColumnReturningKeys
+sealed trait H2
+    extends DatabaseType,
+      SupportsMutations,
+      SupportsForShare,
+      SupportsILike,
+      SupportsArrayTypes,
+      SupportsReturning,
+      SupportsPartialJoins,
+      SupportsMultiColumnReturningKeys
 object H2 extends H2:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
     val limitSql = limit.fold("")(n => s" LIMIT $n")
@@ -203,19 +217,19 @@ object H2 extends H2:
   override val supportsInsertReturning: Boolean = true
 
   def arrayTypeName(jdbcType: Int): Option[String] = jdbcType match
-    case Types.BIGINT                    => Some("BIGINT")
-    case Types.INTEGER                   => Some("INTEGER")
-    case Types.SMALLINT                  => Some("SMALLINT")
-    case Types.TINYINT                   => Some("TINYINT")
-    case Types.VARCHAR                   => Some("VARCHAR")
-    case Types.BOOLEAN                   => Some("BOOLEAN")
-    case Types.DOUBLE                    => Some("DOUBLE")
-    case Types.REAL                      => Some("REAL")
-    case Types.NUMERIC                   => Some("NUMERIC")
-    case Types.DATE                      => Some("DATE")
-    case Types.TIMESTAMP                 => Some("TIMESTAMP")
-    case Types.TIMESTAMP_WITH_TIMEZONE   => Some("TIMESTAMP WITH TIME ZONE")
-    case _                               => None
+    case Types.BIGINT                  => Some("BIGINT")
+    case Types.INTEGER                 => Some("INTEGER")
+    case Types.SMALLINT                => Some("SMALLINT")
+    case Types.TINYINT                 => Some("TINYINT")
+    case Types.VARCHAR                 => Some("VARCHAR")
+    case Types.BOOLEAN                 => Some("BOOLEAN")
+    case Types.DOUBLE                  => Some("DOUBLE")
+    case Types.REAL                    => Some("REAL")
+    case Types.NUMERIC                 => Some("NUMERIC")
+    case Types.DATE                    => Some("DATE")
+    case Types.TIMESTAMP               => Some("TIMESTAMP")
+    case Types.TIMESTAMP_WITH_TIMEZONE => Some("TIMESTAMP WITH TIME ZONE")
+    case _                             => None
 end H2
 
 sealed trait Oracle extends DatabaseType, SupportsMutations, SupportsRowLocks, SupportsReturning, SupportsPartialJoins
@@ -263,6 +277,7 @@ object Oracle extends Oracle:
     s"MERGE INTO $tableName tgt USING (SELECT $srcCols FROM DUAL) src ON (tgt.$pkCol = src.$pkCol) " +
       s"WHEN MATCHED THEN UPDATE SET $updateSet$extraSetSql$wherePart " +
       s"WHEN NOT MATCHED THEN INSERT ($colsList) VALUES ($valsList)"
+end Oracle
 
 sealed trait ClickHouse extends DatabaseType
 object ClickHouse extends ClickHouse:

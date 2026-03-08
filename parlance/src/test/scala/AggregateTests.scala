@@ -121,8 +121,6 @@ end AggregateTestsDefs
 
 class AggregateTests extends QbH2TestBase, AggregateTestsDefs:
   val h2Ddls = Seq("/h2/qb-chunk.sql", "/h2/qb-user.sql")
-end AggregateTests
 
 class PgAggregateTests extends QbPgTestBase, AggregateTestsDefs:
   val pgDdls = Seq("/pg/qb-chunk.sql", "/pg/qb-user.sql")
-end PgAggregateTests

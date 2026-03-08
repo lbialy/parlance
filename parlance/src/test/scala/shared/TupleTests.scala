@@ -61,22 +61,25 @@ def tupleTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(usin
     assert(tupleA.isDefined)
     val isOracle = xa().databaseType == Oracle
     val someTuple = xa().connect:
-      val q = if isOracle then sql"select 1, 1, 1, 1, 1, 1 FROM DUAL"
-              else sql"select 1, 1, 1, 1, 1, 1"
+      val q =
+        if isOracle then sql"select 1, 1, 1, 1, 1, 1 FROM DUAL"
+        else sql"select 1, 1, 1, 1, 1, 1"
       q.query[Option[(Int, Int, Int, Int, Int, Int)]]
         .run()
         .head
     assert(someTuple.isDefined)
     val noneTuple = xa().connect:
-      val q = if isOracle then sql"select 1, 1, 1, 1, null, 1 FROM DUAL"
-              else sql"select 1, 1, 1, 1, null, 1"
+      val q =
+        if isOracle then sql"select 1, 1, 1, 1, null, 1 FROM DUAL"
+        else sql"select 1, 1, 1, 1, null, 1"
       q.query[Option[(Int, Int, Int, Int, Int, Int)]]
         .run()
         .head
     assert(noneTuple.isEmpty)
     val optionTupleOption = xa().connect:
-      val q = if isOracle then sql"select 1, 1, 1, 1, null, 1 FROM DUAL"
-              else sql"select 1, 1, 1, 1, null, 1"
+      val q =
+        if isOracle then sql"select 1, 1, 1, 1, null, 1 FROM DUAL"
+        else sql"select 1, 1, 1, 1, null, 1"
       q.query[Option[(Int, Int, Int, Int, Option[Int], Int)]]
         .run()
         .head
@@ -97,8 +100,9 @@ def tupleTests[D <: DatabaseType](suite: FunSuite, xa: () => Transactor[D])(usin
 
   test("large tuple in large tuple"):
     xa().connect:
-      val q = if xa().databaseType == Oracle then sql"select 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 FROM DUAL"
-              else sql"select 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
+      val q =
+        if xa().databaseType == Oracle then sql"select 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 FROM DUAL"
+        else sql"select 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
       val tuple = q
         .query[(Int, Int, (Int, Int, Int, Int, Int, Int), Int, Int, Int, Int)]
         .run()

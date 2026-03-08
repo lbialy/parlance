@@ -20,8 +20,7 @@ case class CustomerCreator(
     firstName: String,
     lastName: String,
     email: String
-) extends CreatorOf[Customer]
-    derives DbCodec
+) extends CreatorOf[Customer] derives DbCodec
 
 @SqlName("customers")
 @Table(SqlNameMapper.CamelToSnakeCase)
@@ -33,10 +32,7 @@ case class Customer(
     @createdAt createdAt: OffsetDateTime,
     @updatedAt updatedAt: OffsetDateTime,
     @deletedAt deletedAt: Option[OffsetDateTime]
-) derives EntityMeta,
-      HasCreatedAt,
-      HasUpdatedAt,
-      HasDeletedAt
+) derives EntityMeta, HasCreatedAt, HasUpdatedAt, HasDeletedAt
 
 object Customer:
   val orders = Relationship.hasMany[Customer, Order](_.id, _.customerId)
@@ -53,8 +49,7 @@ object Customer:
 case class CategoryCreator(
     name: String,
     parentId: Option[Long]
-) extends CreatorOf[Category]
-    derives DbCodec
+) extends CreatorOf[Category] derives DbCodec
 
 @SqlName("categories")
 @Table(SqlNameMapper.CamelToSnakeCase)
@@ -80,8 +75,7 @@ case class ProductCreator(
     categoryId: Long,
     tags: Vector[String],
     isActive: Boolean
-) extends CreatorOf[Product]
-    derives DbCodec
+) extends CreatorOf[Product] derives DbCodec
 
 @SqlName("products")
 @Table(SqlNameMapper.CamelToSnakeCase)
@@ -116,8 +110,7 @@ case class VariantCreator(
     color: Option[String],
     price: BigDecimal,
     stockQuantity: Int
-) extends CreatorOf[ProductVariant]
-    derives DbCodec
+) extends CreatorOf[ProductVariant] derives DbCodec
 
 @SqlName("product_variants")
 @Table(SqlNameMapper.CamelToSnakeCase)
@@ -149,8 +142,7 @@ case class OrderCreator(
     billingStreet: String,
     billingCity: String,
     billingCountry: String
-) extends CreatorOf[Order]
-    derives DbCodec
+) extends CreatorOf[Order] derives DbCodec
 
 @SqlName("orders")
 @Table(SqlNameMapper.CamelToSnakeCase)
@@ -166,8 +158,7 @@ case class Order(
     billingCity: String,
     billingCountry: String,
     @createdAt createdAt: OffsetDateTime
-) derives EntityMeta,
-      HasCreatedAt
+) derives EntityMeta, HasCreatedAt
 
 object Order:
   val customer = Relationship.belongsTo[Order, Customer](_.customerId, _.id)
@@ -183,8 +174,7 @@ case class OrderItemCreator(
     variantId: Long,
     quantity: Int,
     unitPrice: BigDecimal
-) extends CreatorOf[OrderItem]
-    derives DbCodec
+) extends CreatorOf[OrderItem] derives DbCodec
 
 @SqlName("order_items")
 @Table(SqlNameMapper.CamelToSnakeCase)
@@ -212,8 +202,7 @@ case class ReviewCreator(
     title: String,
     body: String,
     isVerified: Boolean
-) extends CreatorOf[Review]
-    derives DbCodec
+) extends CreatorOf[Review] derives DbCodec
 
 @SqlName("reviews")
 @Table(SqlNameMapper.CamelToSnakeCase)
@@ -226,8 +215,7 @@ case class Review(
     body: String,
     isVerified: Boolean,
     @createdAt createdAt: OffsetDateTime
-) derives EntityMeta,
-      HasCreatedAt
+) derives EntityMeta, HasCreatedAt
 
 object Review:
   val product = Relationship.belongsTo[Review, Product](_.productId, _.id)
@@ -242,8 +230,7 @@ case class WishlistCreator(
     customerId: Long,
     productId: Long,
     addedAt: OffsetDateTime
-) extends CreatorOf[Wishlist]
-    derives DbCodec
+) extends CreatorOf[Wishlist] derives DbCodec
 
 @SqlName("wishlists")
 @Table(SqlNameMapper.CamelToSnakeCase)

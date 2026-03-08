@@ -77,8 +77,7 @@ open class Repo[EC, E, ID](
         fireDeleting(entity)
         deleteByIdCount(id)
         fireDeleted(entity)
-    else
-      deleteByIdCount(id)
+    else deleteByIdCount(id)
 
   private def deleteByIdCount(id: ID)(using con: DbCon[? <: SupportsMutations]): Int =
     if _collectRewriteDelete.nonEmpty then
@@ -132,12 +131,10 @@ open class Repo[EC, E, ID](
 
   /** Insert and return entity, firing creating/created observer events. */
   def create[D <: DatabaseType](entityCreator: EC)(using con: DbCon[D], cr: CanReturn[EC, E, D]): E =
-    if observers.nonEmpty then
-      observers.foreach(_.creating(entityCreator))
+    if observers.nonEmpty then observers.foreach(_.creating(entityCreator))
     val result = ib.insertReturning(entityCreator)
     con.trackLoaded(meta.tableName, extractPk(result), result)
-    if observers.nonEmpty then
-      observers.foreach(_.created(result))
+    if observers.nonEmpty then observers.foreach(_.created(result))
     result
 
   /** Insert all and return entities without firing observer events. */
@@ -152,12 +149,9 @@ open class Repo[EC, E, ID](
 
   /** Update the entity */
   def update(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
-    if observers.nonEmpty then
-      observers.foreach(_.updating(entity))
+    if observers.nonEmpty then observers.foreach(_.updating(entity))
     updateInternal(entity)
-    if observers.nonEmpty then
-      observers.foreach(_.updated(entity))
-  end update
+    if observers.nonEmpty then observers.foreach(_.updated(entity))
 
   private def updateInternal(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val entityProduct = entity.asInstanceOf[Product]
@@ -219,12 +213,9 @@ open class Repo[EC, E, ID](
 
   /** Update only the changed fields between original and current entity */
   def updatePartial(original: E, current: E)(using con: DbCon[? <: SupportsMutations]): Unit =
-    if observers.nonEmpty then
-      observers.foreach(_.updating(current))
+    if observers.nonEmpty then observers.foreach(_.updating(current))
     updatePartialInternal(original, current)
-    if observers.nonEmpty then
-      observers.foreach(_.updated(current))
-  end updatePartial
+    if observers.nonEmpty then observers.foreach(_.updated(current))
 
   private def updatePartialInternal(original: E, current: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val origProduct = original.asInstanceOf[Product]
@@ -304,6 +295,8 @@ open class Repo[EC, E, ID](
             insertByEntity(entity)
             con.trackLoaded(meta.tableName, pkValue, entity)
             if observers.nonEmpty then observers.foreach(_.created(entity))
+    end match
+  end save
 
   /** Insert a full entity (including PK) without conflict handling. */
   private def insertByEntity(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
@@ -326,6 +319,7 @@ open class Repo[EC, E, ID](
           i += 1
         p
     ).update.run()
+  end insertByEntity
 
   /** Insert with conflict handling. */
   def insertOnConflict(entityCreator: EC, target: ConflictTarget, action: ConflictAction)(using DbCon[? <: SupportsMutations]): Unit =
@@ -349,12 +343,10 @@ open class Repo[EC, E, ID](
         entity
       case None =>
         val ec = creator
-        if observers.nonEmpty then
-          observers.foreach(_.creating(ec))
+        if observers.nonEmpty then observers.foreach(_.creating(ec))
         val result = ib.insertReturning(ec)
         con.trackLoaded(meta.tableName, extractPk(result), result)
-        if observers.nonEmpty then
-          observers.foreach(_.created(result))
+        if observers.nonEmpty then observers.foreach(_.created(result))
         result
 
   /** Find and update an existing entity, or insert a new one. */
@@ -372,12 +364,10 @@ open class Repo[EC, E, ID](
         updated
       case None =>
         val ec = creator
-        if observers.nonEmpty then
-          observers.foreach(_.creating(ec))
+        if observers.nonEmpty then observers.foreach(_.creating(ec))
         val result = ib.insertReturning(ec)
         con.trackLoaded(meta.tableName, extractPk(result), result)
-        if observers.nonEmpty then
-          observers.foreach(_.created(result))
+        if observers.nonEmpty then observers.foreach(_.created(result))
         result
 
   /** Touch an entity, setting its @updatedAt column to CURRENT_TIMESTAMP. */

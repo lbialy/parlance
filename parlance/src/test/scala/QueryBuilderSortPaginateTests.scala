@@ -82,8 +82,6 @@ end QueryBuilderSortPaginateTestsDefs
 
 class QueryBuilderSortPaginateTests extends QbH2TestBase, QueryBuilderSortPaginateTestsDefs:
   val h2Ddls = Seq("/h2/qb-user.sql")
-end QueryBuilderSortPaginateTests
 
 class PgQueryBuilderSortPaginateTests extends QbPgTestBase, QueryBuilderSortPaginateTestsDefs:
   val pgDdls = Seq("/pg/qb-user.sql")
-end PgQueryBuilderSortPaginateTests

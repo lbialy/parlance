@@ -16,8 +16,6 @@ trait QbTestBase[D <: DatabaseType] extends FunSuite:
   def xa(): Transactor[D]
   def databaseType: D
 
-end QbTestBase
-
 trait QbH2TestBase extends QbTestBase[H2]:
 
   lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath

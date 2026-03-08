@@ -35,9 +35,7 @@ trait QbPgTestBase extends QbTestBase[Postgres], TestContainersFixtures:
     ds.setUrl(pg.jdbcUrl)
     ds.setUser(pg.username)
     ds.setPassword(pg.password)
-    val tableDDLs = pgDdls.map(p =>
-      Files.readString(Path.of(getClass.getResource(p).toURI))
-    )
+    val tableDDLs = pgDdls.map(p => Files.readString(Path.of(getClass.getResource(p).toURI)))
     Manager(use =>
       val con = use(ds.getConnection)
       val stmt = use(con.createStatement)

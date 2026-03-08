@@ -261,8 +261,6 @@ end EagerLoadTestsDefs
 
 class EagerLoadTests extends QbH2TestBase with EagerLoadTestsDefs:
   val h2Ddls = Seq("/h2/qb-eager-load.sql")
-end EagerLoadTests
 
 class PgEagerLoadTests extends QbPgTestBase with EagerLoadTestsDefs:
   val pgDdls = Seq("/pg/qb-eager-load.sql")
-end PgEagerLoadTests

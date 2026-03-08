@@ -33,8 +33,7 @@ case class PvUserRoleExtCreator(
     roleId: Long,
     assignedBy: String,
     assignedAt: LocalDateTime
-) extends CreatorOf[PvUserRoleExt]
-    derives DbCodec
+) extends CreatorOf[PvUserRoleExt] derives DbCodec
 
 trait PivotTestsDefs:
   self: QbTestBase[?] =>
@@ -463,8 +462,6 @@ end PivotTestsDefs
 
 class PivotTests extends QbH2TestBase, PivotTestsDefs:
   val h2Ddls = Seq("/h2/qb-pivot.sql")
-end PivotTests
 
 class PgPivotTests extends QbPgTestBase, PivotTestsDefs:
   val pgDdls = Seq("/pg/qb-pivot.sql")
-end PgPivotTests

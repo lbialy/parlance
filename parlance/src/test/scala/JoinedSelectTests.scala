@@ -177,11 +177,9 @@ end JoinedSelectTestsDefs
 
 class JoinedSelectTests extends QbH2TestBase with JoinedSelectTestsDefs:
   val h2Ddls = Seq("/h2/qb-join.sql")
-end JoinedSelectTests
 
 class PgJoinedSelectTests extends QbPgTestBase with JoinedSelectTestsDefs:
   val pgDdls = Seq("/pg/qb-join.sql")
-end PgJoinedSelectTests
 
 trait LeftJoinSelectTestsDefs:
   self: QbTestBase[?] =>
@@ -227,11 +225,9 @@ end LeftJoinSelectTestsDefs
 
 class LeftJoinSelectTests extends QbH2TestBase with LeftJoinSelectTestsDefs:
   val h2Ddls = Seq("/h2/qb-left-join.sql")
-end LeftJoinSelectTests
 
 class PgLeftJoinSelectTests extends QbPgTestBase with LeftJoinSelectTestsDefs:
   val pgDdls = Seq("/pg/qb-left-join.sql")
-end PgLeftJoinSelectTests
 
 trait MultiJoinSelectTestsDefs:
   self: QbTestBase[?] =>
@@ -284,8 +280,6 @@ end MultiJoinSelectTestsDefs
 
 class MultiJoinSelectTests extends QbH2TestBase with MultiJoinSelectTestsDefs:
   val h2Ddls = Seq("/h2/qb-multi-join.sql")
-end MultiJoinSelectTests
 
 class PgMultiJoinSelectTests extends QbPgTestBase with MultiJoinSelectTestsDefs:
   val pgDdls = Seq("/pg/qb-multi-join.sql")
-end PgMultiJoinSelectTests

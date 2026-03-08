@@ -108,8 +108,6 @@ end MultiJoinQueryTestsDefs
 
 class MultiJoinQueryTests extends QbH2TestBase with MultiJoinQueryTestsDefs:
   val h2Ddls = Seq("/h2/qb-multi-join.sql")
-end MultiJoinQueryTests
 
 class PgMultiJoinQueryTests extends QbPgTestBase with MultiJoinQueryTestsDefs:
   val pgDdls = Seq("/pg/qb-multi-join.sql")
-end PgMultiJoinQueryTests

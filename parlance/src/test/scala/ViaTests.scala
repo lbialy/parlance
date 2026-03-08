@@ -227,8 +227,6 @@ end ViaTestsDefs
 
 class ViaTests extends QbH2TestBase with ViaTestsDefs:
   val h2Ddls = Seq("/h2/qb-via.sql")
-end ViaTests
 
 class PgViaTests extends QbPgTestBase with ViaTestsDefs:
   val pgDdls = Seq("/pg/qb-via.sql")
-end PgViaTests

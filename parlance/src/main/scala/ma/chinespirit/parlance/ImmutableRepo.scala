@@ -112,7 +112,6 @@ open class ImmutableRepo[E, ID](
     */
   def finalScopes: Vector[Scope[E]] = injectedScopes
 
-
   /** Apply all finalScopes to a QueryBuilder. */
   final def applyScopes[C <: Selectable](
       qb: QueryBuilder[HasRoot, E, C]

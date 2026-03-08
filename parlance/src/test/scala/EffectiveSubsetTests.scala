@@ -125,3 +125,4 @@ class EffectiveSubsetTests extends FunSuite:
       Repo[GoodCreator, Entity, Long]()
     """)
     assert(errors.isEmpty, s"Expected no errors, got: $errors")
+end EffectiveSubsetTests

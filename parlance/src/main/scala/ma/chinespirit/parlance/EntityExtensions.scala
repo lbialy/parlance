@@ -19,7 +19,8 @@ private def selectCols(tm: TableMeta[?]): String =
 private def queryByColumn[T](value: Any, colSqlName: String, tm: EntityMeta[T])(using DbCon[?]): Vector[T] =
   val sql = s"SELECT ${selectCols(tm)} FROM ${tm.tableName} WHERE $colSqlName = ?"
   Frag(sql, Seq(value), FragWriter.fromKeys(Vector(value)))
-    .query[T](using tm).run()
+    .query[T](using tm)
+    .run()
 
 private def queryByColumnIn[T](keys: Vector[Any], colSqlName: String, tm: EntityMeta[T])(using DbCon[?]): Vector[T] =
   if keys.isEmpty then return Vector.empty
@@ -33,8 +34,7 @@ extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[? <: Su
   def delete(): Unit = repo.delete(entity)
 
 // --- Group 1b: Reads ---
-extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[?])
-  def refresh(): E = repo.refresh(entity)
+extension [EC, E, ID](entity: E)(using repo: Repo[EC, E, ID], con: DbCon[?]) def refresh(): E = repo.refresh(entity)
 
 // --- Group 2: Identity comparison ---
 extension [E](entity: E)(using meta: TableMeta[E])
@@ -147,3 +147,4 @@ extension [E](entity: E)(using sm: TableMeta[E], con: DbCon[?])
       EntityMeta[T]
   ): Option[T] =
     load(rel).headOption
+end extension

@@ -3,7 +3,6 @@ import ma.chinespirit.parlance.*
 trait HasCountTestsDefs:
   self: QbTestBase[?] =>
 
-
   // --- HasMany unconstrained ---
 
   test("has(ElAuthor.books)(_ >= 2) returns authors with 2+ books"):
@@ -128,8 +127,6 @@ end HasCountTestsDefs
 
 class HasCountTests extends QbH2TestBase with HasCountTestsDefs:
   val h2Ddls = Seq("/h2/qb-where-has.sql")
-end HasCountTests
 
 class PgHasCountTests extends QbPgTestBase with HasCountTestsDefs:
   val pgDdls = Seq("/pg/qb-where-has.sql")
-end PgHasCountTests
