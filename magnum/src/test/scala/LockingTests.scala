@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class LockingTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-user.sql")
+trait LockingTestsDefs[D <: SupportsForShare]:
+  self: QbTestBase[D] =>
 
   test("lockForUpdate.build produces SQL ending with FOR UPDATE"):
     val t = xa()
@@ -98,9 +97,17 @@ class LockingTests extends QbTestBase:
   test("lockForUpdate does not compile with plain DbTx (no SupportsRowLocks)"):
     val errors = compileErrors("""
       import com.augustnagro.magnum.*
-      def test(using DbTx[SQLite.type]): Unit =
+      def test(using DbTx[SQLite]): Unit =
         QueryBuilder.from[QbUser].lockForUpdate.run()
     """)
     assert(errors.nonEmpty)
 
+end LockingTestsDefs
+
+class LockingTests extends QbH2TestBase, LockingTestsDefs[H2]:
+  val h2Ddls = Seq("/h2/qb-user.sql")
 end LockingTests
+
+class PgLockingTests extends QbPgTestBase, LockingTestsDefs[Postgres]:
+  val pgDdls = Seq("/pg/qb-user.sql")
+end PgLockingTests

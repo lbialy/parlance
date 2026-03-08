@@ -21,9 +21,8 @@ case class BgPerson(@Id id: Long, countryId: Long, name: String) derives EntityM
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class BgArticle(@Id id: Long, personId: Long, title: String) derives EntityMeta
 
-class BugTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-bugs.sql")
+trait BugTestsDefs:
+  self: QbTestBase[?] =>
 
   // ===== Bug 1a: first() skips stitching in PivotEagerQuery =====
 
@@ -160,4 +159,12 @@ class BugTests extends QbTestBase:
     intercept[QueryBuilderException]:
       QueryBuilder.from[BgUser].offset(-1L)
 
+end BugTestsDefs
+
+class BugTests extends QbH2TestBase, BugTestsDefs:
+  val h2Ddls = Seq("/h2/qb-bugs.sql")
 end BugTests
+
+class PgBugTests extends QbPgTestBase, BugTestsDefs:
+  val pgDdls = Seq("/pg/qb-bugs.sql")
+end PgBugTests

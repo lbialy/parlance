@@ -10,9 +10,8 @@ case class SdExtUser(
     @deletedAt deletedAt: Option[OffsetDateTime]
 ) derives EntityMeta, HasDeletedAt
 
-class EntityExtensionSoftDeleteTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/soft-delete.sql")
+trait EntityExtensionSoftDeleteTestsDefs[D <: SupportsMutations]:
+  self: QbTestBase[D] =>
 
   given sdRepo: (Repo[SdExtUser, SdExtUser, Long] & SoftDeletes[SdExtUser, SdExtUser, Long]) =
     new Repo[SdExtUser, SdExtUser, Long] with SoftDeletes[SdExtUser, SdExtUser, Long]
@@ -57,4 +56,10 @@ class EntityExtensionSoftDeleteTests extends QbTestBase:
       // Re-soft-delete for other tests
       sdRepo.deleteById(3L)
 
-end EntityExtensionSoftDeleteTests
+end EntityExtensionSoftDeleteTestsDefs
+
+class EntityExtensionSoftDeleteTests extends QbH2TestBase with EntityExtensionSoftDeleteTestsDefs[H2]:
+  val h2Ddls = Seq("/h2/soft-delete.sql")
+
+class PgEntityExtensionSoftDeleteTests extends QbPgTestBase with EntityExtensionSoftDeleteTestsDefs[Postgres]:
+  val pgDdls = Seq("/pg/soft-delete.sql")

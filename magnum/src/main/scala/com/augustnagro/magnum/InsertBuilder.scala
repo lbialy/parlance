@@ -87,7 +87,7 @@ class InsertBuilder[EC, E] @scala.annotation.publicInBinary private[magnum] (
         val keyColumns = target match
           case ConflictTarget.Columns(cols*) if cols.nonEmpty => cols.map(_.sqlName).mkString(", ")
           case _                                              => pkColName
-        val sql = s"MERGE INTO $tableName $ecInsertKeys KEY ($keyColumns) VALUES (${ecCodec.queryRepr})"
+        val sql = con.databaseType.renderUpsertByPk(tableName, IArray.from(ecColNames), ecCodec.queryRepr, keyColumns)
         handleQuery(sql, ec):
           Using(con.connection.prepareStatement(sql)): ps =>
             ecCodec.writeSingle(ec, ps)
@@ -97,7 +97,7 @@ class InsertBuilder[EC, E] @scala.annotation.publicInBinary private[magnum] (
     val keyColumns = target match
       case ConflictTarget.Columns(cols*) if cols.nonEmpty => cols.map(_.sqlName).mkString(", ")
       case _                                              => pkColName
-    val sql = s"MERGE INTO $tableName $ecInsertKeys KEY ($keyColumns) VALUES (${ecCodec.queryRepr})"
+    val sql = con.databaseType.renderUpsertByPk(tableName, IArray.from(ecColNames), ecCodec.queryRepr, keyColumns)
     handleQuery(sql, ec):
       Using(con.connection.prepareStatement(sql)): ps =>
         ecCodec.writeSingle(ec, ps)

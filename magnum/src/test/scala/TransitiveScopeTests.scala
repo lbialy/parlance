@@ -14,9 +14,8 @@ import com.augustnagro.magnum.*
   * Also uses pv_user/pv_role/pv_user_role from the same DDL.
   *   - Alice: admin+editor, Bob: editor, Charlie: no roles, Dave: admin+editor+viewer
   */
-class TransitiveScopeTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-where-has.sql")
+trait TransitiveScopeTestsDefs:
+  self: QbTestBase[?] =>
 
 
   // --- Scoped book repo that excludes book id=4 ("I, Robot") ---
@@ -42,8 +41,8 @@ class TransitiveScopeTests extends QbTestBase:
   test("whereHas applies book scope transitively"):
     val t = xa()
     t.connect:
-      // Without scope: Tolkien(2), Asimov(2), Herbert(1) have books → 3 authors
-      // With scope excluding "I, Robot": Asimov now has only "Foundation" → still 3 authors
+      // Without scope: Tolkien(2), Asimov(2), Herbert(1) have books -> 3 authors
+      // With scope excluding "I, Robot": Asimov now has only "Foundation" -> still 3 authors
       val results =
         QueryBuilder.from[ElAuthor].whereHas(ElAuthor.books).orderBy(_.name).run()
       assertEquals(results.size, 3)
@@ -76,7 +75,7 @@ class TransitiveScopeTests extends QbTestBase:
     val t = xa()
     t.connect:
       // Without scope: only Rowling has no books
-      // With scope excluding "I, Robot": Rowling still has no books → 1 author
+      // With scope excluding "I, Robot": Rowling still has no books -> 1 author
       // (Asimov still has Foundation, so he's not included)
       val results =
         QueryBuilder.from[ElAuthor].doesntHave(ElAuthor.books).run()
@@ -88,8 +87,8 @@ class TransitiveScopeTests extends QbTestBase:
   test("whereHas(btm) applies role scope transitively"):
     val t = xa()
     t.connect:
-      // Without scope: Alice(admin+editor), Bob(editor), Dave(admin+editor+viewer) → 3 users
-      // With admin-only scope: Alice(admin), Dave(admin) → 2 users
+      // Without scope: Alice(admin+editor), Bob(editor), Dave(admin+editor+viewer) -> 3 users
+      // With admin-only scope: Alice(admin), Dave(admin) -> 2 users
       val results = QueryBuilder
         .from[PvUser]
         .whereHas(PvUser.roles)
@@ -144,7 +143,7 @@ class TransitiveScopeTests extends QbTestBase:
       val alice = results.find(_._1.name == "Alice").get
       assertEquals(alice._2.size, 1)
       assertEquals(alice._2.head.name, "admin")
-      // Bob: no admin role → empty
+      // Bob: no admin role -> empty
       val bob = results.find(_._1.name == "Bob").get
       assertEquals(bob._2.size, 0)
       // Dave: only admin (not editor, viewer)
@@ -207,8 +206,8 @@ class TransitiveScopeTests extends QbTestBase:
         .from[ElAuthor]
         .join(ElAuthor.books)
         .run()
-      // Without scope: 5 rows (Tolkien×2, Asimov×2, Herbert×1)
-      // With scope: 4 rows (Tolkien×2, Asimov×1, Herbert×1) — "I, Robot" excluded
+      // Without scope: 5 rows (Tolkien*2, Asimov*2, Herbert*1)
+      // With scope: 4 rows (Tolkien*2, Asimov*1, Herbert*1) — "I, Robot" excluded
       assertEquals(results.size, 4)
       val titles = results.map(_._2.title).sorted
       assert(!titles.contains("I, Robot"), s"Should not contain excluded book, got: $titles")
@@ -221,7 +220,7 @@ class TransitiveScopeTests extends QbTestBase:
         .from[ElAuthor]
         .leftJoin(ElAuthor.books)
         .run()
-      // 5 rows: Tolkien×2, Asimov×1 (Foundation only), Herbert×1, Rowling×1 (None)
+      // 5 rows: Tolkien*2, Asimov*1 (Foundation only), Herbert*1, Rowling*1 (None)
       assertEquals(results.size, 5)
       val asimovRows = results.filter(_._1.name == "Asimov")
       assertEquals(asimovRows.size, 1)
@@ -233,7 +232,7 @@ class TransitiveScopeTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .whereHas(ElAuthor.books)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       frag.sqlString.contains("el_book.id <> 4"),
       s"SQL should contain scope condition: ${frag.sqlString}"
@@ -243,10 +242,18 @@ class TransitiveScopeTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .withCount(ElAuthor.books)
-      .buildWith(H2)
+      .buildWith(databaseType)
     val sql = frag.sqlString
     assert(
       sql.contains("el_book.id <> 4"),
       s"SQL should contain scope condition: $sql"
     )
+end TransitiveScopeTestsDefs
+
+class TransitiveScopeTests extends QbH2TestBase with TransitiveScopeTestsDefs:
+  val h2Ddls = Seq("/h2/qb-where-has.sql")
 end TransitiveScopeTests
+
+class PgTransitiveScopeTests extends QbPgTestBase with TransitiveScopeTestsDefs:
+  val pgDdls = Seq("/pg/qb-where-has.sql")
+end PgTransitiveScopeTests

@@ -18,9 +18,8 @@ case class ViaBook(@Id id: Long, authorId: Long, title: String) derives EntityMe
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ViaContact(@Id id: Long, authorId: Long, email: String, active: Boolean) derives EntityMeta
 
-class ViaTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-via.sql")
+trait ViaTestsDefs:
+  self: QbTestBase[?] =>
 
   test("basic via: posts get their author's contacts"):
     val t = xa()
@@ -153,7 +152,7 @@ class ViaTests extends QbTestBase:
     val eq = QueryBuilder
       .from[ViaPost]
       .withRelated(ViaPost.contacts)
-    val queries = eq.buildQueriesWith(H2)
+    val queries = eq.buildQueriesWith(databaseType)
     // root + intermediate query + target query = 3
     assertEquals(queries.size, 3)
 
@@ -175,10 +174,10 @@ class ViaTests extends QbTestBase:
         .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 3)
-      // Alice's posts → Alice passes scope → her 2 contacts visible
+      // Alice's posts -> Alice passes scope -> her 2 contacts visible
       assertEquals(results(0)._2.size, 2)
       assertEquals(results(1)._2.size, 2)
-      // Bob's post → Bob excluded by intermediate scope → 0 contacts
+      // Bob's post -> Bob excluded by intermediate scope -> 0 contacts
       assertEquals(results(2)._2.size, 0)
 
   // Scope on the target (ViaContact) — excludes inactive contacts
@@ -199,11 +198,11 @@ class ViaTests extends QbTestBase:
         .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 3)
-      // Alice's posts → Alice passes scope → only 1 active contact
+      // Alice's posts -> Alice passes scope -> only 1 active contact
       assertEquals(results(0)._2.size, 1)
       assertEquals(results(0)._2.head.email, "alice@example.com")
       assertEquals(results(1)._2.size, 1)
-      // Bob's post → Bob excluded by intermediate scope → 0 contacts
+      // Bob's post -> Bob excluded by intermediate scope -> 0 contacts
       assertEquals(results(2)._2.size, 0)
 
   test("via with target scope only (intermediate unscoped)"):
@@ -217,11 +216,19 @@ class ViaTests extends QbTestBase:
         .withRelated(ViaPost.contacts)
         .run()
       assertEquals(results.size, 3)
-      // Alice's posts → 1 active contact each
+      // Alice's posts -> 1 active contact each
       assertEquals(results(0)._2.size, 1)
       assertEquals(results(1)._2.size, 1)
-      // Bob's post → 1 active contact (bob@example.com is active)
+      // Bob's post -> 1 active contact (bob@example.com is active)
       assertEquals(results(2)._2.size, 1)
       assertEquals(results(2)._2.head.email, "bob@example.com")
 
+end ViaTestsDefs
+
+class ViaTests extends QbH2TestBase with ViaTestsDefs:
+  val h2Ddls = Seq("/h2/qb-via.sql")
 end ViaTests
+
+class PgViaTests extends QbPgTestBase with ViaTestsDefs:
+  val pgDdls = Seq("/pg/qb-via.sql")
+end PgViaTests

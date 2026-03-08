@@ -32,7 +32,7 @@ class MySqlTests extends FunSuite, TestContainersFixtures:
   override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ mySqlContainer
 
-  def xa(): Transactor[MySQL.type] =
+  def xa(): Transactor[MySQL] =
     val mySql = mySqlContainer()
     val ds = MysqlDataSource()
     ds.setURL(mySql.jdbcUrl)

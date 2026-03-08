@@ -26,7 +26,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
       @Table()
       case class Item(@Id id: Long, name: String) derives EntityMeta
       val repo = Repo[Item, Item, Long]()
-      def test(using DbCon[ClickHouse.type]): Unit =
+      def test(using DbCon[ClickHouse]): Unit =
         repo.update(Item(1L, "x"))
     """)
     assert(
@@ -40,7 +40,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
       @Table()
       case class Item(@Id id: Long, name: String) derives EntityMeta
       given repo: Repo[Item, Item, Long] = Repo[Item, Item, Long]()
-      def test(using DbCon[ClickHouse.type]): Unit =
+      def test(using DbCon[ClickHouse]): Unit =
         Item(1L, "x").save()
     """)
     assert(
@@ -53,7 +53,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
       import com.augustnagro.magnum.*
       @Table()
       case class Item(@Id id: Long, name: String) derives EntityMeta
-      def test(using DbCon[ClickHouse.type]): Unit =
+      def test(using DbCon[ClickHouse]): Unit =
         QueryBuilder.from[Item].upsertByPk(Item(1L, "x"))
     """)
     assert(
@@ -69,7 +69,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
       @Table()
       case class User(id: UUID, name: String) derives EntityMeta
       val repo = Repo[UserCreator, User, UUID]()
-      def test(using DbCon[ClickHouse.type]): Unit =
+      def test(using DbCon[ClickHouse]): Unit =
         repo.create(UserCreator("test"))
     """)
     assert(
@@ -86,7 +86,7 @@ class ClickHouseTests extends FunSuite, TestContainersFixtures:
   override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ clickHouseContainer
 
-  def xa(): Transactor[ClickHouse.type] =
+  def xa(): Transactor[ClickHouse] =
     val clickHouse = clickHouseContainer()
     val ds = ClickHouseDataSource(clickHouse.jdbcUrl)
     val tableDDLs = Vector(

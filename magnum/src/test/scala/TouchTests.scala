@@ -7,9 +7,8 @@ case class TouchableItem(@Id id: Long, name: String, status: String, @updatedAt 
 object TouchableItem:
   val repo = Repo[TouchableItem, TouchableItem, Long]()
 
-class TouchTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-touch.sql")
+trait TouchTestsDefs[D <: SupportsMutations]:
+  self: QbTestBase[D] =>
 
   val epoch = OffsetDateTime.parse("2025-01-01T00:00:00Z")
 
@@ -66,4 +65,12 @@ class TouchTests extends QbTestBase:
     """)
     assert(errors.nonEmpty, "Expected compilation error for entity without @updatedAt")
 
+end TouchTestsDefs
+
+class TouchTests extends QbH2TestBase, TouchTestsDefs[H2]:
+  val h2Ddls = Seq("/h2/qb-touch.sql")
 end TouchTests
+
+class PgTouchTests extends QbPgTestBase, TouchTestsDefs[Postgres]:
+  val pgDdls = Seq("/pg/qb-touch.sql")
+end PgTouchTests

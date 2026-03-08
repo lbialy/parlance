@@ -39,7 +39,7 @@ class SqliteTests extends FunSuite:
 
   lazy val sqliteDbPath = Files.createTempFile(null, ".db").toAbsolutePath
 
-  def xa(): Transactor[SQLite.type] =
+  def xa(): Transactor[SQLite] =
     val ds = SQLiteDataSource()
     ds.setUrl("jdbc:sqlite:" + sqliteDbPath)
     Manager(use =>

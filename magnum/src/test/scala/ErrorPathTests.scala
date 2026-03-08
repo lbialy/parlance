@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class ErrorPathTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-user.sql", "/h2/qb-join.sql")
+trait ErrorPathTestsDefs:
+  self: QbTestBase[?] =>
 
   // --- chunk() validation ---
 
@@ -104,4 +103,12 @@ class ErrorPathTests extends QbTestBase:
       val result = QueryBuilder.from[QbUser].where(_.age > 100).max(_.age)
       assertEquals(result, None)
 
+end ErrorPathTestsDefs
+
+class ErrorPathTests extends QbH2TestBase, ErrorPathTestsDefs:
+  val h2Ddls = Seq("/h2/qb-user.sql", "/h2/qb-join.sql")
 end ErrorPathTests
+
+class PgErrorPathTests extends QbPgTestBase, ErrorPathTestsDefs:
+  val pgDdls = Seq("/pg/qb-user.sql", "/pg/qb-join.sql")
+end PgErrorPathTests

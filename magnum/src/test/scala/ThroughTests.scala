@@ -24,9 +24,8 @@ case class ThCar(@Id id: Long, mechanicId: Long, model: String) derives EntityMe
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ThOwner(@Id id: Long, carId: Long, name: String) derives EntityMeta
 
-class ThroughTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-through.sql")
+trait ThroughTestsDefs:
+  self: QbTestBase[?] =>
 
   // --- hasManyThrough tests ---
 
@@ -180,7 +179,7 @@ class ThroughTests extends QbTestBase:
     val tq = QueryBuilder
       .from[ThCountry]
       .withRelated(ThCountry.posts)
-    val queries = tq.buildQueriesWith(H2)
+    val queries = tq.buildQueriesWith(databaseType)
     assertEquals(queries.size, 3)
     assert(queries(0).sqlString.contains("SELECT"), "Root should be a SELECT")
     assert(!queries(0).sqlString.contains("JOIN"), "Root should not contain JOIN")
@@ -193,7 +192,7 @@ class ThroughTests extends QbTestBase:
     val tq = QueryBuilder
       .from[ThMechanic]
       .withRelated(ThMechanic.owner)
-    val queries = tq.buildQueriesWith(H2)
+    val queries = tq.buildQueriesWith(databaseType)
     assertEquals(queries.size, 3)
     assert(queries(0).sqlString.contains("SELECT"), "Root should be a SELECT")
     assert(queries(1).sqlString.contains("mechanic_id"), "Intermediate query should reference sourceFk")
@@ -213,4 +212,12 @@ class ThroughTests extends QbTestBase:
         .run()
       assertEquals(results, Vector.empty)
 
+end ThroughTestsDefs
+
+class ThroughTests extends QbH2TestBase with ThroughTestsDefs:
+  val h2Ddls = Seq("/h2/qb-through.sql")
 end ThroughTests
+
+class PgThroughTests extends QbPgTestBase with ThroughTestsDefs:
+  val pgDdls = Seq("/pg/qb-through.sql")
+end PgThroughTests

@@ -12,9 +12,8 @@ case class RepoItem(
 object RepoItem:
   val repo = Repo[RepoItem, RepoItem, Long]()
 
-class RepoQueryTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/repo-query.sql", "/h2/soft-delete.sql")
+trait RepoQueryTestsDefs[D <: SupportsMutations]:
+  self: QbTestBase[D] =>
 
   // --- query basics ---
 
@@ -236,4 +235,10 @@ class RepoQueryTests extends QbTestBase:
       assertEquals(results.length, 3)
       assertEquals(results.map(_.id).sorted, Vector(1L, 2L, 4L))
 
-end RepoQueryTests
+end RepoQueryTestsDefs
+
+class RepoQueryTests extends QbH2TestBase with RepoQueryTestsDefs[H2]:
+  val h2Ddls = Seq("/h2/repo-query.sql", "/h2/soft-delete.sql")
+
+class PgRepoQueryTests extends QbPgTestBase with RepoQueryTestsDefs[Postgres]:
+  val pgDdls = Seq("/pg/repo-query.sql", "/pg/soft-delete.sql")

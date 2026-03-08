@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS touchable_item;
+CREATE TABLE touchable_item (
+  id BIGINT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+INSERT INTO touchable_item VALUES (1, 'Alpha', 'active', TIMESTAMP WITH TIME ZONE '2025-01-01T00:00:00Z');
+INSERT INTO touchable_item VALUES (2, 'Beta', 'active', TIMESTAMP WITH TIME ZONE '2025-01-01T00:00:00Z');
+INSERT INTO touchable_item VALUES (3, 'Gamma', 'archived', TIMESTAMP WITH TIME ZONE '2025-01-01T00:00:00Z');

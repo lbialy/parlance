@@ -5,9 +5,8 @@ case class UpsertItem(@Id id: Long, name: String, amount: Int) derives EntityMet
 object UpsertItem:
   val repo = Repo[UpsertItem, UpsertItem, Long]()
 
-class UpsertTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/upsert.sql")
+trait UpsertTestsDefs[D <: SupportsMutations]:
+  self: QbTestBase[D] =>
 
   // --- insertOnConflict ---
 
@@ -170,4 +169,10 @@ class UpsertTests extends QbTestBase:
       assertEquals(result.amount, 30) // creator value, not updater
       assertEquals(UpsertItem.repo.count, 3L)
 
-end UpsertTests
+end UpsertTestsDefs
+
+class UpsertTests extends QbH2TestBase with UpsertTestsDefs[H2]:
+  val h2Ddls = Seq("/h2/upsert.sql")
+
+class PgUpsertTests extends QbPgTestBase with UpsertTestsDefs[Postgres]:
+  val pgDdls = Seq("/pg/upsert.sql")

@@ -45,7 +45,8 @@ trait SupportsReturning extends DatabaseType
 trait SupportsPartialJoins extends DatabaseType
 trait SupportsMultiColumnReturningKeys extends SupportsReturning
 
-object Postgres extends DatabaseType, SupportsMutations, SupportsForShare, SupportsILike, SupportsReturning, SupportsArrayTypes, SupportsPartialJoins, SupportsMultiColumnReturningKeys:
+sealed trait Postgres extends DatabaseType, SupportsMutations, SupportsForShare, SupportsILike, SupportsReturning, SupportsArrayTypes, SupportsPartialJoins, SupportsMultiColumnReturningKeys
+object Postgres extends Postgres:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
     val limitSql = limit.fold("")(n => s" LIMIT $n")
     val offsetSql = offset.fold("")(n => s" OFFSET $n")
@@ -93,7 +94,8 @@ object Postgres extends DatabaseType, SupportsMutations, SupportsForShare, Suppo
     case _                               => None
 end Postgres
 
-object MySQL extends DatabaseType, SupportsMutations, SupportsRowLocks, SupportsPartialJoins:
+sealed trait MySQL extends DatabaseType, SupportsMutations, SupportsRowLocks, SupportsPartialJoins
+object MySQL extends MySQL:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
     (limit, offset) match
       case (Some(l), Some(o)) => s" LIMIT $o, $l"
@@ -126,7 +128,8 @@ object MySQL extends DatabaseType, SupportsMutations, SupportsRowLocks, Supports
     s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON DUPLICATE KEY UPDATE $updateSet$extraSetSql"
 end MySQL
 
-object SQLite extends DatabaseType, SupportsMutations, SupportsPartialJoins:
+sealed trait SQLite extends DatabaseType, SupportsMutations, SupportsPartialJoins
+object SQLite extends SQLite:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
     (limit, offset) match
       case (Some(l), Some(o)) => s" LIMIT $l OFFSET $o"
@@ -162,7 +165,8 @@ object SQLite extends DatabaseType, SupportsMutations, SupportsPartialJoins:
     s"INSERT INTO $tableName $colsList VALUES ($allColsQueryRepr) ON CONFLICT ($pkCol) DO UPDATE SET $updateSet$extraSetSql$wherePart"
 end SQLite
 
-object H2 extends DatabaseType, SupportsMutations, SupportsForShare, SupportsILike, SupportsArrayTypes, SupportsReturning, SupportsPartialJoins, SupportsMultiColumnReturningKeys:
+sealed trait H2 extends DatabaseType, SupportsMutations, SupportsForShare, SupportsILike, SupportsArrayTypes, SupportsReturning, SupportsPartialJoins, SupportsMultiColumnReturningKeys
+object H2 extends H2:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
     val limitSql = limit.fold("")(n => s" LIMIT $n")
     val offsetSql = offset.fold("")(n => s" OFFSET $n")
@@ -214,7 +218,8 @@ object H2 extends DatabaseType, SupportsMutations, SupportsForShare, SupportsILi
     case _                               => None
 end H2
 
-object Oracle extends DatabaseType, SupportsMutations, SupportsRowLocks, SupportsReturning, SupportsPartialJoins:
+sealed trait Oracle extends DatabaseType, SupportsMutations, SupportsRowLocks, SupportsReturning, SupportsPartialJoins
+object Oracle extends Oracle:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
     (limit, offset) match
       case (Some(l), Some(o)) =>
@@ -259,7 +264,8 @@ object Oracle extends DatabaseType, SupportsMutations, SupportsRowLocks, Support
       s"WHEN MATCHED THEN UPDATE SET $updateSet$extraSetSql$wherePart " +
       s"WHEN NOT MATCHED THEN INSERT ($colsList) VALUES ($valsList)"
 
-object ClickHouse extends DatabaseType:
+sealed trait ClickHouse extends DatabaseType
+object ClickHouse extends ClickHouse:
   def renderLimitOffset(limit: Option[Int], offset: Option[Long]): String =
     val limitSql = limit.fold("")(n => s" LIMIT $n")
     val offsetSql = offset.fold("")(n => s" OFFSET $n")

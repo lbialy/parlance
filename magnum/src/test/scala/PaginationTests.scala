@@ -5,9 +5,8 @@ import java.time.LocalDateTime
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class QbPaginated(@Id id: Long, name: String, score: Int, createdAt: LocalDateTime) derives EntityMeta
 
-class PaginationTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-pagination.sql")
+trait PaginationTestsDefs:
+  self: QbTestBase[?] =>
 
   // --- Offset pagination tests ---
 
@@ -195,4 +194,12 @@ class PaginationTests extends QbTestBase:
     val frag = KeysetSql.buildKeysetFrag(Vector(entry1, entry2, entry3), Vector(1L, 2, 3L))
     assertEquals(frag.sqlString, "((a > ?) OR (a = ? AND b < ?) OR (a = ? AND b = ? AND c > ?))")
 
+end PaginationTestsDefs
+
+class PaginationTests extends QbH2TestBase, PaginationTestsDefs:
+  val h2Ddls = Seq("/h2/qb-pagination.sql")
 end PaginationTests
+
+class PgPaginationTests extends QbPgTestBase, PaginationTestsDefs:
+  val pgDdls = Seq("/pg/qb-pagination.sql")
+end PgPaginationTests

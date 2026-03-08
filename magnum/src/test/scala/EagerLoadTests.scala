@@ -13,9 +13,8 @@ object ElBook:
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class ElReview(@Id id: Long, bookId: Long, score: Int, body: String) derives EntityMeta
 
-class EagerLoadTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-eager-load.sql")
+trait EagerLoadTestsDefs:
+  self: QbTestBase[?] =>
 
   test("basic eager load returns all authors with books"):
     val t = xa()
@@ -120,7 +119,7 @@ class EagerLoadTests extends QbTestBase:
     val rootFrag = QueryBuilder
       .from[ElAuthor]
       .where(_.name === "Tolkien")
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       !rootFrag.sqlString.contains("JOIN"),
       s"Root query should not contain JOIN: ${rootFrag.sqlString}"
@@ -254,8 +253,16 @@ class EagerLoadTests extends QbTestBase:
       .from[ElAuthor]
       .withRelated(authorBooksRel)
       .withRelated(authorBooksAgain)
-    val queries = eq.buildQueriesWith(H2)
+    val queries = eq.buildQueriesWith(databaseType)
     // root + 1 child query + 1 child query = 3
     assertEquals(queries.size, 3)
 
+end EagerLoadTestsDefs
+
+class EagerLoadTests extends QbH2TestBase with EagerLoadTestsDefs:
+  val h2Ddls = Seq("/h2/qb-eager-load.sql")
 end EagerLoadTests
+
+class PgEagerLoadTests extends QbPgTestBase with EagerLoadTestsDefs:
+  val pgDdls = Seq("/pg/qb-eager-load.sql")
+end PgEagerLoadTests

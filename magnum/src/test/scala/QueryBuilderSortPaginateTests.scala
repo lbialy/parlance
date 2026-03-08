@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class QueryBuilderSortPaginateTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-user.sql")
+trait QueryBuilderSortPaginateTestsDefs:
+  self: QbTestBase[?] =>
 
   // val u = Columns.of[QbUser]
 
@@ -49,10 +48,10 @@ class QueryBuilderSortPaginateTests extends QbTestBase:
       .from[QbUser]
       .orderBy(_.firstName)
       .orderBy(_.age)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(frag.sqlString.contains("ORDER BY first_name ASC, age ASC"))
 
-  test("multiple orderBy calls run against H2"):
+  test("multiple orderBy calls run against DB"):
     val t = xa()
     t.connect:
       val results = QueryBuilder
@@ -60,10 +59,11 @@ class QueryBuilderSortPaginateTests extends QbTestBase:
         .orderBy(_.firstName)
         .orderBy(_.age)
         .run()
-      assertEquals(
-        results.map(_.firstName),
-        Vector(None, Some("Alice"), Some("Bob"), Some("Charlie"))
-      )
+      // H2 sorts NULLs first for ASC, PostgreSQL sorts NULLs last
+      val expected = databaseType match
+        case H2 => Vector(None, Some("Alice"), Some("Bob"), Some("Charlie"))
+        case _  => Vector(Some("Alice"), Some("Bob"), Some("Charlie"), None)
+      assertEquals(results.map(_.firstName), expected)
 
   test("build SQL with ORDER BY, LIMIT, OFFSET"):
     val frag = QueryBuilder
@@ -72,10 +72,18 @@ class QueryBuilderSortPaginateTests extends QbTestBase:
       .orderBy(_.age, SortOrder.Desc)
       .limit(10)
       .offset(5)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE age > ? ORDER BY age DESC LIMIT 10 OFFSET 5"
     )
 
+end QueryBuilderSortPaginateTestsDefs
+
+class QueryBuilderSortPaginateTests extends QbH2TestBase, QueryBuilderSortPaginateTestsDefs:
+  val h2Ddls = Seq("/h2/qb-user.sql")
 end QueryBuilderSortPaginateTests
+
+class PgQueryBuilderSortPaginateTests extends QbPgTestBase, QueryBuilderSortPaginateTestsDefs:
+  val pgDdls = Seq("/pg/qb-user.sql")
+end PgQueryBuilderSortPaginateTests

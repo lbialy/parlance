@@ -1,13 +1,7 @@
 import com.augustnagro.magnum.*
 
-class RelationshipLoadTests extends QbTestBase:
-
-  val h2Ddls = Seq(
-    "/h2/qb-eager-load.sql",
-    "/h2/qb-pivot.sql",
-    "/h2/qb-through.sql",
-    "/h2/qb-via.sql"
-  )
+trait RelationshipLoadTestsDefs:
+  self: QbTestBase[?] =>
 
   // BelongsTo: book -> author
   val bookAuthor = Relationship.belongsTo[ElBook, ElAuthor](_.authorId, _.id)
@@ -158,4 +152,22 @@ class RelationshipLoadTests extends QbTestBase:
       val contacts = post.load(ViaPost.contacts)
       assertEquals(contacts, Vector.empty[ViaContact])
 
+end RelationshipLoadTestsDefs
+
+class RelationshipLoadTests extends QbH2TestBase, RelationshipLoadTestsDefs:
+  val h2Ddls = Seq(
+    "/h2/qb-eager-load.sql",
+    "/h2/qb-pivot.sql",
+    "/h2/qb-through.sql",
+    "/h2/qb-via.sql"
+  )
 end RelationshipLoadTests
+
+class PgRelationshipLoadTests extends QbPgTestBase, RelationshipLoadTestsDefs:
+  val pgDdls = Seq(
+    "/pg/qb-eager-load.sql",
+    "/pg/qb-pivot.sql",
+    "/pg/qb-through.sql",
+    "/pg/qb-via.sql"
+  )
+end PgRelationshipLoadTests

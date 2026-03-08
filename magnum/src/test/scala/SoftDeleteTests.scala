@@ -12,9 +12,8 @@ object SdUser:
   val repo = new Repo[SdUser, SdUser, Long] with SoftDeletes[SdUser, SdUser, Long]
   val plainRepo = Repo[SdUser, SdUser, Long]()
 
-class SoftDeleteTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/soft-delete.sql")
+trait SoftDeleteTestsDefs[D <: SupportsMutations]:
+  self: QbTestBase[D] =>
 
   // --- reads filter soft-deleted rows ---
 
@@ -206,4 +205,10 @@ class SoftDeleteTests extends QbTestBase:
       // Restore
       SdUser.repo.restoreById(1L)
 
-end SoftDeleteTests
+end SoftDeleteTestsDefs
+
+class SoftDeleteTests extends QbH2TestBase with SoftDeleteTestsDefs[H2]:
+  val h2Ddls = Seq("/h2/soft-delete.sql")
+
+class PgSoftDeleteTests extends QbPgTestBase with SoftDeleteTestsDefs[Postgres]:
+  val pgDdls = Seq("/pg/soft-delete.sql")

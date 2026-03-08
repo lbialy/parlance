@@ -21,10 +21,8 @@ case class ClChecklistItem(@Id id: Long, checklistId: Long, formId: Long, descri
 object ClChecklistItem:
   val checklist = Relationship.belongsTo[ClChecklistItem, ClChecklist](_.checklistId, _.id)
 
-class WhereHasTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-where-has.sql")
-
+trait WhereHasTestsDefs:
+  self: QbTestBase[?] =>
 
   // --- Relationship (HasMany) tests ---
 
@@ -92,7 +90,7 @@ class WhereHasTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .whereHas(ElAuthor.books)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       frag.sqlString.contains("EXISTS (SELECT 1 FROM"),
       s"SQL should contain EXISTS subquery: ${frag.sqlString}"
@@ -226,7 +224,7 @@ class WhereHasTests extends QbTestBase:
       .from[ElAuthor]
       .where(_.name === "Rowling")
       .orWhereHas(ElAuthor.books)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       frag.sqlString.contains("OR EXISTS (SELECT 1 FROM"),
       s"SQL should contain OR EXISTS subquery: ${frag.sqlString}"
@@ -273,7 +271,7 @@ class WhereHasTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .whereHas(ElAuthor.books)(_.whereHas(ElBook.reviews)(_.score >= 4))
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       frag.sqlString.contains("EXISTS (SELECT 1 FROM el_book"),
       s"SQL should contain outer EXISTS: ${frag.sqlString}"
@@ -433,7 +431,7 @@ class WhereHasTests extends QbTestBase:
       .whereHas(ClChecklistItem.checklist)(sq =>
         sq.whereHas(ClChecklist.trip)(sq2 => sq2.whereHas(ClTrip.owners)(_.id === userId) || sq2.whereHas(ClTrip.users)(_.id === userId))
       )
-      .buildWith(H2)
+      .buildWith(databaseType)
 
     val sql = frag.sqlString
     // Should have 3 levels of EXISTS nesting + an OR between the two innermost
@@ -443,4 +441,12 @@ class WhereHasTests extends QbTestBase:
     assert(sql.contains("EXISTS (SELECT 1 FROM cl_trip_user"), s"Missing trip_user EXISTS: $sql")
     assert(sql.contains(" OR "), s"Missing OR between owner/user EXISTS: $sql")
 
+end WhereHasTestsDefs
+
+class WhereHasTests extends QbH2TestBase, WhereHasTestsDefs:
+  val h2Ddls = Seq("/h2/qb-where-has.sql")
 end WhereHasTests
+
+class PgWhereHasTests extends QbPgTestBase, WhereHasTestsDefs:
+  val pgDdls = Seq("/pg/qb-where-has.sql")
+end PgWhereHasTests

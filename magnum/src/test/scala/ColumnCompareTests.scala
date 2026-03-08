@@ -3,9 +3,8 @@ import com.augustnagro.magnum.*
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class QbScore(@Id id: Long, scoreA: Int, scoreB: Int) derives EntityMeta
 
-class ColumnCompareTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-score.sql")
+trait ColumnCompareTestsDefs:
+  self: QbTestBase[?] =>
 
   // --- SQL fragment tests ---
 
@@ -13,7 +12,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA === c.scoreB)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a = score_b"
@@ -24,7 +23,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA !== c.scoreB)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a <> score_b"
@@ -34,7 +33,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA > c.scoreB)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a > score_b"
@@ -44,7 +43,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA < c.scoreB)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a < score_b"
@@ -54,7 +53,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA >= c.scoreB)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a >= score_b"
@@ -64,7 +63,7 @@ class ColumnCompareTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbScore]
       .where(c => c.scoreA <= c.scoreB)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, score_a, score_b FROM qb_score WHERE score_a <= score_b"
@@ -126,4 +125,12 @@ class ColumnCompareTests extends QbTestBase:
       assertEquals(results.length, 1)
       assertEquals(results.head.id, 1L)
 
+end ColumnCompareTestsDefs
+
+class ColumnCompareTests extends QbH2TestBase, ColumnCompareTestsDefs:
+  val h2Ddls = Seq("/h2/qb-score.sql")
 end ColumnCompareTests
+
+class PgColumnCompareTests extends QbPgTestBase, ColumnCompareTestsDefs:
+  val pgDdls = Seq("/pg/qb-score.sql")
+end PgColumnCompareTests

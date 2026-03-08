@@ -13,9 +13,8 @@ case class LjBook(@Id id: Long, authorId: Option[Long], title: String) derives E
 object LjBook:
   val author = Relationship.belongsTo[LjBook, LjAuthor](_.authorId, _.id)
 
-class LeftJoinTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-left-join.sql")
+trait LeftJoinTestsDefs:
+  self: QbTestBase[?] =>
 
   test("leftJoin returns all books with Option[Author]"):
     val t = xa()
@@ -68,7 +67,7 @@ class LeftJoinTests extends QbTestBase:
     val frag = QueryBuilder
       .from[LjBook]
       .leftJoin(LjBook.author)
-      .buildWith(H2)
+      .buildWith(databaseType)
     val sql = frag.sqlString
     assert(sql.contains("LEFT JOIN"), s"Expected LEFT JOIN in: $sql")
     assert(sql.contains("ON t0.author_id = t1.id"), s"Expected ON clause in: $sql")
@@ -107,4 +106,12 @@ class LeftJoinTests extends QbTestBase:
       assert(lonely.isDefined)
       assertEquals(lonely.get._2, None)
 
+end LeftJoinTestsDefs
+
+class LeftJoinTests extends QbH2TestBase with LeftJoinTestsDefs:
+  val h2Ddls = Seq("/h2/qb-left-join.sql")
 end LeftJoinTests
+
+class PgLeftJoinTests extends QbPgTestBase with LeftJoinTestsDefs:
+  val pgDdls = Seq("/pg/qb-left-join.sql")
+end PgLeftJoinTests

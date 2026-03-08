@@ -3,9 +3,8 @@ import com.augustnagro.magnum.*
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class QbItem(@Id id: Long, amount: Int) derives EntityMeta
 
-class ChunkTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-chunk.sql")
+trait ChunkTestsDefs:
+  self: QbTestBase[?] =>
 
   test("chunk(25) over 100 rows yields exactly 4 batches of 25"):
     val t = xa()
@@ -97,4 +96,12 @@ class ChunkTests extends QbTestBase:
         .toVector
       assertEquals(batches.size, 0)
 
+end ChunkTestsDefs
+
+class ChunkTests extends QbH2TestBase, ChunkTestsDefs:
+  val h2Ddls = Seq("/h2/qb-chunk.sql")
 end ChunkTests
+
+class PgChunkTests extends QbPgTestBase, ChunkTestsDefs:
+  val pgDdls = Seq("/pg/qb-chunk.sql")
+end PgChunkTests

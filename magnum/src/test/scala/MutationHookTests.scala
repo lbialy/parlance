@@ -12,9 +12,8 @@ case class MhItem(
     status: String
 ) derives EntityMeta, HasDeletedAt
 
-class MutationHookTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/mutation-hooks.sql")
+trait MutationHookTestsDefs[D <: SupportsMutations]:
+  self: QbTestBase[D] =>
 
   // --- scope definitions ---
 
@@ -191,4 +190,10 @@ class MutationHookTests extends QbTestBase:
       // restore
       sql"UPDATE mh_item SET status = 'active'".update.run()
 
-end MutationHookTests
+end MutationHookTestsDefs
+
+class MutationHookTests extends QbH2TestBase with MutationHookTestsDefs[H2]:
+  val h2Ddls = Seq("/h2/mutation-hooks.sql")
+
+class PgMutationHookTests extends QbPgTestBase with MutationHookTestsDefs[Postgres]:
+  val pgDdls = Seq("/pg/mutation-hooks.sql")

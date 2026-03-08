@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class WithCountTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-where-has.sql")
+trait WithCountTestsDefs:
+  self: QbTestBase[?] =>
 
 
   // --- HasMany tests ---
@@ -143,7 +142,7 @@ class WithCountTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .withCount(ElAuthor.books)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       frag.sqlString.contains("(SELECT COUNT(*)"),
       s"SQL should contain COUNT subquery: ${frag.sqlString}"
@@ -157,7 +156,7 @@ class WithCountTests extends QbTestBase:
     val frag = QueryBuilder
       .from[PvUser]
       .withCount(PvUser.roles)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       frag.sqlString.contains("(SELECT COUNT(*)"),
       s"SQL should contain COUNT subquery: ${frag.sqlString}"
@@ -171,7 +170,7 @@ class WithCountTests extends QbTestBase:
     val frag = QueryBuilder
       .from[PvUser]
       .withCount(PvUser.roles)(_.name === "admin")
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       frag.sqlString.contains("JOIN pv_role"),
       s"SQL should contain JOIN to target table: ${frag.sqlString}"
@@ -189,4 +188,12 @@ class WithCountTests extends QbTestBase:
         .run()
       assertEquals(results, Vector.empty[(ElAuthor, Long)])
 
+end WithCountTestsDefs
+
+class WithCountTests extends QbH2TestBase with WithCountTestsDefs:
+  val h2Ddls = Seq("/h2/qb-where-has.sql")
 end WithCountTests
+
+class PgWithCountTests extends QbPgTestBase with WithCountTestsDefs:
+  val pgDdls = Seq("/pg/qb-where-has.sql")
+end PgWithCountTests

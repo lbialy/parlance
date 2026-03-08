@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class JoinedSelectTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-join.sql")
+trait JoinedSelectTestsDefs:
+  self: QbTestBase[?] =>
 
   test("join select: columns from both tables"):
     val t = xa()
@@ -146,7 +145,7 @@ class JoinedSelectTests extends QbTestBase:
           author = jq.of[JnAuthor].name
         )
       )
-      .buildWith(H2)
+      .buildWith(databaseType)
     val sql = frag.sqlString
     assert(sql.contains("SELECT"), s"Expected SELECT in: $sql")
     assert(sql.contains("t0.title AS title"), s"Expected t0.title AS title in: $sql")
@@ -168,17 +167,24 @@ class JoinedSelectTests extends QbTestBase:
       .groupBy(_.author)
       .having(_.cnt > 1L)
       .orderBy(_.author)
-      .buildWith(H2)
+      .buildWith(databaseType)
     val sql = frag.sqlString
     assert(sql.contains("GROUP BY t1.name"), s"Expected GROUP BY in: $sql")
     assert(sql.contains("HAVING COUNT(*) > ?"), s"Expected HAVING in: $sql")
     assert(sql.contains("ORDER BY t1.name ASC"), s"Expected ORDER BY in: $sql")
 
+end JoinedSelectTestsDefs
+
+class JoinedSelectTests extends QbH2TestBase with JoinedSelectTestsDefs:
+  val h2Ddls = Seq("/h2/qb-join.sql")
 end JoinedSelectTests
 
-class LeftJoinSelectTests extends QbTestBase:
+class PgJoinedSelectTests extends QbPgTestBase with JoinedSelectTestsDefs:
+  val pgDdls = Seq("/pg/qb-join.sql")
+end PgJoinedSelectTests
 
-  val h2Ddls = Seq("/h2/qb-left-join.sql")
+trait LeftJoinSelectTestsDefs:
+  self: QbTestBase[?] =>
 
   test("left join select: columns from both tables"):
     val t = xa()
@@ -212,16 +218,23 @@ class LeftJoinSelectTests extends QbTestBase:
           author = jq.ofLeft[LjAuthor].name
         )
       )
-      .buildWith(H2)
+      .buildWith(databaseType)
     val sql = frag.sqlString
     assert(sql.contains("LEFT JOIN"), s"Expected LEFT JOIN in: $sql")
     assert(sql.contains("t1.name AS author"), s"Expected t1.name AS author in: $sql")
 
+end LeftJoinSelectTestsDefs
+
+class LeftJoinSelectTests extends QbH2TestBase with LeftJoinSelectTestsDefs:
+  val h2Ddls = Seq("/h2/qb-left-join.sql")
 end LeftJoinSelectTests
 
-class MultiJoinSelectTests extends QbTestBase:
+class PgLeftJoinSelectTests extends QbPgTestBase with LeftJoinSelectTestsDefs:
+  val pgDdls = Seq("/pg/qb-left-join.sql")
+end PgLeftJoinSelectTests
 
-  val h2Ddls = Seq("/h2/qb-multi-join.sql")
+trait MultiJoinSelectTestsDefs:
+  self: QbTestBase[?] =>
 
   test("3-table join select: columns from all 3 tables"):
     val t = xa()
@@ -267,4 +280,12 @@ class MultiJoinSelectTests extends QbTestBase:
       assertEquals(results(1).country, "USA")
       assertEquals(results(1).cnt, 3L)
 
+end MultiJoinSelectTestsDefs
+
+class MultiJoinSelectTests extends QbH2TestBase with MultiJoinSelectTestsDefs:
+  val h2Ddls = Seq("/h2/qb-multi-join.sql")
 end MultiJoinSelectTests
+
+class PgMultiJoinSelectTests extends QbPgTestBase with MultiJoinSelectTestsDefs:
+  val pgDdls = Seq("/pg/qb-multi-join.sql")
+end PgMultiJoinSelectTests

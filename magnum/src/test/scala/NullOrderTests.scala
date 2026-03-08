@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class NullOrderTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-user.sql")
+trait NullOrderTestsDefs:
+  self: QbTestBase[?] =>
 
   // --- SQL generation tests ---
 
@@ -42,7 +41,7 @@ class NullOrderTests extends QbTestBase:
         .build
       assert(!frag.sqlString.contains("NULLS"), frag.sqlString)
 
-  // --- Behavioral tests against H2 ---
+  // --- Behavioral tests against DB ---
 
   test("NULLS FIRST puts NULL first_name first"):
     val t = xa()
@@ -74,4 +73,12 @@ class NullOrderTests extends QbTestBase:
         .build
       assert(frag.sqlString.contains("ORDER BY first_name ASC NULLS FIRST, age DESC NULLS LAST"), frag.sqlString)
 
+end NullOrderTestsDefs
+
+class NullOrderTests extends QbH2TestBase, NullOrderTestsDefs:
+  val h2Ddls = Seq("/h2/qb-user.sql")
 end NullOrderTests
+
+class PgNullOrderTests extends QbPgTestBase, NullOrderTestsDefs:
+  val pgDdls = Seq("/pg/qb-user.sql")
+end PgNullOrderTests

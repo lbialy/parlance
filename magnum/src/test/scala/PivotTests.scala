@@ -35,9 +35,8 @@ case class PvUserRoleExtCreator(
     assignedAt: LocalDateTime
 ) derives DbCodec
 
-class PivotTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-pivot.sql")
+trait PivotTestsDefs:
+  self: QbTestBase[?] =>
 
   test("basic pivot load returns all users with roles"):
     val t = xa()
@@ -143,7 +142,7 @@ class PivotTests extends QbTestBase:
     val rootFrag = QueryBuilder
       .from[PvUser]
       .where(_.name === "Alice")
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       !rootFrag.sqlString.contains("JOIN"),
       s"Root query should not contain JOIN: ${rootFrag.sqlString}"
@@ -459,4 +458,12 @@ class PivotTests extends QbTestBase:
         .run()
       assertEquals(results.head._2.size, 0)
 
+end PivotTestsDefs
+
+class PivotTests extends QbH2TestBase, PivotTestsDefs:
+  val h2Ddls = Seq("/h2/qb-pivot.sql")
 end PivotTests
+
+class PgPivotTests extends QbPgTestBase, PivotTestsDefs:
+  val pgDdls = Seq("/pg/qb-pivot.sql")
+end PgPivotTests

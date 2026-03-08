@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class QueryBuilderTerminalTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-user.sql")
+trait QueryBuilderTerminalTestsDefs:
+  self: QbTestBase[?] =>
 
   // val u = Columns.of[QbUser]
 
@@ -52,4 +51,12 @@ class QueryBuilderTerminalTests extends QbTestBase:
       assert(QueryBuilder.from[QbUser].exists())
       assert(!QueryBuilder.from[QbUser].where(_.age > 100).exists())
 
+end QueryBuilderTerminalTestsDefs
+
+class QueryBuilderTerminalTests extends QbH2TestBase, QueryBuilderTerminalTestsDefs:
+  val h2Ddls = Seq("/h2/qb-user.sql")
 end QueryBuilderTerminalTests
+
+class PgQueryBuilderTerminalTests extends QbPgTestBase, QueryBuilderTerminalTestsDefs:
+  val pgDdls = Seq("/pg/qb-user.sql")
+end PgQueryBuilderTerminalTests

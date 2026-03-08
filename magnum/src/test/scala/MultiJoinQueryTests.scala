@@ -17,9 +17,8 @@ object MjBook:
   val author = Relationship.belongsTo[MjBook, MjAuthor](_.authorId, _.id)
   val publisher = Relationship.belongsTo[MjBook, MjPublisher](_.publisherId, _.id)
 
-class MultiJoinQueryTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-multi-join.sql")
+trait MultiJoinQueryTestsDefs:
+  self: QbTestBase[?] =>
 
   test("3-table linear join returns all tuples"):
     val t = xa()
@@ -52,7 +51,7 @@ class MultiJoinQueryTests extends QbTestBase:
       assertEquals(results(2)._3.name, "USA")
 
   test("build SQL for 3-table join"):
-    val frag = QueryBuilder.from[MjBook].join(MjBook.author).join(MjAuthor.country).buildWith(H2)
+    val frag = QueryBuilder.from[MjBook].join(MjBook.author).join(MjAuthor.country).buildWith(databaseType)
     val sql = frag.sqlString
     assert(sql.contains("t0."), s"Expected t0. alias in: $sql")
     assert(sql.contains("t1."), s"Expected t1. alias in: $sql")
@@ -105,4 +104,12 @@ class MultiJoinQueryTests extends QbTestBase:
       assertEquals(result.get._2.name, "Herbert")
       assertEquals(result.get._3.name, "USA")
 
+end MultiJoinQueryTestsDefs
+
+class MultiJoinQueryTests extends QbH2TestBase with MultiJoinQueryTestsDefs:
+  val h2Ddls = Seq("/h2/qb-multi-join.sql")
 end MultiJoinQueryTests
+
+class PgMultiJoinQueryTests extends QbPgTestBase with MultiJoinQueryTestsDefs:
+  val pgDdls = Seq("/pg/qb-multi-join.sql")
+end PgMultiJoinQueryTests

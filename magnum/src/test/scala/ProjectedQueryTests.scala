@@ -3,9 +3,8 @@ import com.augustnagro.magnum.*
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class QbOrder(@Id id: Long, customer: String, status: String, amount: Int) derives EntityMeta
 
-class ProjectedQueryTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-projected.sql")
+trait ProjectedQueryTestsDefs:
+  self: QbTestBase[?] =>
 
   test("select subset of columns"):
     val t = xa()
@@ -131,7 +130,7 @@ class ProjectedQueryTests extends QbTestBase:
       .having(_.total > 100)
       .orderBy(_.total, SortOrder.Desc)
       .limit(10)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT customer AS customer, SUM(amount) AS total FROM qb_order WHERE status = ? GROUP BY customer HAVING SUM(amount) > ? ORDER BY SUM(amount) DESC LIMIT 10"
@@ -190,4 +189,12 @@ class ProjectedQueryTests extends QbTestBase:
       assertEquals(alice.minAmt, 100)
       assertEquals(alice.maxAmt, 200)
 
+end ProjectedQueryTestsDefs
+
+class ProjectedQueryTests extends QbH2TestBase, ProjectedQueryTestsDefs:
+  val h2Ddls = Seq("/h2/qb-projected.sql")
 end ProjectedQueryTests
+
+class PgProjectedQueryTests extends QbPgTestBase, ProjectedQueryTestsDefs:
+  val pgDdls = Seq("/pg/qb-projected.sql")
+end PgProjectedQueryTests

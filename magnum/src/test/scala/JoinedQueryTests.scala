@@ -8,9 +8,8 @@ case class JnBook(@Id id: Long, authorId: Long, title: String) derives EntityMet
 object JnBook:
   val author = Relationship.belongsTo[JnBook, JnAuthor](_.authorId, _.id)
 
-class JoinedQueryTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-join.sql")
+trait JoinedQueryTestsDefs:
+  self: QbTestBase[?] =>
 
   test("join returns all tuples"):
     val t = xa()
@@ -50,7 +49,7 @@ class JoinedQueryTests extends QbTestBase:
     val frag = QueryBuilder
       .from[JnBook]
       .join(JnBook.author)
-      .buildWith(H2)
+      .buildWith(databaseType)
     val sql = frag.sqlString
     assert(sql.matches(".*\\bt0\\.\\w+.*"), s"Expected t0.<col> alias in: $sql")
     assert(sql.matches(".*\\bt1\\.\\w+.*"), s"Expected t1.<col> alias in: $sql")
@@ -158,9 +157,17 @@ class JoinedQueryTests extends QbTestBase:
     val frag = qb
       .where(qb.of[JnBook].title === "Dune")
       .where(qb.of[JnAuthor].name === "Tolkien")
-      .buildWith(H2)
+      .buildWith(databaseType)
     val sql = frag.sqlString
     assert(sql.contains("t0.title = ?"), s"Expected t0.title = ? in: $sql")
     assert(sql.contains("t1.name = ?"), s"Expected t1.name = ? in: $sql")
 
+end JoinedQueryTestsDefs
+
+class JoinedQueryTests extends QbH2TestBase with JoinedQueryTestsDefs:
+  val h2Ddls = Seq("/h2/qb-join.sql")
 end JoinedQueryTests
+
+class PgJoinedQueryTests extends QbPgTestBase with JoinedQueryTestsDefs:
+  val pgDdls = Seq("/pg/qb-join.sql")
+end PgJoinedQueryTests

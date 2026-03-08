@@ -34,7 +34,7 @@ class PgTests extends FunSuite, TestContainersFixtures:
   override def munitFixtures: Seq[AnyFixture[?]] =
     super.munitFixtures :+ pgContainer
 
-  def xa(): Transactor[Postgres.type] =
+  def xa(): Transactor[Postgres] =
     val ds = PGSimpleDataSource()
     val pg = pgContainer()
     ds.setUrl(pg.jdbcUrl)

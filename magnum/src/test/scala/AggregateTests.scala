@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class AggregateTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-chunk.sql", "/h2/qb-user.sql")
+trait AggregateTestsDefs:
+  self: QbTestBase[?] =>
 
   // --- SUM ---
 
@@ -118,4 +117,12 @@ class AggregateTests extends QbTestBase:
       assertEquals(countAll, 4L)
       assertEquals(countFirstName, 3L)
 
+end AggregateTestsDefs
+
+class AggregateTests extends QbH2TestBase, AggregateTestsDefs:
+  val h2Ddls = Seq("/h2/qb-chunk.sql", "/h2/qb-user.sql")
 end AggregateTests
+
+class PgAggregateTests extends QbPgTestBase, AggregateTestsDefs:
+  val pgDdls = Seq("/pg/qb-chunk.sql", "/pg/qb-user.sql")
+end PgAggregateTests

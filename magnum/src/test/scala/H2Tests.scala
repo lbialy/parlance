@@ -18,7 +18,7 @@ class H2Tests extends FunSuite:
 
   lazy val h2DbPath = Files.createTempDirectory(null).toAbsolutePath
 
-  def xa(): Transactor[H2.type] =
+  def xa(): Transactor[H2] =
     val ds = JdbcDataSource()
     ds.setURL("jdbc:h2:" + h2DbPath)
     ds.setUser("sa")

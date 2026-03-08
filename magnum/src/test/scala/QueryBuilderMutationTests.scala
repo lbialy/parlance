@@ -3,9 +3,8 @@ import com.augustnagro.magnum.*
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class QbCounter(@Id id: Long, name: String, status: String, viewCount: Long, score: Int) derives EntityMeta
 
-class QueryBuilderMutationTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-mutations.sql")
+trait QueryBuilderMutationTestsDefs:
+  self: QbTestBase[? <: SupportsMutations] =>
 
   // --- delete ---
 
@@ -210,4 +209,12 @@ class QueryBuilderMutationTests extends QbTestBase:
     """)
     assert(errors.contains("No given instance of type Numeric[String] was found"))
 
+end QueryBuilderMutationTestsDefs
+
+class QueryBuilderMutationTests extends QbH2TestBase, QueryBuilderMutationTestsDefs:
+  val h2Ddls = Seq("/h2/qb-mutations.sql")
 end QueryBuilderMutationTests
+
+class PgQueryBuilderMutationTests extends QbPgTestBase, QueryBuilderMutationTestsDefs:
+  val pgDdls = Seq("/pg/qb-mutations.sql")
+end PgQueryBuilderMutationTests

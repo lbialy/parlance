@@ -1,8 +1,7 @@
 import com.augustnagro.magnum.*
 
-class HasCountTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-where-has.sql")
+trait HasCountTestsDefs:
+  self: QbTestBase[?] =>
 
 
   // --- HasMany unconstrained ---
@@ -115,7 +114,7 @@ class HasCountTests extends QbTestBase:
     val frag = QueryBuilder
       .from[ElAuthor]
       .has(ElAuthor.books)(_ >= 2)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assert(
       frag.sqlString.contains("(SELECT COUNT(*) FROM"),
       s"SQL should contain count subquery: ${frag.sqlString}"
@@ -125,4 +124,12 @@ class HasCountTests extends QbTestBase:
       s"SQL should contain >= ? operator: ${frag.sqlString}"
     )
 
+end HasCountTestsDefs
+
+class HasCountTests extends QbH2TestBase with HasCountTestsDefs:
+  val h2Ddls = Seq("/h2/qb-where-has.sql")
 end HasCountTests
+
+class PgHasCountTests extends QbPgTestBase with HasCountTestsDefs:
+  val pgDdls = Seq("/pg/qb-where-has.sql")
+end PgHasCountTests

@@ -6,9 +6,8 @@ case class QbUser(@Id id: Long, firstName: Option[String], age: Int) derives Ent
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class QbProduct(@Id id: Long, name: String, price: Int) derives EntityMeta
 
-class QueryBuilderBasicTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-user.sql", "/h2/qb-product.sql")
+trait QueryBuilderBasicTestsDefs:
+  self: QbTestBase[? <: SupportsILike] =>
 
   // val u = Columns.of[QbUser]
 
@@ -68,7 +67,7 @@ class QueryBuilderBasicTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbUser]
       .where(_.age > 18)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE age > ?"
@@ -228,7 +227,7 @@ class QueryBuilderBasicTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbUser]
       .where(_.age > 18)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE age > ?"
@@ -240,7 +239,7 @@ class QueryBuilderBasicTests extends QbTestBase:
     val frag = QueryBuilder
       .from[QbUser]
       .distinct
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT DISTINCT id, first_name, age FROM qb_user"
@@ -251,7 +250,7 @@ class QueryBuilderBasicTests extends QbTestBase:
       .from[QbUser]
       .distinct
       .where(_.age > 18)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT DISTINCT id, first_name, age FROM qb_user WHERE age > ?"
@@ -267,4 +266,12 @@ class QueryBuilderBasicTests extends QbTestBase:
       assertEquals(results.length, 4)
       assertEquals(results.map(_.id).sorted, Vector(1L, 2L, 3L, 4L))
 
+end QueryBuilderBasicTestsDefs
+
+class QueryBuilderBasicTests extends QbH2TestBase, QueryBuilderBasicTestsDefs:
+  val h2Ddls = Seq("/h2/qb-user.sql", "/h2/qb-product.sql")
 end QueryBuilderBasicTests
+
+class PgQueryBuilderBasicTests extends QbPgTestBase, QueryBuilderBasicTestsDefs:
+  val pgDdls = Seq("/pg/qb-user.sql", "/pg/qb-product.sql")
+end PgQueryBuilderBasicTests

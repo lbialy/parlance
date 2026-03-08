@@ -49,9 +49,8 @@ class RecordingSdObserver extends RepoObserver[ObsSdUser, ObsSdUser]:
   override def restoring(entity: ObsSdUser)(using DbCon[?]): Unit = events += "restoring"
   override def restored(entity: ObsSdUser)(using DbCon[?]): Unit = events += "restored"
 
-class RepoObserverTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/repo-observer.sql")
+trait RepoObserverTestsDefs[D <: SupportsMutations & SupportsReturning]:
+  self: QbTestBase[D] =>
 
   val observer = RecordingObserver()
   val repo = new Repo[ObsUserCreator, ObsUser, Long](
@@ -59,10 +58,6 @@ class RepoObserverTests extends QbTestBase:
   )
 
   val plainRepo = Repo[ObsUserCreator, ObsUser, Long]()
-
-  override def beforeEach(context: BeforeEach): Unit =
-    super.beforeEach(context)
-    observer.events.clear()
 
   // --- no observers = zero overhead (regression) ---
 
@@ -323,4 +318,16 @@ class RepoObserverTests extends QbTestBase:
       // re-trash
       sdRepo.deleteById(2L)
 
-end RepoObserverTests
+end RepoObserverTestsDefs
+
+class RepoObserverTests extends QbH2TestBase with RepoObserverTestsDefs[H2]:
+  val h2Ddls = Seq("/h2/repo-observer.sql")
+  override def beforeEach(context: BeforeEach): Unit =
+    super.beforeEach(context)
+    observer.events.clear()
+
+class PgRepoObserverTests extends QbPgTestBase with RepoObserverTestsDefs[Postgres]:
+  val pgDdls = Seq("/pg/repo-observer.sql")
+  override def beforeEach(context: BeforeEach): Unit =
+    super.beforeEach(context)
+    observer.events.clear()

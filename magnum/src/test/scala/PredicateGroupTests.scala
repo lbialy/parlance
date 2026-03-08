@@ -1,15 +1,14 @@
 import com.augustnagro.magnum.*
 
-class PredicateGroupTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-user.sql")
+trait PredicateGroupTestsDefs:
+  self: QbTestBase[?] =>
 
   test("orWhere SQL generation"):
     val frag = QueryBuilder
       .from[QbUser]
       .where(_.age > 18)
       .orWhere(_.age < 5)
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE (age > ? OR age < ?)"
@@ -32,7 +31,7 @@ class PredicateGroupTests extends QbTestBase:
       .from[QbUser]
       .where(sq => (sq.age > 20) && (sq.age < 26))
       .orWhere(_.firstName === Some("Bob"))
-      .buildWith(H2)
+      .buildWith(databaseType)
     assertEquals(
       frag.sqlString,
       "SELECT id, first_name, age FROM qb_user WHERE ((age > ? AND age < ?) OR first_name = ?)"
@@ -105,4 +104,12 @@ class PredicateGroupTests extends QbTestBase:
     val result2 = WhereFrag.empty || nonEmpty
     assertEquals(result2.sqlString, "age > ?")
 
+end PredicateGroupTestsDefs
+
+class PredicateGroupTests extends QbH2TestBase, PredicateGroupTestsDefs:
+  val h2Ddls = Seq("/h2/qb-user.sql")
 end PredicateGroupTests
+
+class PgPredicateGroupTests extends QbPgTestBase, PredicateGroupTestsDefs:
+  val pgDdls = Seq("/pg/qb-user.sql")
+end PgPredicateGroupTests

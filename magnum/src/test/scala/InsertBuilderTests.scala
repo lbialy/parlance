@@ -6,9 +6,8 @@ case class QbMutItem(@Id id: Long, name: String, amount: Int) derives EntityMeta
 @Table(SqlNameMapper.CamelToSnakeCase)
 case class QbMutItemCreator(name: String, amount: Int) derives DbCodec
 
-class InsertBuilderTests extends QbTestBase:
-
-  val h2Ddls = Seq("/h2/qb-entity-mutations.sql")
+trait InsertBuilderTestsDefs:
+  self: QbTestBase[? <: SupportsMutations & SupportsReturning] =>
 
   // --- insert ---
 
@@ -111,4 +110,12 @@ class InsertBuilderTests extends QbTestBase:
       assertEquals(QueryBuilder.from[QbMutItem].count(), 5L)
       assertEquals(QueryBuilder.from[QbMutItem].where(_.id === 1L).firstOrFail().amount, 10) // unchanged
 
+end InsertBuilderTestsDefs
+
+class InsertBuilderTests extends QbH2TestBase, InsertBuilderTestsDefs:
+  val h2Ddls = Seq("/h2/qb-entity-mutations.sql")
 end InsertBuilderTests
+
+class PgInsertBuilderTests extends QbPgTestBase, InsertBuilderTestsDefs:
+  val pgDdls = Seq("/pg/qb-entity-mutations.sql")
+end PgInsertBuilderTests
