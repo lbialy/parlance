@@ -500,11 +500,12 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       JoinType.Inner,
       onFrag
     )
+    val rewrittenPredicate = rootPredicate.map(_.rewriteAlias(meta.tableName, "t0"))
     new JoinedQuery[(E, T)](
       Vector(meta, joinedMeta),
       Vector(codec, joinedCodec),
       Vector(entry),
-      rootPredicate,
+      rewrittenPredicate,
       orderEntries,
       limitOpt,
       offsetOpt
@@ -528,11 +529,12 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       JoinType.Left,
       onFrag
     )
+    val rewrittenPredicate = rootPredicate.map(_.rewriteAlias(meta.tableName, "t0"))
     new JoinedQuery[(E, Option[T])](
       Vector(meta, joinedMeta),
       Vector(codec, optCodec),
       Vector(entry),
-      rootPredicate,
+      rewrittenPredicate,
       orderEntries,
       limitOpt,
       offsetOpt

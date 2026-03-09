@@ -18,7 +18,7 @@ import scala.reflect.{ClassTag, classTag}
   *
   * The entity must have an `Option` -typed field annotated with `@deletedAt` and must derive `HasDeletedAt`.
   */
-trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
+trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]) extends HasScopes[E]:
   self: Repo[EC, E, ID] =>
 
   // --- internals ---
@@ -39,8 +39,8 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]):
       Vector(SetClause.literal(hasDeletedAt.column, "CURRENT_TIMESTAMP"))
     override def key: ClassTag[?] = classTag[SoftDeletes[?, ?, ?]]
 
-  override def finalScopes: Vector[Scope[E]] =
-    self.injectedScopes :+ softDeleteScope
+  abstract override def finalScopes: Vector[Scope[E]] =
+    super.finalScopes :+ softDeleteScope
 
   // --- observer dispatch overrides ---
 

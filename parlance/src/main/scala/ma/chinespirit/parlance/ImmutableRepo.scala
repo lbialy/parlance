@@ -15,7 +15,7 @@ open class ImmutableRepo[E, ID](
     val injectedScopes: Vector[Scope[E]] = Vector.empty[Scope[E]]
 )(using
     meta: EntityMeta[E]
-):
+) extends HasScopes[E]:
 
   /** Expose table metadata for traits with self-type. */
   protected def entityMeta: TableMeta[E] = meta
@@ -107,10 +107,6 @@ open class ImmutableRepo[E, ID](
   def findAllById(ids: Iterable[ID])(using con: DbCon[?]): Vector[E] =
     if ids.isEmpty then Vector.empty
     else trackAll(scopedQb.where(pkInFrag(ids, con)).run())
-
-  /** All scopes that will be applied to queries created via `query`. Override to add local scopes in subclasses.
-    */
-  def finalScopes: Vector[Scope[E]] = injectedScopes
 
   /** Apply all finalScopes to a QueryBuilder. */
   final def applyScopes[C <: Selectable](

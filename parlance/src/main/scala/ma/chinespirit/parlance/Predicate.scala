@@ -23,6 +23,15 @@ enum Predicate:
         case 0 => WhereFrag.empty
         case 1 => nonEmpty.head
         case _ => Predicate.joinFrags(nonEmpty, " OR ")
+
+  /** Rewrite all SQL fragments, replacing `tableName.` with `alias.` */
+  def rewriteAlias(tableName: String, alias: String): Predicate = this match
+    case Leaf(frag) =>
+      val newSql = frag.sqlString.replace(tableName + ".", alias + ".")
+      Leaf(WhereFrag(Frag(newSql, frag.params, frag.writer)))
+    case And(children) => And(children.map(_.rewriteAlias(tableName, alias)))
+    case Or(children)  => Or(children.map(_.rewriteAlias(tableName, alias)))
+
 end Predicate
 
 object Predicate:

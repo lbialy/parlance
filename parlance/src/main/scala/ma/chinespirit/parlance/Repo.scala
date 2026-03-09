@@ -26,6 +26,9 @@ open class Repo[EC, E, ID](
   private lazy val _collectOnUpdate: Vector[SetClause] =
     finalScopes.flatMap(_.onUpdate(meta))
 
+  private lazy val _collectOnInsert: Vector[SetClause] =
+    finalScopes.flatMap(_.onInsert(meta))
+
   private lazy val _collectRewriteDelete: Vector[SetClause] =
     finalScopes.flatMap(_.rewriteDelete(meta))
 
@@ -33,11 +36,11 @@ open class Repo[EC, E, ID](
     finalScopes.flatMap(_.conditions(meta))
 
   private lazy val _hasMutationHooks: Boolean =
-    _collectOnUpdate.nonEmpty || _collectRewriteDelete.nonEmpty
+    _collectOnUpdate.nonEmpty || _collectRewriteDelete.nonEmpty || _collectOnInsert.nonEmpty
 
   /** SQL column names that mutation hooks will set — structured access, no string parsing. */
   private lazy val _hookColumnNames: Set[String] =
-    (_collectOnUpdate ++ _collectRewriteDelete).map(_.col.sqlName.toLowerCase).toSet
+    (_collectOnUpdate ++ _collectRewriteDelete ++ _collectOnInsert).map(_.col.sqlName.toLowerCase).toSet
 
   // --- observer dispatch ---
 
@@ -121,18 +124,94 @@ open class Repo[EC, E, ID](
 
   // --- INSERT methods ---
 
+  // Augmented insert SQL that appends onInsert hook columns/expressions
+  private lazy val _augmentedInsertSql: Option[String] =
+    if _collectOnInsert.isEmpty then None
+    else
+      val hookCols = _collectOnInsert.map(_.col.sqlName)
+      val hookExprs = _collectOnInsert.map(_.expression)
+      val allCols = (ib.ecColNames.toSeq ++ hookCols).mkString("(", ", ", ")")
+      val allVals = (Seq(ib.ecCodec.queryRepr) ++ hookExprs).mkString(", ")
+      Some(s"INSERT INTO ${ib.tableName} $allCols VALUES ($allVals)")
+
+  private lazy val _augmentedInsertGenKeys: Array[String] = Array.from(ib.eColNames)
+
+  private def augmentedInsert(ec: EC)(using con: DbCon[?]): Unit =
+    val sql = _augmentedInsertSql.get
+    handleQuery(sql, ec):
+      Using(con.connection.prepareStatement(sql)): ps =>
+        ib.ecCodec.writeSingle(ec, ps)
+        var p = 1 + ib.ecCodec.cols.length
+        for c <- _collectOnInsert do p = c.writer.write(ps, p)
+        timed(ps.executeUpdate())
+
+  private def augmentedInsertAll(ecs: Iterable[EC])(using con: DbCon[?]): Unit =
+    val sql = _augmentedInsertSql.get
+    handleQuery(sql, ecs):
+      Using(con.connection.prepareStatement(sql)): ps =>
+        for ec <- ecs do
+          ib.ecCodec.writeSingle(ec, ps)
+          var p = 1 + ib.ecCodec.cols.length
+          for c <- _collectOnInsert do p = c.writer.write(ps, p)
+          ps.addBatch()
+        timed(batchUpdateResult(ps.executeBatch()))
+
+  private def augmentedInsertReturning[D <: DatabaseType](ec: EC)(using con: DbCon[D], cr: CanReturn[EC, E, D]): E =
+    if !con.databaseType.supportsInsertReturning then
+      augmentedInsert(ec)
+      ec.asInstanceOf[E]
+    else
+      val sql = _augmentedInsertSql.get
+      handleQuery(sql, ec):
+        Using.Manager: use =>
+          val ps = use(con.connection.prepareStatement(sql, _augmentedInsertGenKeys))
+          ib.ecCodec.writeSingle(ec, ps)
+          var p = 1 + ib.ecCodec.cols.length
+          for c <- _collectOnInsert do p = c.writer.write(ps, p)
+          timed:
+            ps.executeUpdate()
+            val rs = use(ps.getGeneratedKeys)
+            rs.next()
+            ib.eCodec.readSingle(rs)
+
+  private def augmentedInsertAllReturning[D <: DatabaseType](ecs: Iterable[EC])(using
+      con: DbCon[D],
+      cr: CanReturn[EC, E, D]
+  ): Vector[E] =
+    if !con.databaseType.supportsInsertReturning then
+      augmentedInsertAll(ecs)
+      ecs.toVector.asInstanceOf[Vector[E]]
+    else
+      val sql = _augmentedInsertSql.get
+      handleQuery(sql, ecs):
+        Using.Manager: use =>
+          val ps = use(con.connection.prepareStatement(sql, _augmentedInsertGenKeys))
+          for ec <- ecs do
+            ib.ecCodec.writeSingle(ec, ps)
+            var p = 1 + ib.ecCodec.cols.length
+            for c <- _collectOnInsert do p = c.writer.write(ps, p)
+            ps.addBatch()
+          timed:
+            batchUpdateResult(ps.executeBatch())
+            val rs = use(ps.getGeneratedKeys)
+            ib.eCodec.read(rs)
+
   /** Insert entity without returning or firing observer events. */
   def rawInsert(entityCreator: EC)(using DbCon[?]): Unit =
-    ib.insert(entityCreator)
+    if _collectOnInsert.nonEmpty then augmentedInsert(entityCreator)
+    else ib.insert(entityCreator)
 
   /** Insert all entities without returning or firing observer events. */
   def rawInsertAll(entityCreators: Iterable[EC])(using DbCon[?]): Unit =
-    ib.insertAll(entityCreators)
+    if _collectOnInsert.nonEmpty then augmentedInsertAll(entityCreators)
+    else ib.insertAll(entityCreators)
 
   /** Insert and return entity, firing creating/created observer events. */
   def create[D <: DatabaseType](entityCreator: EC)(using con: DbCon[D], cr: CanReturn[EC, E, D]): E =
     if observers.nonEmpty then observers.foreach(_.creating(entityCreator))
-    val result = ib.insertReturning(entityCreator)
+    val result =
+      if _collectOnInsert.nonEmpty then augmentedInsertReturning(entityCreator)
+      else ib.insertReturning(entityCreator)
     con.trackLoaded(meta.tableName, extractPk(result), result)
     if observers.nonEmpty then observers.foreach(_.created(result))
     result
@@ -141,7 +220,9 @@ open class Repo[EC, E, ID](
   def rawInsertAllReturning[D <: DatabaseType](
       entityCreators: Iterable[EC]
   )(using con: DbCon[D], cr: CanReturn[EC, E, D]): Vector[E] =
-    val results = ib.insertAllReturning(entityCreators)
+    val results =
+      if _collectOnInsert.nonEmpty then augmentedInsertAllReturning(entityCreators)
+      else ib.insertAllReturning(entityCreators)
     results.foreach(e => con.trackLoaded(meta.tableName, extractPk(e), e))
     results
 
@@ -302,23 +383,50 @@ open class Repo[EC, E, ID](
   private def insertByEntity(entity: E)(using con: DbCon[? <: SupportsMutations]): Unit =
     val columns = meta.columns
     val codecs = meta.elementCodecs
-    val colNames = columns.map(_.sqlName).mkString(", ")
-    val placeholders = codecs.map(_.queryRepr).mkString(", ")
-    val sql = s"INSERT INTO ${meta.tableName} ($colNames) VALUES ($placeholders)"
+    val hookClauses = _collectOnInsert
+    val hookCols = _hookColumnNames
     val entityProduct = entity.asInstanceOf[Product]
-    Frag(
-      sql,
-      Seq.empty,
-      (ps, pos) =>
-        var p = pos
-        var i = 0
-        while i < columns.length do
-          val codec = codecs(i).asInstanceOf[DbCodec[Any]]
-          codec.writeSingle(entityProduct.productElement(i), ps, p)
-          p += codec.cols.length
-          i += 1
-        p
-    ).update.run()
+
+    if hookClauses.isEmpty then
+      val colNames = columns.map(_.sqlName).mkString(", ")
+      val placeholders = codecs.map(_.queryRepr).mkString(", ")
+      val sql = s"INSERT INTO ${meta.tableName} ($colNames) VALUES ($placeholders)"
+      Frag(
+        sql,
+        Seq.empty,
+        (ps, pos) =>
+          var p = pos
+          var i = 0
+          while i < columns.length do
+            val codec = codecs(i).asInstanceOf[DbCodec[Any]]
+            codec.writeSingle(entityProduct.productElement(i), ps, p)
+            p += codec.cols.length
+            i += 1
+          p
+      ).update.run()
+    else
+      // Filter out entity columns that are covered by hooks, then append hook expressions
+      val entityIndices = (0 until columns.length).filterNot(i => hookCols.contains(columns(i).sqlName.toLowerCase))
+      val entityColSql = entityIndices.map(i => columns(i).sqlName)
+      val entityValSql = entityIndices.map(i => codecs(i).queryRepr)
+      val hookColSql = hookClauses.map(_.col.sqlName)
+      val hookExprSql = hookClauses.map(_.expression)
+      val allCols = (entityColSql ++ hookColSql).mkString(", ")
+      val allVals = (entityValSql ++ hookExprSql).mkString(", ")
+      val sql = s"INSERT INTO ${meta.tableName} ($allCols) VALUES ($allVals)"
+      Frag(
+        sql,
+        Seq.empty,
+        (ps, pos) =>
+          var p = pos
+          for i <- entityIndices do
+            val codec = codecs(i).asInstanceOf[DbCodec[Any]]
+            codec.writeSingle(entityProduct.productElement(i), ps, p)
+            p += codec.cols.length
+          for c <- hookClauses do p = c.writer.write(ps, p)
+          p
+      ).update.run()
+    end if
   end insertByEntity
 
   /** Insert with conflict handling. */
