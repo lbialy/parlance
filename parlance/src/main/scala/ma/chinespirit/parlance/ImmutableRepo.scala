@@ -39,9 +39,9 @@ open class ImmutableRepo[E, ID](
     entities
 
   /** Internal scoped query builder using build0 (no structural typing needed). */
-  protected def scopedQb: QueryBuilder[HasRoot, E, Columns[E]] =
+  protected def scopedQb: QueryBuilder[HasRoot, E, Columns[E], ApplyScopes] =
     val cols = new Columns[E](meta.columns)
-    val qb = QueryBuilder.build0[E, Columns[E]](meta, meta, cols)
+    val qb = QueryBuilder.build0[E, Columns[E], ApplyScopes](meta, meta, cols)
     applyScopes(qb)
 
   /** Build a WhereFrag for `pk = ?` */
@@ -109,9 +109,9 @@ open class ImmutableRepo[E, ID](
     else trackAll(scopedQb.where(pkInFrag(ids, con)).run())
 
   /** Apply all finalScopes to a QueryBuilder. */
-  final def applyScopes[C <: Selectable](
-      qb: QueryBuilder[HasRoot, E, C]
-  ): QueryBuilder[HasRoot, E, C] =
+  final def applyScopes[C <: Selectable, P <: ScopePolicy](
+      qb: QueryBuilder[HasRoot, E, C, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
     val m = entityMeta
     val withWheres = finalScopes
       .flatMap(_.conditions(m))

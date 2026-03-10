@@ -59,6 +59,11 @@ object DmjUser:
 object DmjProfile:
   val addresses = Relationship.hasMany[DmjProfile, DmjAddress](_.id, _.profileId)
 
+// Scoped givens for entities without repos — required in ApplyScopes mode
+given Scoped[DemoProfile] = Scoped.none
+given Scoped[DemoAddress] = Scoped.none
+given Scoped[DemoOrder] = Scoped.none
+
 // Scoped givens so JoinedQuery picks up soft-delete conditions on ON clauses
 given Scoped[DmjProfile] with
   def scopes: Vector[Scope[DmjProfile]] = Vector(NotDeletedScope[DmjProfile]())

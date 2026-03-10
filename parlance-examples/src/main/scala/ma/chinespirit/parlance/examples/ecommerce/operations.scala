@@ -66,8 +66,8 @@ class AccountController(using AppContext):
   /** Reactivate a previously deactivated account */
   def reactivateAccount(customerId: Long)(using DbCon[Postgres]): Customer =
     val deactivated = Customer.repo.withTrashed
-      .run()
-      .find(_.id == customerId)
+      .where(_.id === customerId)
+      .first()
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found"))
     require(deactivated.trashed, "Account is not deactivated")
     deactivated.restore()
@@ -78,8 +78,8 @@ class AccountController(using AppContext):
   /** Permanently delete account — GDPR "right to be forgotten" */
   def deleteAccountPermanently(customerId: Long)(using DbCon[Postgres]): Unit =
     val customer = Customer.repo.withTrashed
-      .run()
-      .find(_.id == customerId)
+      .where(_.id === customerId)
+      .first()
       .getOrElse(throw java.util.NoSuchElementException(s"Customer $customerId not found"))
     Customer.repo.forceDelete(customer)
 

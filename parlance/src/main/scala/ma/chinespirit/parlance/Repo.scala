@@ -444,7 +444,7 @@ open class Repo[EC, E, ID](
   /** Find an existing entity matching the predicate, or insert a new one. */
   def firstOrCreate[D <: DatabaseType](predicate: WhereFrag, creator: => EC)(using con: DbTx[D], cr: CanReturn[EC, E, D]): E =
     val found = applyScopes(
-      QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
+      QueryBuilder.build0[E, Columns[E], ApplyScopes](meta, meta, new Columns[E](meta.columns))
     ).where(predicate).first()
     found match
       case Some(entity) =>
@@ -463,7 +463,7 @@ open class Repo[EC, E, ID](
       cr: CanReturn[EC, E, D]
   ): E =
     val found = applyScopes(
-      QueryBuilder.build0[E, Columns[E]](meta, meta, new Columns[E](meta.columns))
+      QueryBuilder.build0[E, Columns[E], ApplyScopes](meta, meta, new Columns[E](meta.columns))
     ).where(predicate).first()
     found match
       case Some(existing) =>

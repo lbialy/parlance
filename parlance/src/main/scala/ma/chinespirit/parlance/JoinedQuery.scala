@@ -5,7 +5,7 @@ import scala.NamedTuple
 import scala.deriving.Mirror
 import scala.quoted.*
 
-class JoinedQuery[R <: NonEmptyTuple] private[parlance] (
+class JoinedQuery[R <: NonEmptyTuple, P <: ScopePolicy] private[parlance] (
     private[parlance] val metas: Vector[TableMeta[?]],
     private val codecs: Vector[DbCodec[?]],
     private val joinClauses: Vector[JoinEntry],
@@ -26,33 +26,33 @@ class JoinedQuery[R <: NonEmptyTuple] private[parlance] (
   private def addOr(pred: Predicate): Option[Predicate] =
     QuerySqlBuilder.addOr(predicate, pred)
 
-  def where(frag: WhereFrag): JoinedQuery[R] =
+  def where(frag: WhereFrag): JoinedQuery[R, P] =
     new JoinedQuery(metas, codecs, joinClauses, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
 
-  def orWhere(frag: WhereFrag): JoinedQuery[R] =
+  def orWhere(frag: WhereFrag): JoinedQuery[R, P] =
     new JoinedQuery(metas, codecs, joinClauses, addOr(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt)
 
-  def orderBy(col: ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): JoinedQuery[R] =
+  def orderBy(col: ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): JoinedQuery[R, P] =
     new JoinedQuery(metas, codecs, joinClauses, predicate, orderEntries :+ (col, order, nullOrder), limitOpt, offsetOpt)
 
-  def limit(n: Int): JoinedQuery[R] =
+  def limit(n: Int): JoinedQuery[R, P] =
     new JoinedQuery(metas, codecs, joinClauses, predicate, orderEntries, Some(n), offsetOpt)
 
-  def offset(n: Long): JoinedQuery[R] =
+  def offset(n: Long): JoinedQuery[R, P] =
     new JoinedQuery(metas, codecs, joinClauses, predicate, orderEntries, limitOpt, Some(n))
 
   def join[S, U](rel: Relationship[S, U])(using
       sMeta: TableMeta[S],
       uMeta: TableMeta[U],
       uCodec: DbCodec[U],
-      scoped: Scoped[U]
-  ): JoinedQuery[Tuple.Append[R, U]] =
+      resolve: ResolveScopes[U, P]
+  ): JoinedQuery[Tuple.Append[R, U], P] =
     val sourceIdx = metas.indexWhere(_.tableName == sMeta.tableName)
     require(sourceIdx >= 0, s"Table ${sMeta.tableName} not in join chain")
     val newIdx = metas.size
     val alias = s"t$newIdx"
     val baseOn = s"t$sourceIdx.${rel.fk.sqlName} = $alias.${rel.pk.sqlName}"
-    val onFrag = ExistsBuilder.scopeConditions(scoped.scopes, uMeta) match
+    val onFrag = ExistsBuilder.scopeConditions(resolve.scopes, uMeta) match
       case None => Frag(baseOn, Seq.empty, FragWriter.empty)
       case Some(sc) =>
         val scopeSql = sc.sqlString.replace(uMeta.tableName + ".", alias + ".")
@@ -62,7 +62,7 @@ class JoinedQuery[R <: NonEmptyTuple] private[parlance] (
       JoinType.Inner,
       onFrag
     )
-    new JoinedQuery[Tuple.Append[R, U]](
+    new JoinedQuery[Tuple.Append[R, U], P](
       metas :+ uMeta,
       codecs :+ uCodec,
       joinClauses :+ entry,
@@ -77,15 +77,15 @@ class JoinedQuery[R <: NonEmptyTuple] private[parlance] (
       sMeta: TableMeta[S],
       uMeta: TableMeta[U],
       uCodec: DbCodec[U],
-      scoped: Scoped[U]
-  ): JoinedQuery[Tuple.Append[R, Option[U]]] =
+      resolve: ResolveScopes[U, P]
+  ): JoinedQuery[Tuple.Append[R, Option[U]], P] =
     val sourceIdx = metas.indexWhere(_.tableName == sMeta.tableName)
     require(sourceIdx >= 0, s"Table ${sMeta.tableName} not in join chain")
     val newIdx = metas.size
     val alias = s"t$newIdx"
     val optCodec = DbCodec.OptionCodec[U](using uCodec)
     val baseOn = s"t$sourceIdx.${rel.fk.sqlName} = $alias.${rel.pk.sqlName}"
-    val onFrag = ExistsBuilder.scopeConditions(scoped.scopes, uMeta) match
+    val onFrag = ExistsBuilder.scopeConditions(resolve.scopes, uMeta) match
       case None => Frag(baseOn, Seq.empty, FragWriter.empty)
       case Some(sc) =>
         val scopeSql = sc.sqlString.replace(uMeta.tableName + ".", alias + ".")
@@ -95,7 +95,7 @@ class JoinedQuery[R <: NonEmptyTuple] private[parlance] (
       JoinType.Left,
       onFrag
     )
-    new JoinedQuery[Tuple.Append[R, Option[U]]](
+    new JoinedQuery[Tuple.Append[R, Option[U]], P](
       metas :+ uMeta,
       codecs :+ optCodec,
       joinClauses :+ entry,
@@ -212,7 +212,7 @@ class JoinedQuery[R <: NonEmptyTuple] private[parlance] (
       .run()
       .head
 
-  def select: JoinedQuery.JoinedSelectPhase[R] =
+  def select: JoinedQuery.JoinedSelectPhase[R, P] =
     JoinedQuery.JoinedSelectPhase(this)
 
   def debugPrintSql(using DbCon[?]): this.type =
@@ -223,11 +223,11 @@ end JoinedQuery
 
 object JoinedQuery:
 
-  class JoinedSelectPhase[R <: NonEmptyTuple](val jq: JoinedQuery[R]):
-    transparent inline def apply[P](inline f: JoinedQuery[R] => P): Any =
-      ${ joinedSelectImpl[R, P]('this, 'f) }
+  class JoinedSelectPhase[R <: NonEmptyTuple, PP <: ScopePolicy](val jq: JoinedQuery[R, PP]):
+    transparent inline def apply[P](inline f: JoinedQuery[R, PP] => P): Any =
+      ${ joinedSelectImpl[R, PP, P]('this, 'f) }
 
-  extension [R <: NonEmptyTuple](jq: JoinedQuery[R])
+  extension [R <: NonEmptyTuple, PP <: ScopePolicy](jq: JoinedQuery[R, PP])
     transparent inline def of[T]: Any = ${ ofImpl[R, T] }
     transparent inline def ofLeft[T]: Any = ${ ofLeftImpl[R, T] }
 
@@ -344,9 +344,9 @@ object JoinedQuery:
 
   // --- joinedSelectImpl macro ---
 
-  private def joinedSelectImpl[R <: NonEmptyTuple: Type, P: Type](
-      phaseExpr: Expr[JoinedSelectPhase[R]],
-      f: Expr[JoinedQuery[R] => P]
+  private def joinedSelectImpl[R <: NonEmptyTuple: Type, PP <: ScopePolicy: Type, P: Type](
+      phaseExpr: Expr[JoinedSelectPhase[R, PP]],
+      f: Expr[JoinedQuery[R, PP] => P]
   )(using Quotes): Expr[Any] =
     import quotes.reflect.*
 

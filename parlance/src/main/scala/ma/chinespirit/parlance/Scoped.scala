@@ -12,6 +12,6 @@ object Scoped:
   given fromRepo[E, ID](using repo: ImmutableRepo[E, ID]): Scoped[E] with
     def scopes: Vector[Scope[E]] = repo.finalScopes
 
-  /** Fallback when no repo is available. Less constrained → lower priority. */
-  given empty[E]: Scoped[E] with
+  /** Explicit opt-in for entities without scopes. Not a given — must be assigned manually. */
+  def none[E]: Scoped[E] = new Scoped[E]:
     def scopes: Vector[Scope[E]] = Vector.empty

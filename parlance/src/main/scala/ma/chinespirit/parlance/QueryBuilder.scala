@@ -9,7 +9,7 @@ import scala.util.Using
 sealed trait QBState
 sealed trait HasRoot extends QBState
 
-class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
+class QueryBuilder[S <: QBState, E, C <: Selectable, P <: ScopePolicy] private[parlance] (
     private[parlance] val meta: TableMeta[E],
     private val codec: DbCodec[E],
     private[parlance] val cols: C,
@@ -27,21 +27,21 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
   private def addOr(pred: Predicate): Option[Predicate] =
     QuerySqlBuilder.addOr(rootPredicate, pred)
 
-  def where(frag: WhereFrag): QueryBuilder[HasRoot, E, C] =
+  def where(frag: WhereFrag): QueryBuilder[HasRoot, E, C, P] =
     new QueryBuilder(meta, codec, cols, addAnd(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt, distinctFlag, rawOrderFrags)
 
-  def where(f: SubQuery[E, C] => WhereFrag): QueryBuilder[HasRoot, E, C] =
-    val sq = new SubQuery[E, C](meta, cols)
+  def where(f: SubQuery[E, C, P] => WhereFrag): QueryBuilder[HasRoot, E, C, P] =
+    val sq = new SubQuery[E, C, P](meta, cols)
     new QueryBuilder(meta, codec, cols, addAnd(Predicate.Leaf(f(sq))), orderEntries, limitOpt, offsetOpt, distinctFlag, rawOrderFrags)
 
-  def orWhere(frag: WhereFrag): QueryBuilder[HasRoot, E, C] =
+  def orWhere(frag: WhereFrag): QueryBuilder[HasRoot, E, C, P] =
     new QueryBuilder(meta, codec, cols, addOr(Predicate.Leaf(frag)), orderEntries, limitOpt, offsetOpt, distinctFlag, rawOrderFrags)
 
-  def orWhere(f: SubQuery[E, C] => WhereFrag): QueryBuilder[HasRoot, E, C] =
-    val sq = new SubQuery[E, C](meta, cols)
+  def orWhere(f: SubQuery[E, C, P] => WhereFrag): QueryBuilder[HasRoot, E, C, P] =
+    val sq = new SubQuery[E, C, P](meta, cols)
     new QueryBuilder(meta, codec, cols, addOr(Predicate.Leaf(f(sq))), orderEntries, limitOpt, offsetOpt, distinctFlag, rawOrderFrags)
 
-  def orderBy(f: C => ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): QueryBuilder[S, E, C] =
+  def orderBy(f: C => ColRef[?], order: SortOrder = SortOrder.Asc, nullOrder: NullOrder = NullOrder.Default): QueryBuilder[S, E, C, P] =
     new QueryBuilder(
       meta,
       codec,
@@ -54,7 +54,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       rawOrderFrags
     )
 
-  def orderBy(f: C => ColRef[?]): QueryBuilder[S, E, C] =
+  def orderBy(f: C => ColRef[?]): QueryBuilder[S, E, C, P] =
     new QueryBuilder(
       meta,
       codec,
@@ -67,18 +67,18 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       rawOrderFrags
     )
 
-  def orderBy(frag: OrderByFrag): QueryBuilder[S, E, C] =
+  def orderBy(frag: OrderByFrag): QueryBuilder[S, E, C, P] =
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, distinctFlag, rawOrderFrags :+ frag)
 
-  def limit(n: Int): QueryBuilder[S, E, C] =
+  def limit(n: Int): QueryBuilder[S, E, C, P] =
     if n < 0 then throw QueryBuilderException("limit must not be negative")
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, Some(n), offsetOpt, distinctFlag, rawOrderFrags)
 
-  def offset(n: Long): QueryBuilder[S, E, C] =
+  def offset(n: Long): QueryBuilder[S, E, C, P] =
     if n < 0 then throw QueryBuilderException("offset must not be negative")
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, Some(n), distinctFlag, rawOrderFrags)
 
-  def distinct: QueryBuilder[S, E, C] =
+  def distinct: QueryBuilder[S, E, C, P] =
     new QueryBuilder(meta, codec, cols, rootPredicate, orderEntries, limitOpt, offsetOpt, true, rawOrderFrags)
 
   def lockForUpdate(using DbTx[? <: SupportsRowLocks]): LockedQueryBuilder[S, E, C] =
@@ -168,8 +168,8 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
     QueryBuilder.SelectPhase(meta.tableName, cols, rootPredicate)
 
   /** Merge scope conditions with an optional user filter for eager loading. */
-  private def mergeEagerFilter[T](userFilter: Option[Frag], targetMeta: TableMeta[T], scoped: Scoped[T]): Option[Frag] =
-    val scopeFrag = ExistsBuilder.scopeConditions(scoped.scopes, targetMeta).map(f => f: Frag)
+  private def mergeEagerFilter[T](userFilter: Option[Frag], targetMeta: TableMeta[T], scopes: Vector[Scope[T]]): Option[Frag] =
+    val scopeFrag = ExistsBuilder.scopeConditions(scopes, targetMeta).map(f => f: Frag)
     (userFilter, scopeFrag) match
       case (None, None)    => None
       case (Some(u), None) => Some(u)
@@ -185,24 +185,24 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
   def withRelated[T](rel: HasMany[E, T, ?])(using
       childMeta: TableMeta[T],
       childCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
-    val d = DirectEagerDef(meta, rel, childMeta, childCodec, mergeEagerFilter(None, childMeta, scoped))
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
+    val d = DirectEagerDef(meta, rel, childMeta, childCodec, mergeEagerFilter(None, childMeta, resolve.scopes))
     EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T](rel: BelongsToMany[E, T, ?])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
-    val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, mergeEagerFilter(None, targetMeta, scoped))
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
+    val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, mergeEagerFilter(None, targetMeta, resolve.scopes))
     EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T](rel: HasManyThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
     val d = ThroughEagerDef(
       meta,
       rel.intermediateTable,
@@ -213,15 +213,15 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       rel.sourcePk.scalaName,
       targetMeta,
       targetCodec,
-      mergeEagerFilter(None, targetMeta, scoped)
+      mergeEagerFilter(None, targetMeta, resolve.scopes)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
 
   def withRelated[T](rel: HasOneThrough[E, T, ?])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
     val d = ThroughEagerDef(
       meta,
       rel.intermediateTable,
@@ -232,39 +232,39 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       rel.sourcePk.scalaName,
       targetMeta,
       targetCodec,
-      mergeEagerFilter(None, targetMeta, scoped)
+      mergeEagerFilter(None, targetMeta, resolve.scopes)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
 
   // --- Constrained withRelated ---
 
-  def withRelated[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def withRelated[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       childMeta: TableMeta[T],
       childCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
     val relCols = new Columns[T](childMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](childMeta, relCols)
-    val d = DirectEagerDef(meta, rel, childMeta, childCodec, mergeEagerFilter(Some(f(sq)), childMeta, scoped))
+    val sq = new SubQuery[T, CT, P](childMeta, relCols)
+    val d = DirectEagerDef(meta, rel, childMeta, childCodec, mergeEagerFilter(Some(f(sq)), childMeta, resolve.scopes))
     EagerQuery(buildWith, codec, meta, Vector(d))
 
-  def withRelated[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def withRelated[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](targetMeta, relCols)
-    val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, mergeEagerFilter(Some(f(sq)), targetMeta, scoped))
+    val sq = new SubQuery[T, CT, P](targetMeta, relCols)
+    val d = PivotEagerDef(meta, rel, targetMeta, targetCodec, mergeEagerFilter(Some(f(sq)), targetMeta, resolve.scopes))
     EagerQuery(buildWith, codec, meta, Vector(d))
 
-  def withRelated[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def withRelated[T, CT <: Selectable](rel: HasManyThrough[E, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](targetMeta, relCols)
+    val sq = new SubQuery[T, CT, P](targetMeta, relCols)
     val d = ThroughEagerDef(
       meta,
       rel.intermediateTable,
@@ -275,18 +275,18 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       rel.sourcePk.scalaName,
       targetMeta,
       targetCodec,
-      mergeEagerFilter(Some(f(sq)), targetMeta, scoped)
+      mergeEagerFilter(Some(f(sq)), targetMeta, resolve.scopes)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
   end withRelated
 
-  def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def withRelated[T, CT <: Selectable](rel: HasOneThrough[E, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](targetMeta, relCols)
+    val sq = new SubQuery[T, CT, P](targetMeta, relCols)
     val d = ThroughEagerDef(
       meta,
       rel.intermediateTable,
@@ -297,32 +297,32 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       rel.sourcePk.scalaName,
       targetMeta,
       targetCodec,
-      mergeEagerFilter(Some(f(sq)), targetMeta, scoped)
+      mergeEagerFilter(Some(f(sq)), targetMeta, resolve.scopes)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
   end withRelated
 
   // --- withRelated for PivotRelation (delegates to underlying BelongsToMany) ---
 
-  def withRelated[T, P, CT <: Selectable, PCT <: Selectable](rel: PivotRelation[E, T, P, CT, PCT])(using
+  def withRelated[T, Pv, CT <: Selectable, PCT <: Selectable](rel: PivotRelation[E, T, Pv, CT, PCT])(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
-    val d = PivotEagerDef(meta, rel.underlying, targetMeta, targetCodec, mergeEagerFilter(None, targetMeta, scoped))
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
+    val d = PivotEagerDef(meta, rel.underlying, targetMeta, targetCodec, mergeEagerFilter(None, targetMeta, resolve.scopes))
     EagerQuery(buildWith, codec, meta, Vector(d))
 
   // --- withRelatedAndPivot ---
 
-  def withRelatedAndPivot[T, P, CT <: Selectable, PCT <: Selectable](
-      rel: PivotRelation[E, T, P, CT, PCT]
+  def withRelatedAndPivot[T, Pv, CT <: Selectable, PCT <: Selectable](
+      rel: PivotRelation[E, T, Pv, CT, PCT]
   )(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      pivotMeta: TableMeta[P],
-      pivotCodec: DbCodec[P],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[(T, P)] *: EmptyTuple] =
+      pivotMeta: TableMeta[Pv],
+      pivotCodec: DbCodec[Pv],
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[(T, Pv)] *: EmptyTuple, P] =
     val d = PivotWithDataEagerDef(
       meta,
       rel.underlying,
@@ -330,20 +330,20 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       targetCodec,
       pivotMeta,
       pivotCodec,
-      mergeEagerFilter(None, targetMeta, scoped)
+      mergeEagerFilter(None, targetMeta, resolve.scopes)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
 
-  def withRelatedAndPivot[T, P, CT <: Selectable, PCT <: Selectable](
-      rel: PivotRelation[E, T, P, CT, PCT],
+  def withRelatedAndPivot[T, Pv, CT <: Selectable, PCT <: Selectable](
+      rel: PivotRelation[E, T, Pv, CT, PCT],
       pivotFilter: Frag
   )(using
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      pivotMeta: TableMeta[P],
-      pivotCodec: DbCodec[P],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[(T, P)] *: EmptyTuple] =
+      pivotMeta: TableMeta[Pv],
+      pivotCodec: DbCodec[Pv],
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[(T, Pv)] *: EmptyTuple, P] =
     val d = PivotWithDataEagerDef(
       meta,
       rel.underlying,
@@ -351,7 +351,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       targetCodec,
       pivotMeta,
       pivotCodec,
-      mergeEagerFilter(Some(pivotFilter), targetMeta, scoped)
+      mergeEagerFilter(Some(pivotFilter), targetMeta, resolve.scopes)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
   end withRelatedAndPivot
@@ -363,9 +363,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       intermediateCodec: DbCodec[I],
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      intermediateScoped: Scoped[I],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+      intermediateResolve: ResolveScopes[I, P],
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
     val d = ComposedEagerDef(
       meta,
       rel.inner,
@@ -374,22 +374,22 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       rel.outer,
       targetMeta,
       targetCodec,
-      mergeEagerFilter(None, intermediateMeta, intermediateScoped),
-      mergeEagerFilter(None, targetMeta, scoped)
+      mergeEagerFilter(None, intermediateMeta, intermediateResolve.scopes),
+      mergeEagerFilter(None, targetMeta, resolve.scopes)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
   end withRelated
 
-  def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def withRelated[I, T, CT <: Selectable](rel: ComposedRelationship[E, I, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       intermediateMeta: TableMeta[I],
       intermediateCodec: DbCodec[I],
       targetMeta: TableMeta[T],
       targetCodec: DbCodec[T],
-      intermediateScoped: Scoped[I],
-      scoped: Scoped[T]
-  ): EagerQuery[E, Vector[T] *: EmptyTuple] =
+      intermediateResolve: ResolveScopes[I, P],
+      resolve: ResolveScopes[T, P]
+  ): EagerQuery[E, Vector[T] *: EmptyTuple, P] =
     val relCols = new Columns[T](targetMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](targetMeta, relCols)
+    val sq = new SubQuery[T, CT, P](targetMeta, relCols)
     val d = ComposedEagerDef(
       meta,
       rel.inner,
@@ -398,8 +398,8 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       rel.outer,
       targetMeta,
       targetCodec,
-      mergeEagerFilter(None, intermediateMeta, intermediateScoped),
-      mergeEagerFilter(Some(f(sq)), targetMeta, scoped)
+      mergeEagerFilter(None, intermediateMeta, intermediateResolve.scopes),
+      mergeEagerFilter(Some(f(sq)), targetMeta, resolve.scopes)
     )
     EagerQuery(buildWith, codec, meta, Vector(d))
   end withRelated
@@ -408,9 +408,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
 
   def withCount[T](rel: HasMany[E, T, ?])(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
+      resolve: ResolveScopes[T, P]
   ): CountQuery[E] =
-    val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, scoped.scopes)
+    val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, resolve.scopes)
     new CountQuery(
       meta,
       codec,
@@ -424,13 +424,13 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       countFrag.writer
     )
 
-  def withCount[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def withCount[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
+      resolve: ResolveScopes[T, P]
   ): CountQuery[E] =
-    val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, scoped.scopes)
+    val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, resolve.scopes)
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](relMeta, relCols)
+    val sq = new SubQuery[T, CT, P](relMeta, relCols)
     new CountQuery(
       meta,
       codec,
@@ -448,9 +448,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
 
   def withCount[T](rel: BelongsToMany[E, T, ?])(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
+      resolve: ResolveScopes[T, P]
   ): CountQuery[E] =
-    val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, scoped.scopes)
+    val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, resolve.scopes)
     new CountQuery(
       meta,
       codec,
@@ -464,13 +464,13 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       countFrag.writer
     )
 
-  def withCount[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def withCount[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
+      resolve: ResolveScopes[T, P]
   ): CountQuery[E] =
-    val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, scoped.scopes, hasUserCondition = true)
+    val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, resolve.scopes, hasUserCondition = true)
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](relMeta, relCols)
+    val sq = new SubQuery[T, CT, P](relMeta, relCols)
     new CountQuery(
       meta,
       codec,
@@ -487,10 +487,10 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
   def join[T](rel: Relationship[E, T])(using
       joinedMeta: TableMeta[T],
       joinedCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): JoinedQuery[(E, T)] =
+      resolve: ResolveScopes[T, P]
+  ): JoinedQuery[(E, T), P] =
     val baseOn = s"t0.${rel.fk.sqlName} = t1.${rel.pk.sqlName}"
-    val onFrag = ExistsBuilder.scopeConditions(scoped.scopes, joinedMeta) match
+    val onFrag = ExistsBuilder.scopeConditions(resolve.scopes, joinedMeta) match
       case None => Frag(baseOn, Seq.empty, FragWriter.empty)
       case Some(sc) =>
         val scopeSql = sc.sqlString.replace(joinedMeta.tableName + ".", "t1.")
@@ -501,7 +501,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       onFrag
     )
     val rewrittenPredicate = rootPredicate.map(_.rewriteAlias(meta.tableName, "t0"))
-    new JoinedQuery[(E, T)](
+    new JoinedQuery[(E, T), P](
       Vector(meta, joinedMeta),
       Vector(codec, joinedCodec),
       Vector(entry),
@@ -515,11 +515,11 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
   def leftJoin[T](rel: Relationship[E, T])(using
       joinedMeta: TableMeta[T],
       joinedCodec: DbCodec[T],
-      scoped: Scoped[T]
-  ): JoinedQuery[(E, Option[T])] =
+      resolve: ResolveScopes[T, P]
+  ): JoinedQuery[(E, Option[T]), P] =
     val optCodec = DbCodec.OptionCodec[T](using joinedCodec)
     val baseOn = s"t0.${rel.fk.sqlName} = t1.${rel.pk.sqlName}"
-    val onFrag = ExistsBuilder.scopeConditions(scoped.scopes, joinedMeta) match
+    val onFrag = ExistsBuilder.scopeConditions(resolve.scopes, joinedMeta) match
       case None => Frag(baseOn, Seq.empty, FragWriter.empty)
       case Some(sc) =>
         val scopeSql = sc.sqlString.replace(joinedMeta.tableName + ".", "t1.")
@@ -530,7 +530,7 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       onFrag
     )
     val rewrittenPredicate = rootPredicate.map(_.rewriteAlias(meta.tableName, "t0"))
-    new JoinedQuery[(E, Option[T])](
+    new JoinedQuery[(E, Option[T]), P](
       Vector(meta, joinedMeta),
       Vector(codec, optCodec),
       Vector(entry),
@@ -545,128 +545,128 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
 
   def whereHas[T](rel: Relationship[E, T])(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    where(buildRelExistsFrag(rel, relMeta, None, negate = false, scoped))
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    where(buildRelExistsFrag(rel, relMeta, None, negate = false, resolve.scopes))
 
-  def whereHas[T](rel: BelongsTo[E, T])(f: SubQuery[T, Columns[T]] => WhereFrag)(using
+  def whereHas[T](rel: BelongsTo[E, T])(f: SubQuery[T, Columns[T], P] => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
     val relCols = new Columns[T](relMeta.columns)
-    val sq = new SubQuery[T, Columns[T]](relMeta, relCols)
-    where(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, scoped))
+    val sq = new SubQuery[T, Columns[T], P](relMeta, relCols)
+    where(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, resolve.scopes))
 
-  def whereHas[T](rel: HasOne[E, T])(f: SubQuery[T, Columns[T]] => WhereFrag)(using
+  def whereHas[T](rel: HasOne[E, T])(f: SubQuery[T, Columns[T], P] => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
     val relCols = new Columns[T](relMeta.columns)
-    val sq = new SubQuery[T, Columns[T]](relMeta, relCols)
-    where(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, scoped))
+    val sq = new SubQuery[T, Columns[T], P](relMeta, relCols)
+    where(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, resolve.scopes))
 
   def whereHas[T](rel: HasMany[E, T, ?])(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    where(buildRelExistsFrag(rel, relMeta, None, negate = false, scoped))
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    where(buildRelExistsFrag(rel, relMeta, None, negate = false, resolve.scopes))
 
-  def whereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def whereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](relMeta, relCols)
-    where(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, scoped))
+    val sq = new SubQuery[T, CT, P](relMeta, relCols)
+    where(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, resolve.scopes))
 
   def doesntHave[T](rel: HasMany[E, T, ?])(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    where(buildRelExistsFrag(rel, relMeta, None, negate = true, scoped))
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    where(buildRelExistsFrag(rel, relMeta, None, negate = true, resolve.scopes))
 
   def doesntHave[T](rel: Relationship[E, T])(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    where(buildRelExistsFrag(rel, relMeta, None, negate = true, scoped))
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    where(buildRelExistsFrag(rel, relMeta, None, negate = true, resolve.scopes))
 
   // --- whereHas / doesntHave for BelongsToMany ---
 
   def whereHas[T](rel: BelongsToMany[E, T, ?])(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    where(buildPivotExistsFrag(rel, None, negate = false, scoped, relMeta))
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    where(buildPivotExistsFrag(rel, None, negate = false, resolve.scopes, relMeta))
 
-  def whereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT] => WhereFrag)(using
+  def whereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(f: SubQuery[T, CT, P] => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](relMeta, relCols)
-    where(buildPivotExistsFrag(rel, Some((f(sq), relMeta)), negate = false, scoped, relMeta))
+    val sq = new SubQuery[T, CT, P](relMeta, relCols)
+    where(buildPivotExistsFrag(rel, Some((f(sq), relMeta)), negate = false, resolve.scopes, relMeta))
 
   def doesntHave[T](rel: BelongsToMany[E, T, ?])(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    where(buildPivotExistsFrag(rel, None, negate = true, scoped, relMeta))
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    where(buildPivotExistsFrag(rel, None, negate = true, resolve.scopes, relMeta))
 
   // --- orWhereHas / orDoesntHave for Relationship ---
 
-  def orWhereHas[T](rel: Relationship[E, T])(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
-    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = false, scoped))
+  def orWhereHas[T](rel: Relationship[E, T])(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
+    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = false, resolve.scopes))
 
-  def orWhereHas[T](rel: HasMany[E, T, ?])(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
-    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = false, scoped))
+  def orWhereHas[T](rel: HasMany[E, T, ?])(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
+    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = false, resolve.scopes))
 
   def orWhereHas[T, CT <: Selectable](rel: HasMany[E, T, CT])(
-      f: SubQuery[T, CT] => WhereFrag
-  )(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
+      f: SubQuery[T, CT, P] => WhereFrag
+  )(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](relMeta, relCols)
-    orWhere(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, scoped))
+    val sq = new SubQuery[T, CT, P](relMeta, relCols)
+    orWhere(buildRelExistsFrag(rel, relMeta, Some(f(sq)), negate = false, resolve.scopes))
 
-  def orDoesntHave[T](rel: HasMany[E, T, ?])(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
-    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = true, scoped))
+  def orDoesntHave[T](rel: HasMany[E, T, ?])(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
+    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = true, resolve.scopes))
 
-  def orDoesntHave[T](rel: Relationship[E, T])(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
-    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = true, scoped))
+  def orDoesntHave[T](rel: Relationship[E, T])(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
+    orWhere(buildRelExistsFrag(rel, relMeta, None, negate = true, resolve.scopes))
 
   // --- orWhereHas / orDoesntHave for BelongsToMany ---
 
-  def orWhereHas[T](rel: BelongsToMany[E, T, ?])(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
-    orWhere(buildPivotExistsFrag(rel, None, negate = false, scoped, relMeta))
+  def orWhereHas[T](rel: BelongsToMany[E, T, ?])(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
+    orWhere(buildPivotExistsFrag(rel, None, negate = false, resolve.scopes, relMeta))
 
   def orWhereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(
-      f: SubQuery[T, CT] => WhereFrag
-  )(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
+      f: SubQuery[T, CT, P] => WhereFrag
+  )(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](relMeta, relCols)
-    orWhere(buildPivotExistsFrag(rel, Some((f(sq), relMeta)), negate = false, scoped, relMeta))
+    val sq = new SubQuery[T, CT, P](relMeta, relCols)
+    orWhere(buildPivotExistsFrag(rel, Some((f(sq), relMeta)), negate = false, resolve.scopes, relMeta))
 
-  def orDoesntHave[T](rel: BelongsToMany[E, T, ?])(using relMeta: TableMeta[T], scoped: Scoped[T]): QueryBuilder[HasRoot, E, C] =
-    orWhere(buildPivotExistsFrag(rel, None, negate = true, scoped, relMeta))
+  def orDoesntHave[T](rel: BelongsToMany[E, T, ?])(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
+    orWhere(buildPivotExistsFrag(rel, None, negate = true, resolve.scopes, relMeta))
 
   // --- has with count threshold ---
 
   // HasMany — unconstrained
   def has[T](rel: HasMany[E, T, ?])(f: CountExpr => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, scoped.scopes)
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, resolve.scopes)
     where(f(CountExpr.fromFrag(countFrag)))
 
   // HasMany — constrained
-  def has[T, CT <: Selectable](rel: HasMany[E, T, CT], cond: SubQuery[T, CT] => WhereFrag)(f: CountExpr => WhereFrag)(using
+  def has[T, CT <: Selectable](rel: HasMany[E, T, CT], cond: SubQuery[T, CT, P] => WhereFrag)(f: CountExpr => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, scoped.scopes)
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    val countFrag = ExistsBuilder.buildRelCountFrag(meta, rel, relMeta, resolve.scopes)
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](relMeta, relCols)
+    val sq = new SubQuery[T, CT, P](relMeta, relCols)
     val condFrag = cond(sq)
     val combinedSql = s"${countFrag.sqlString} AND ${condFrag.sqlString}"
     val combinedParams = countFrag.params ++ condFrag.params
@@ -678,19 +678,19 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
   // BelongsToMany — unconstrained
   def has[T](rel: BelongsToMany[E, T, ?])(f: CountExpr => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, scoped.scopes)
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, resolve.scopes)
     where(f(CountExpr.fromFrag(countFrag)))
 
   // BelongsToMany — constrained
-  def has[T, CT <: Selectable](rel: BelongsToMany[E, T, CT], cond: SubQuery[T, CT] => WhereFrag)(f: CountExpr => WhereFrag)(using
+  def has[T, CT <: Selectable](rel: BelongsToMany[E, T, CT], cond: SubQuery[T, CT, P] => WhereFrag)(f: CountExpr => WhereFrag)(using
       relMeta: TableMeta[T],
-      scoped: Scoped[T]
-  ): QueryBuilder[HasRoot, E, C] =
-    val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, scoped.scopes)
+      resolve: ResolveScopes[T, P]
+  ): QueryBuilder[HasRoot, E, C, P] =
+    val countFrag = ExistsBuilder.buildPivotCountFrag(meta, rel, relMeta, resolve.scopes)
     val relCols = new Columns[T](relMeta.columns).asInstanceOf[CT]
-    val sq = new SubQuery[T, CT](relMeta, relCols)
+    val sq = new SubQuery[T, CT, P](relMeta, relCols)
     val condFrag = cond(sq)
     val combinedSql = s"${countFrag.sqlString} AND ${condFrag.sqlString}"
     val combinedParams = countFrag.params ++ condFrag.params
@@ -706,18 +706,18 @@ class QueryBuilder[S <: QBState, E, C <: Selectable] private[parlance] (
       relMeta: TableMeta[T],
       condition: Option[WhereFrag],
       negate: Boolean,
-      scoped: Scoped[T]
+      scopes: Vector[Scope[T]]
   ): WhereFrag =
-    ExistsBuilder.buildRelExistsFrag(meta, rel, relMeta, condition, negate, scoped.scopes)
+    ExistsBuilder.buildRelExistsFrag(meta, rel, relMeta, condition, negate, scopes)
 
   private def buildPivotExistsFrag[T](
       rel: BelongsToMany[E, T, ?],
       conditionWithMeta: Option[(WhereFrag, TableMeta[T])],
       negate: Boolean,
-      scoped: Scoped[T],
+      scopes: Vector[Scope[T]],
       targetMeta: TableMeta[T]
   ): WhereFrag =
-    ExistsBuilder.buildPivotExistsFragScoped(meta, rel, conditionWithMeta, negate, scoped.scopes, targetMeta)
+    ExistsBuilder.buildPivotExistsFragScoped(meta, rel, conditionWithMeta, negate, scopes, targetMeta)
 
   private def buildPivotExistsFrag[T](
       rel: BelongsToMany[E, T, ?],
@@ -1020,11 +1020,11 @@ object QueryBuilder:
     transparent inline def apply[P](inline f: C => P): Any =
       ${ selectImpl[C, P]('this, 'f) }
 
-  private[parlance] def build0[E, C <: Selectable](
+  private[parlance] def build0[E, C <: Selectable, P <: ScopePolicy](
       meta: TableMeta[E],
       codec: DbCodec[E],
       cols: C
-  ): QueryBuilder[HasRoot, E, C] =
+  ): QueryBuilder[HasRoot, E, C, P] =
     new QueryBuilder(meta, codec, cols, None, Vector.empty, None, None)
 
   inline def into[EC, E](using
@@ -1125,7 +1125,7 @@ object QueryBuilder:
           case '[ct] =>
             '{
               val cols = new Columns[E]($meta.columns).asInstanceOf[ct & Selectable]
-              build0[E, ct & Selectable]($meta, $codec, cols)
+              build0[E, ct & Selectable, IgnoreScopes]($meta, $codec, cols)
             }
 
       case _ =>
@@ -1170,7 +1170,7 @@ object QueryBuilder:
           case '[ct] =>
             '{
               val cols = new Columns[E]($meta.columns).asInstanceOf[ct & Selectable]
-              val qb = build0[E, ct & Selectable]($meta, $codec, cols)
+              val qb = build0[E, ct & Selectable, ApplyScopes]($meta, $codec, cols)
               val m = $meta
               val withWheres = $scopes
                 .flatMap(_.conditions(m))
@@ -1359,7 +1359,7 @@ object QueryBuilder:
         report.errorAndAbort("Failed to construct NamedTuple type for select(). This is a bug in parlance.")
 
   class UpdatePhase[E] private[parlance] (
-      private[parlance] val qb: QueryBuilder[?, E, ?]
+      private[parlance] val qb: QueryBuilder[?, E, ?, ?]
   ):
     inline def apply[P](inline assignments: P)(using inline con: DbCon[? <: SupportsMutations]): Int =
       ${ updateImpl[E, P]('this, 'assignments, 'con) }

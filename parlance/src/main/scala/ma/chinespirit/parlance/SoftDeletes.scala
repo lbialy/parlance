@@ -129,11 +129,11 @@ trait SoftDeletes[EC, E, ID](using hasDeletedAt: HasDeletedAt[E]) extends HasSco
   /** Query builder that returns ONLY soft-deleted rows. Uses build0 + manual scope application since transparent inline macros cannot
     * resolve given instances from trait self-types.
     */
-  def onlyTrashed: QueryBuilder[HasRoot, E, Columns[E]] =
+  def onlyTrashed: QueryBuilder[HasRoot, E, Columns[E], ApplyScopes] =
     val meta = self.entityMeta
     val codec = self.entityCodec
     val cols = new Columns[E](meta.columns)
-    val qb = QueryBuilder.build0[E, Columns[E]](meta, codec, cols)
+    val qb = QueryBuilder.build0[E, Columns[E], ApplyScopes](meta, codec, cols)
     val scopes = onlyTrashedScopes
     val withWheres = scopes.flatMap(_.conditions(meta)).foldLeft(qb)(_.where(_))
     scopes.flatMap(_.orderings(meta)).foldLeft(withWheres)(_.orderBy(_))

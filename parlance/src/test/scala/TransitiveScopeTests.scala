@@ -23,8 +23,8 @@ trait TransitiveScopeTestsDefs:
     override def conditions(meta: TableMeta[ElBook]): Vector[WhereFrag] =
       Vector(Frag(s"${meta.tableName}.id <> 4", Seq.empty, FragWriter.empty).unsafeAsWhere)
 
-  given bookScoped: Scoped[ElBook] with
-    def scopes: Vector[Scope[ElBook]] = Vector(excludeIRobotScope)
+  given authorRepo: ImmutableRepo[ElAuthor, Long] = ImmutableRepo[ElAuthor, Long]()
+  given bookRepo: ImmutableRepo[ElBook, Long] = ImmutableRepo[ElBook, Long](Vector(excludeIRobotScope))
 
   // --- Scoped role repo that only includes "admin" roles ---
 
@@ -32,8 +32,8 @@ trait TransitiveScopeTestsDefs:
     override def conditions(meta: TableMeta[PvRole]): Vector[WhereFrag] =
       Vector(Frag(s"${meta.tableName}.name = 'admin'", Seq.empty, FragWriter.empty).unsafeAsWhere)
 
-  given roleScoped: Scoped[PvRole] with
-    def scopes: Vector[Scope[PvRole]] = Vector(adminOnlyScope)
+  given userRepo: ImmutableRepo[PvUser, Long] = ImmutableRepo[PvUser, Long]()
+  given roleRepo: ImmutableRepo[PvRole, Long] = ImmutableRepo[PvRole, Long](Vector(adminOnlyScope))
 
   // --- whereHas: HasMany with transitive scope ---
 
@@ -43,7 +43,7 @@ trait TransitiveScopeTestsDefs:
       // Without scope: Tolkien(2), Asimov(2), Herbert(1) have books -> 3 authors
       // With scope excluding "I, Robot": Asimov now has only "Foundation" -> still 3 authors
       val results =
-        QueryBuilder.from[ElAuthor].whereHas(ElAuthor.books).orderBy(_.name).run()
+        authorRepo.query.whereHas(ElAuthor.books).orderBy(_.name).run()
       assertEquals(results.size, 3)
       assertEquals(results.map(_.name), Vector("Asimov", "Herbert", "Tolkien"))
 
@@ -51,8 +51,7 @@ trait TransitiveScopeTestsDefs:
     val t = xa()
     t.connect:
       // Looking for authors with books titled "I, Robot" — but scope excludes it
-      val results = QueryBuilder
-        .from[ElAuthor]
+      val results = authorRepo.query
         .whereHas(ElAuthor.books)(_.title === "I, Robot")
         .run()
       assertEquals(results.size, 0)
@@ -61,8 +60,7 @@ trait TransitiveScopeTestsDefs:
     val t = xa()
     t.connect:
       // "Foundation" (id=3) is not excluded by scope
-      val results = QueryBuilder
-        .from[ElAuthor]
+      val results = authorRepo.query
         .whereHas(ElAuthor.books)(_.title === "Foundation")
         .run()
       assertEquals(results.size, 1)
@@ -77,7 +75,7 @@ trait TransitiveScopeTestsDefs:
       // With scope excluding "I, Robot": Rowling still has no books -> 1 author
       // (Asimov still has Foundation, so he's not included)
       val results =
-        QueryBuilder.from[ElAuthor].doesntHave(ElAuthor.books).run()
+        authorRepo.query.doesntHave(ElAuthor.books).run()
       assertEquals(results.size, 1)
       assertEquals(results.head.name, "Rowling")
 
@@ -88,8 +86,7 @@ trait TransitiveScopeTestsDefs:
     t.connect:
       // Without scope: Alice(admin+editor), Bob(editor), Dave(admin+editor+viewer) -> 3 users
       // With admin-only scope: Alice(admin), Dave(admin) -> 2 users
-      val results = QueryBuilder
-        .from[PvUser]
+      val results = userRepo.query
         .whereHas(PvUser.roles)
         .orderBy(_.name)
         .run()
@@ -100,8 +97,7 @@ trait TransitiveScopeTestsDefs:
     val t = xa()
     t.connect:
       // With admin-only scope: Bob and Charlie don't have admin role
-      val results = QueryBuilder
-        .from[PvUser]
+      val results = userRepo.query
         .doesntHave(PvUser.roles)
         .orderBy(_.name)
         .run()
@@ -113,8 +109,7 @@ trait TransitiveScopeTestsDefs:
   test("withRelated applies book scope transitively"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[ElAuthor]
+      val results = authorRepo.query
         .orderBy(_.name)
         .withRelated(ElAuthor.books)
         .run()
@@ -132,8 +127,7 @@ trait TransitiveScopeTestsDefs:
   test("withRelated(btm) applies role scope transitively"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[PvUser]
+      val results = userRepo.query
         .orderBy(_.name)
         .withRelated(PvUser.roles)
         .run()
@@ -154,8 +148,7 @@ trait TransitiveScopeTestsDefs:
   test("withCount applies book scope transitively"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[ElAuthor]
+      val results = authorRepo.query
         .orderBy(_.name)
         .withCount(ElAuthor.books)
         .run()
@@ -169,8 +162,7 @@ trait TransitiveScopeTestsDefs:
   test("withCount(btm) applies role scope transitively"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[PvUser]
+      val results = userRepo.query
         .orderBy(_.name)
         .withCount(PvUser.roles)
         .run()
@@ -188,8 +180,7 @@ trait TransitiveScopeTestsDefs:
     t.connect:
       // Asimov has 1 book with scope (Foundation only)
       // asking for authors with >= 2 books: only Tolkien
-      val results = QueryBuilder
-        .from[ElAuthor]
+      val results = authorRepo.query
         .has(ElAuthor.books)(_ >= 2)
         .orderBy(_.name)
         .run()
@@ -201,8 +192,7 @@ trait TransitiveScopeTestsDefs:
   test("join applies book scope transitively"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[ElAuthor]
+      val results = authorRepo.query
         .join(ElAuthor.books)
         .run()
       // Without scope: 5 rows (Tolkien*2, Asimov*2, Herbert*1)
@@ -215,8 +205,7 @@ trait TransitiveScopeTestsDefs:
   test("leftJoin applies book scope transitively"):
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[ElAuthor]
+      val results = authorRepo.query
         .leftJoin(ElAuthor.books)
         .run()
       // 5 rows: Tolkien*2, Asimov*1 (Foundation only), Herbert*1, Rowling*1 (None)
@@ -228,8 +217,7 @@ trait TransitiveScopeTestsDefs:
   // --- SQL verification ---
 
   test("SQL verification: whereHas with scope includes scope condition in EXISTS"):
-    val frag = QueryBuilder
-      .from[ElAuthor]
+    val frag = authorRepo.query
       .whereHas(ElAuthor.books)
       .buildWith(databaseType)
     assert(
@@ -238,8 +226,7 @@ trait TransitiveScopeTestsDefs:
     )
 
   test("SQL verification: withCount with scope includes scope condition"):
-    val frag = QueryBuilder
-      .from[ElAuthor]
+    val frag = authorRepo.query
       .withCount(ElAuthor.books)
       .buildWith(databaseType)
     val sql = frag.sqlString

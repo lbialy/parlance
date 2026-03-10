@@ -158,6 +158,8 @@ trait ViaTestsDefs:
 
   // --- Transitive scope tests for ComposedRelationship ---
 
+  private val postRepo = ImmutableRepo[ViaPost, Long]()
+
   // Scope that excludes author id=2 (Bob) from the intermediate step
   private val excludeBobAuthorScope = new Scope[ViaAuthor]:
     override def conditions(meta: TableMeta[ViaAuthor]): Vector[WhereFrag] =
@@ -166,10 +168,10 @@ trait ViaTestsDefs:
   test("via with intermediate scope excludes intermediates"):
     given Scoped[ViaAuthor] with
       def scopes: Vector[Scope[ViaAuthor]] = Vector(excludeBobAuthorScope)
+    given Scoped[ViaContact] = Scoped.none
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[ViaPost]
+      val results = postRepo.query
         .orderBy(_.id)
         .withRelated(ViaPost.contacts)
         .run()
@@ -192,8 +194,7 @@ trait ViaTestsDefs:
       def scopes: Vector[Scope[ViaContact]] = Vector(activeOnlyScope)
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[ViaPost]
+      val results = postRepo.query
         .orderBy(_.id)
         .withRelated(ViaPost.contacts)
         .run()
@@ -206,12 +207,12 @@ trait ViaTestsDefs:
       assertEquals(results(2)._2.size, 0)
 
   test("via with target scope only (intermediate unscoped)"):
+    given Scoped[ViaAuthor] = Scoped.none
     given Scoped[ViaContact] with
       def scopes: Vector[Scope[ViaContact]] = Vector(activeOnlyScope)
     val t = xa()
     t.connect:
-      val results = QueryBuilder
-        .from[ViaPost]
+      val results = postRepo.query
         .orderBy(_.id)
         .withRelated(ViaPost.contacts)
         .run()
