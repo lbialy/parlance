@@ -1,5 +1,5 @@
 ThisBuild / organization := "ma.chinespirit"
-ThisBuild / version := "2.0.0-M2"
+ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / scalaVersion := "3.8.2"
 ThisBuild / scalacOptions ++= Seq("-deprecation")
