@@ -164,8 +164,17 @@ class EagerQuery[E, R <: Tuple, P <: ScopePolicy] private[parlance] (
       resolve: ResolveScopes[T, P]
   ): EagerQuery[E, Tuple.Append[R, Vector[(T, Pv)]], P] =
     val d =
-      PivotWithDataEagerDef(rootMeta, rel.underlying, targetMeta, targetCodec, pivotMeta, pivotCodec, mergeFilter(None, targetMeta, resolve.scopes))
+      PivotWithDataEagerDef(
+        rootMeta,
+        rel.underlying,
+        targetMeta,
+        targetCodec,
+        pivotMeta,
+        pivotCodec,
+        mergeFilter(None, targetMeta, resolve.scopes)
+      )
     EagerQuery(rootFragBuilder, rootCodec, rootMeta, defs :+ d)
+  end withRelatedAndPivot
 
   def withRelatedAndPivot[T, Pv, CT <: Selectable, PCT <: Selectable](
       rel: PivotRelation[E, T, Pv, CT, PCT],

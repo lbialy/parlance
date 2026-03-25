@@ -636,7 +636,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable, P <: ScopePolicy] private[p
 
   // --- orWhereHas / orDoesntHave for BelongsToMany ---
 
-  def orWhereHas[T](rel: BelongsToMany[E, T, ?])(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
+  def orWhereHas[T](
+      rel: BelongsToMany[E, T, ?]
+  )(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
     orWhere(buildPivotExistsFrag(rel, None, negate = false, resolve.scopes, relMeta))
 
   def orWhereHas[T, CT <: Selectable](rel: BelongsToMany[E, T, CT])(
@@ -646,7 +648,9 @@ class QueryBuilder[S <: QBState, E, C <: Selectable, P <: ScopePolicy] private[p
     val sq = new SubQuery[T, CT, P](relMeta, relCols)
     orWhere(buildPivotExistsFrag(rel, Some((f(sq), relMeta)), negate = false, resolve.scopes, relMeta))
 
-  def orDoesntHave[T](rel: BelongsToMany[E, T, ?])(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
+  def orDoesntHave[T](
+      rel: BelongsToMany[E, T, ?]
+  )(using relMeta: TableMeta[T], resolve: ResolveScopes[T, P]): QueryBuilder[HasRoot, E, C, P] =
     orWhere(buildPivotExistsFrag(rel, None, negate = true, resolve.scopes, relMeta))
 
   // --- has with count threshold ---
