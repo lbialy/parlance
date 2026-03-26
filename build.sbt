@@ -75,6 +75,7 @@ lazy val parlanceMigrate = project
   .dependsOn(parlance)
   .settings(
     name := "parlance-migrate",
+    publish / skip := false,
     Test / fork := true,
     libraryDependencies ++= Seq(
       "org.scalameta" %% "munit" % munitVersion % Test,
@@ -87,7 +88,6 @@ lazy val parlanceExamples = project
   .dependsOn(parlance, parlancePg, parlanceMigrate)
   .settings(
     name := "parlance-examples",
-    publish / skip := true,
     Test / fork := true,
     libraryDependencies ++= Seq(
       "org.scalameta" %% "munit" % munitVersion % Test,
@@ -101,6 +101,7 @@ lazy val parlancePg = project
   .in(file("parlance-pg"))
   .dependsOn(parlance)
   .settings(
+    name := "parlance-pg",
     Test / fork := true,
     publish / skip := false,
     libraryDependencies ++= Seq(
