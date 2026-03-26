@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: ["master"]
+    branches: [master]
+    tags: ["v*"]
   pull_request:
-    branches: ["master"]
+    branches: [master]
 
 permissions:
   contents: read
@@ -15,9 +16,36 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: olafurpg/setup-scala@v14
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
-          java-version: 17
-      - name: run tests
+          distribution: temurin
+          java-version: 11
+          cache: sbt
+      - uses: sbt/setup-sbt@13c2c27693f0ec4a33b1ebefd04c53c4c0ba618a # v1
+      - name: Run tests
         run: sbt 'clean; scalafmtCheckAll; test'
+
+  publish:
+    needs: [ci]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: 11
+          cache: sbt
+      - uses: sbt/setup-sbt@13c2c27693f0ec4a33b1ebefd04c53c4c0ba618a # v1
+      - name: Publish
+        run: sbt ci-release
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}

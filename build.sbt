@@ -1,5 +1,4 @@
 ThisBuild / organization := "ma.chinespirit"
-ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / scalaVersion := "3.8.2"
 ThisBuild / scalacOptions ++= Seq("-deprecation")
@@ -25,15 +24,6 @@ ThisBuild / developers := List(
     url = url("https://chinespirit.ma")
   )
 )
-ThisBuild / publishMavenStyle := true
-ThisBuild / pomIncludeRepository := { _ => false }
-ThisBuild / publishTo := {
-  val nexus = "https://oss.sonatype.org/"
-  if (isSnapshot.value)
-    Some("snapshots" at nexus + "content/repositories/snapshots")
-  else
-    Some("releases" at nexus + "service/local/staging/deploy/maven2")
-}
 ThisBuild / publish / skip := true
 ThisBuild / coverageExcludedPackages := ""
 ThisBuild / coverageFailOnMinimum := false
