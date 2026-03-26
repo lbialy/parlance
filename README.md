@@ -1,6 +1,10 @@
-# Parlance
+<p align="center">
+  <img src="logo.png" alt="Parlance logo" />
+</p>
 
-High-velocity, opinionated functional ORM inspired by Active Record patterns, laser-focused on productivity.
+<h1 align="center">Parlance</h1>
+
+**High-velocity, opinionated functional ORM inspired by Active Record patterns, laser-focused on productivity.**
 
 No dependencies beyond JDBC drivers. Scala 3 only.
 
